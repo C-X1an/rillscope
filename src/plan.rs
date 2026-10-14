@@ -76,4 +76,29 @@ pub(crate) struct BoundPlan {
     pub context: Arc<Context>,
     pub sources: BTreeMap<u32, usize>,
     pub trace: Vec<&'static str>,
+    trusted_catalog: Arc<Catalog>,
+    trusted_context: Arc<Context>,
+}
+impl BoundPlan {
+    pub fn new(
+        root: Node,
+        catalog: Arc<Catalog>,
+        context: Arc<Context>,
+        sources: BTreeMap<u32, usize>,
+        trace: Vec<&'static str>,
+    ) -> Self {
+        Self {
+            root,
+            trusted_catalog: catalog.clone(),
+            trusted_context: context.clone(),
+            catalog,
+            context,
+            sources,
+            trace,
+        }
+    }
+    pub fn binding_identity_matches(&self) -> bool {
+        Arc::ptr_eq(&self.catalog, &self.trusted_catalog)
+            && Arc::ptr_eq(&self.context, &self.trusted_context)
+    }
 }

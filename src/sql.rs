@@ -423,7 +423,7 @@ impl Parser {
             let (right, right_alias) = self.table()?;
             self.expect_word("on")?;
             let on = join_keys(&self.expression(0, 1)?, &left_alias, &right_alias)?;
-            input = Plan::Join {
+            input = Plan::SqlJoin {
                 left: Box::new(input),
                 right: Box::new(right),
                 on,
@@ -432,7 +432,7 @@ impl Parser {
             let (right, right_alias) = self.table()?;
             self.expect_word("on")?;
             let on = join_keys(&self.expression(0, 1)?, &left_alias, &right_alias)?;
-            input = Plan::Join {
+            input = Plan::SqlJoin {
                 left: Box::new(input),
                 right: Box::new(right),
                 on,
@@ -685,15 +685,8 @@ fn join_keys(expr: &Scalar, left: &str, right: &str) -> Result<Vec<(Expr, Expr)>
                 let (Expr::Col(an), Expr::Col(bn)) = (&a, &b) else {
                     return Err(E::Unsupported.into());
                 };
-                let (aq, _) = an.split_once('.').ok_or(E::Bind)?;
-                let (bq, _) = bn.split_once('.').ok_or(E::Bind)?;
-                if aq == left && bq == right {
-                    out.push((a, b));
-                } else if aq == right && bq == left {
-                    out.push((b, a));
-                } else {
-                    return Err(E::Bind.into());
-                }
+                let _ = (an, bn, left, right);
+                out.push((a, b));
             }
             _ => return Err(E::Unsupported.into()),
         }

@@ -12,10 +12,12 @@ ROOT = Path(__file__).resolve().parents[1]
 CONTROLS = [
     ('tenant_barrier', 'src/operators/stream.rs', 'if data.text_matches(row, grant.tenant_column, &context.tenant)? {', 'if true {', 'execute::tests::duplicate_join_and_scalar_aggregate_are_exact'),
     ('forbidden_reference', 'src/bind.rs', 'Expr::Col(name) => {', 'Expr::Col(name) => {\n                if self.hidden.contains(name) { return Ok(TypedExpr { kind: ExprKind::Literal(Value::I64(0)), data_type: DataType::I64, nullable: false }); }', 'verify::tests::denied_filter_is_bound_before_execution'),
-    ('forged_provenance', 'src/verify.rs', 'if schema.len() > 64 || schema != node.schema {', 'if schema.len() > 64 {', 'verify::tests::reject_forged_provenance_grant_source_and_snapshot'),
+    ('forged_provenance', 'src/verify.rs', 'if schema.len() > 256 || schema != node.schema {', 'if schema.len() > 256 {', 'verify::tests::reject_forged_provenance_grant_source_and_snapshot'),
     ('work_cap', 'src/budget.rs', 'if next > self.limits.max_work {', 'if false {', 'budget::tests::charge_never_exceeds_limit_and_cancel_precedes_allocation'),
     ('expression_temporaries', 'src/operators/stream.rs', 'pub(crate) fn expr_temporary_bytes(expr: &TypedExpr, row: &[Value]) -> Result<usize> {', 'pub(crate) fn expr_temporary_bytes(expr: &TypedExpr, row: &[Value]) -> Result<usize> {\n    if matches!(expr.kind, crate::types::ExprKind::Binary(..)) { return Ok(std::mem::size_of::<Value>()); }', 'execute::tests::expression_string_temporaries_reserve_before_allocation'),
     ('sort_reorder_checkpoint', 'src/operators/stream.rs', 'budget.observe("sort_reorder_output")?;\n            budget.charge(1)?;', '/* Intentionally removed reorder cancellation/work checkpoint. */', 'operators::stream::review_tests::reorder_observes_mid_loop_cancellation_and_work_limit'),
+    ('binding_identity_anchor', 'src/verify.rs', '!plan.binding_identity_matches()', 'false', 'verify::tests::reject_context_and_snapshot_substitution_before_verification'),
+    ('retained_schema_reservation', 'src/execute.rs', 'let schema_reservation = budget.reserve(schema_bytes(plan.root())?)?;', 'let schema_reservation = budget.reserve(0)?;', 'execute::tests::empty_result_schema_is_reserved_and_retained'),
 ]
 
 def run(command, cwd, out, env):
@@ -65,7 +67,7 @@ def main():
             reports.append(report)
             print(json.dumps({'control': control, 'sequence': [baseline.returncode, mutant.returncode, restored.returncode], 'status': report['status']}), flush=True)
     summary = {'source_commit': commit, 'controls': reports, 'status': 'PASS' if all(r['status'] == 'PASS' for r in reports) else 'FAIL',
-               'scope': 'six selected Rust controls; no broad mutation-coverage percentage is claimed'}
+               'scope': 'eight selected Rust controls; no broad mutation-coverage percentage is claimed'}
     (args.out / 'summary.json').write_text(json.dumps(summary, indent=2) + '\n')
     return int(summary['status'] != 'PASS')
 

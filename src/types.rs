@@ -383,7 +383,9 @@ pub struct Batch {
 }
 impl Batch {
     pub fn from_rows(fields: Vec<Field>, rows: &[Row]) -> Result<Self> {
-        if fields.len() > 64 || rows.iter().any(|r| r.len() != fields.len()) {
+        // Internal joins/group lowering can carry four bounded scan schemas.
+        // The binder and verifier separately enforce the public 64-column result cap.
+        if fields.len() > 256 || rows.iter().any(|r| r.len() != fields.len()) {
             return Err(E::Plan.into());
         }
         let mut columns = Vec::new();

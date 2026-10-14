@@ -305,14 +305,17 @@ impl Checker<'_> {
                 self.node(input, depth + 1)?
             }
         };
-        if schema.len() > 64 || schema != node.schema {
+        if schema.len() > 256 || schema != node.schema {
             return Err(E::Plan.into());
         }
         Ok(schema)
     }
 }
 pub(crate) fn verify(plan: BoundPlan) -> Result<VerifiedPlan> {
-    if !Arc::ptr_eq(&plan.catalog, &plan.context.catalog) {
+    if !plan.binding_identity_matches()
+        || !Arc::ptr_eq(&plan.catalog, &plan.context.catalog)
+        || plan.root.schema.len() > 64
+    {
         return Err(E::Plan.into());
     }
     let mut checker = Checker {
@@ -379,6 +382,20 @@ mod tests {
                 .map_err(|e| e.code),
             Err(E::Plan)
         );
+        Ok(())
+    }
+
+    #[test]
+    fn reject_context_and_snapshot_substitution_before_verification() -> Result<()> {
+        let mut plan = fixture()?;
+        let beta = Context::from_bytes(plan.catalog.clone(), br#"{"version":1,"tenant":"beta","policy_revision":"r2","tables":{"sales":{"tenant_column":"tenant","columns":["id","amount"]}}}"#)?;
+        plan.context = beta;
+        assert_eq!(verify(plan).err().map(|e| e.code), Some(E::Plan));
+        let mut plan = fixture()?;
+        let other = fixture()?;
+        plan.catalog = other.catalog;
+        plan.context = other.context;
+        assert_eq!(verify(plan).err().map(|e| e.code), Some(E::Plan));
         Ok(())
     }
     #[test]

@@ -22,6 +22,8 @@ pub struct QueryResult {
     #[serde(skip)]
     _reservation: Rows,
     #[serde(skip)]
+    _schema_reservation: Reservation,
+    #[serde(skip)]
     output_limit: usize,
     #[serde(skip)]
     execution_elapsed_ns: u128,
@@ -119,6 +121,32 @@ fn nodes(node: &Node) -> usize {
         | NodeKind::Limit { input, .. } => nodes(input),
     }
 }
+fn schema_bytes(node: &Node) -> Result<usize> {
+    node.schema.iter().try_fold(
+        std::mem::size_of::<Vec<Field>>(),
+        |sum, field| -> Result<usize> {
+            sum.checked_add(std::mem::size_of::<Field>())
+                .and_then(|n| n.checked_add(field.field.name.len()))
+                .ok_or(E::Budget.into())
+        },
+    )
+}
+fn execution_schema_bytes(node: &Node) -> Result<usize> {
+    let children = match &node.kind {
+        NodeKind::PolicyScan { .. } => 0,
+        NodeKind::Join { left, right, .. } => execution_schema_bytes(left)?
+            .checked_add(execution_schema_bytes(right)?)
+            .ok_or(E::Budget)?,
+        NodeKind::Filter { input, .. }
+        | NodeKind::Project { input, .. }
+        | NodeKind::Aggregate { input, .. }
+        | NodeKind::Sort { input, .. }
+        | NodeKind::Limit { input, .. } => execution_schema_bytes(input)?,
+    };
+    schema_bytes(node)?
+        .checked_add(children)
+        .ok_or(E::Budget.into())
+}
 pub fn execute(plan: &VerifiedPlan, budget: &mut Budget) -> Result<QueryResult> {
     execute_in(plan, plan.catalog(), plan.context(), budget)
 }
@@ -131,7 +159,13 @@ pub fn execute_in(
     plan.check_identity(catalog, context)?;
     budget.checkpoint()?;
     let started = Instant::now();
-    let _operator_state = budget.reserve(nodes(plan.root()).checked_mul(512).ok_or(E::Budget)?)?;
+    let _operator_state = budget.reserve(
+        nodes(plan.root())
+            .checked_mul(512)
+            .and_then(|n| n.checked_add(execution_schema_bytes(plan.root()).ok()?))
+            .ok_or(E::Budget)?,
+    )?;
+    let schema_reservation = budget.reserve(schema_bytes(plan.root())?)?;
     let mut input = Stream::build(plan.root(), catalog, context, budget)?;
     let mut rows = Rows::new(budget)?;
     while let Some(frame) = input.next(budget)? {
@@ -155,6 +189,7 @@ pub fn execute_in(
         metrics: budget.metrics(),
         implementation: "rust",
         _reservation: rows,
+        _schema_reservation: schema_reservation,
         output_limit: budget.limits().max_output_bytes,
         execution_elapsed_ns,
     };
@@ -343,6 +378,42 @@ mod tests {
         );
         assert!(reached.load(std::sync::atomic::Ordering::Acquire));
         assert!(budget.consumed_work() <= 3000);
+        assert_eq!(budget.reserved_bytes(), 0);
+        Ok(())
+    }
+
+    #[test]
+    fn empty_result_schema_is_reserved_and_retained() -> Result<()> {
+        let mut columns = vec![serde_json::json!({"name":"tenant","type":"text","nullable":false})];
+        let mut names = Vec::new();
+        for i in 0..63 {
+            let name = format!("c{i}");
+            names.push(name.clone());
+            columns.push(serde_json::json!({"name":name,"type":"i64","nullable":false}));
+        }
+        let catalog = Catalog::from_bytes(&serde_json::to_vec(&serde_json::json!({"version":1,"snapshot":"empty-schema","tables":{"t":{"columns":columns,"rows":[]}}})).map_err(|_| E::Internal)?)?;
+        let context = Context::from_bytes(catalog.clone(), &serde_json::to_vec(&serde_json::json!({"version":1,"tenant":"alpha","policy_revision":"r1","tables":{"t":{"tenant_column":"tenant","columns":names}}})).map_err(|_| E::Internal)?)?;
+        let query =
+            Query::from_json(br#"{"version":1,"plan":{"op":"scan","table":"t","alias":"a"}}"#)?;
+        let plan = crate::compile(&query, catalog, context)?;
+        let mut small = Budget::new(
+            Limits {
+                max_reserved_bytes: 512,
+                ..Limits::default()
+            },
+            Arc::new(AtomicBool::new(false)),
+            None,
+        )?;
+        assert_eq!(
+            execute(&plan, &mut small).err().map(|e| e.code),
+            Some(E::Budget)
+        );
+        assert_eq!(small.reserved_bytes(), 0);
+        let mut budget = Budget::new(Limits::default(), Arc::new(AtomicBool::new(false)), None)?;
+        let result = execute(&plan, &mut budget)?;
+        assert_eq!(result.schema().len(), 63);
+        assert!(budget.reserved_bytes() >= 63 * std::mem::size_of::<crate::types::Field>());
+        drop(result);
         assert_eq!(budget.reserved_bytes(), 0);
         Ok(())
     }

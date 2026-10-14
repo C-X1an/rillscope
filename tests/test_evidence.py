@@ -57,6 +57,41 @@ class EvidenceTests(unittest.TestCase):
             (root / 'stdout.txt').write_bytes(b'edited to PASS')
             self.assertFalse(evidence.verify_receipt(path))
 
+    def test_external_stdin_and_file_inputs_have_actual_hashes(self):
+        evidence = module('evidence')
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            external = root / 'catalog.json'; external.write_bytes(b'synthetic operator bytes')
+            digests = []
+            for i, data in enumerate((b'a', b'b')):
+                source = root / ('query-' + str(i) + '.sql'); source.write_bytes(data)
+                out = root / ('run-' + str(i))
+                command = [sys.executable, str(ROOT / 'scripts/evidence.py'), '--out', str(out),
+                           '--input', str(external), '--stdin', str(source), '--', sys.executable,
+                           '-c', 'import sys; print(len(sys.stdin.buffer.read()))', '--query', '-']
+                result = subprocess.run(command, capture_output=True, timeout=15)
+                self.assertEqual(result.returncode, 0)
+                receipt = json.loads((out / 'receipt.json').read_text())
+                self.assertEqual(receipt['verification_status'], 'PASS')
+                self.assertEqual(receipt['stdin']['sha256'], evidence.digest(data))
+                self.assertEqual({row['sha256'] for row in receipt['inputs_before']}, {evidence.digest(data), evidence.digest(external.read_bytes())})
+                self.assertEqual(receipt['inputs_before'], receipt['inputs_after'])
+                digests.append(receipt['stdin']['sha256'])
+            self.assertNotEqual(*digests)
+
+    def test_external_input_mutation_prevents_verification_pass(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder); source = root / 'input.txt'; source.write_text('before')
+            out = root / 'run'
+            code = 'from pathlib import Path; import sys; Path(sys.argv[1]).write_text("after")'
+            result = subprocess.run([sys.executable, str(ROOT / 'scripts/evidence.py'), '--out', str(out),
+                                     '--input', str(source), '--', sys.executable, '-c', code, str(source)], capture_output=True, timeout=15)
+            self.assertEqual(result.returncode, 0)
+            receipt = json.loads((out / 'receipt.json').read_text())
+            self.assertEqual(receipt['execution_outcome'], 'INPUT_CHANGED')
+            self.assertEqual(receipt['verification_status'], 'FAIL')
+            self.assertNotEqual(receipt['inputs_before'], receipt['inputs_after'])
+
     def test_html_escape(self):
         demo = module('demo_reference')
         text = demo.render([('<script>alert(1)</script>', {'rows': [['<img src=x onerror=alert(1)>']], 'implementation': 'python-reference'})])

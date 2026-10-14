@@ -119,12 +119,17 @@ class ProductTests(unittest.TestCase):
         self.assertEqual(value['rows'], [[1, 1000]])
 
     def test_ac011_forbidden_column_in_all_six_contexts(self):
-        self.denied(project(scan(), [('salary', column('s.salary'))]))
-        self.denied(filtered(scan(), binary('gt', column('s.salary'), literal(0))))
-        self.denied({'op': 'join', 'left': scan(), 'right': scan('lookup', 'l'), 'on': [{'left': column('s.salary'), 'right': column('l.key')}]})
-        self.denied({'op': 'aggregate', 'input': scan(), 'keys': [{'name': 'k', 'expr': column('s.salary')}], 'aggregates': []})
-        self.denied({'op': 'aggregate', 'input': scan(), 'keys': [], 'aggregates': [{'name': 'v', 'kind': 'sum', 'expr': column('s.salary')}]})
-        self.denied(ordered(scan(), ['s.salary']))
+        counter = Path(self.temp.name) / 'denial-matrix-scan-counter.txt'
+        self.client.env['RILLSCOPE_TEST_SCAN_COUNTER_FILE'] = str(counter)
+        queries = [project(scan(), [('salary', column('s.salary'))]),
+                   filtered(scan(), binary('gt', column('s.salary'), literal(0))),
+                   {'op': 'join', 'left': scan(), 'right': scan('lookup', 'l'), 'on': [{'left': column('s.salary'), 'right': column('l.key')}]},
+                   {'op': 'aggregate', 'input': scan(), 'keys': [{'name': 'k', 'expr': column('s.salary')}], 'aggregates': []},
+                   {'op': 'aggregate', 'input': scan(), 'keys': [], 'aggregates': [{'name': 'v', 'kind': 'sum', 'expr': column('s.salary')}]},
+                   ordered(scan(), ['s.salary'])]
+        for query in queries:
+            self.denied(query)
+            self.assertEqual(counter.read_text().strip(), '0')
 
     def test_ac013_sql_has_no_effectful_constructs(self):
         for sql in ["COPY sales TO 'canary'", "ATTACH 'canary'", 'CREATE TABLE canary(id int)', 'UPDATE sales SET id=9',

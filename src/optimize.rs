@@ -143,6 +143,7 @@ fn rewrite(
     if !predicate.total() {
         return Ok(());
     }
+    let mut changed = false;
     match &input.kind {
         NodeKind::Project {
             input: base,
@@ -176,6 +177,7 @@ fn rewrite(
                 columns: columns.clone(),
             };
             trace.push("push_pure_filter_project");
+            changed = true;
         }
         NodeKind::Join { left, right, on } => {
             if depth + 1 + expr_depth(predicate) > 32 {
@@ -198,6 +200,7 @@ fn rewrite(
                     on: on.clone(),
                 };
                 trace.push("push_pure_filter_join_left");
+                changed = true;
             } else if columns.iter().all(|i| *i >= split) {
                 let map = columns.iter().map(|i| (*i, *i - split)).collect();
                 let filtered = Node {
@@ -213,9 +216,13 @@ fn rewrite(
                     on: on.clone(),
                 };
                 trace.push("push_pure_filter_join_right");
+                changed = true;
             }
         }
         _ => {}
+    }
+    if changed {
+        rewrite(node, trace, nodes, depth)?;
     }
     Ok(())
 }
@@ -456,8 +463,7 @@ pub(crate) fn optimize(mut plan: BoundPlan, enabled: bool) -> Result<BoundPlan> 
         }
     }
     if !converged {
-        // A bounded pass count limits optimization effort, not accepted query semantics.
-        plan.trace.push("optimization_pass_limit");
+        return Err(E::Plan.into());
     }
     let required = (0..plan.root.schema.len()).collect();
     let (root, _) = prune(&plan.root, &required)?;

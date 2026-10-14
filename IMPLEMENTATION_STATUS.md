@@ -11,12 +11,12 @@ RillScope is an experimental original Rust restricted-query compiler and executo
 | Opaque VerifiedPlan and independent traversal | Implemented; schema/types/provenance/grants/source identities recomputed; known-bad unit plans rejected |
 | Original pull-based batch engine | Implemented scan/filter/project, duplicate-preserving hash join, nullable aggregation, stable bounded sort, limit |
 | Work, logical reservations, cancellation and collector | Implemented; finite charges, RAII release, typed failures and complete result publication |
-| Optimizer | Implemented projection pruning and pure filter pushdown, with no push beneath PolicyScan; predicts expression growth before cloning; stops after 16 passes while preserving a valid plan |
-| Local source checks | PASS at recorded revisions: Rust 1.99 GNU Windows build/fmt/Clippy/check; 32 Rust unit tests; 26 real CLI/system tests |
+| Optimizer | Implemented projection pruning and pure filter pushdown, with no push beneath PolicyScan; predicts growth before cloning; bounded traversal and 16-pass convergence, with E_PLAN for nonconvergence |
+| Local source checks | PASS at recorded revisions: Rust 1.99 GNU Windows build/fmt/Clippy/check; 34 Rust unit tests; 28 real CLI/system tests |
 | Generated semantic / malformed corpus | PASS at recorded revisions: 1,000 cases comparing both JSON and SQL, optimizer on/off, with scoped SQLite; 2,000 finite malformed inputs (1,000 JSON + 1,000 SQL); raw verdicts preserved |
 | Actual process failure | PASS: CLI killed after a real join checkpoint; catalog raw SHA-256 unchanged; independent rerun succeeded |
 | Linux | Cross-target static check PASS; actual Linux runtime and signal latency NOT RUN |
-| Selected Rust mutations | Four actual PASS-FAIL-PASS controls at the earlier committed candidate; expanded six-control current rerun pending |
+| Selected Rust mutations | Six actual PASS-FAIL-PASS controls at the earlier fixed candidate; expanded eight-control latest rerun pending |
 | Rust demo, adapter and browser review | NOT RUN / pending |
 | Rust benchmarks and reference-host targets | NOT YET MEASURED |
 | Independent review | Two separate source inspections identified defects; integrator reproduced failures and fixed/retested them. Reviewers executed no commands; follow-up review/full clean execution remains pending |

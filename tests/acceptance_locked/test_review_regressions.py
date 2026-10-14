@@ -68,4 +68,21 @@ class ReviewRegressions(unittest.TestCase):
             self.assertEqual(code, 2)
             self.assertEqual(result['error']['code'], 'E_UNSUPPORTED')
 
+    def test_unqualified_join_keys_resolve_in_combined_scope(self):
+        for on in ('id = key', 'key = id', 's.id = key', 'key = s.id'):
+            code, result = self.client.call('SELECT s.id AS id FROM sales s INNER JOIN lookup l ON ' + on, format='sql')
+            self.assertEqual(code, 0)
+            self.assertEqual(result['rows'], [[1], [1], [1], [1]])
+        code, result = self.client.call('SELECT s.id AS id FROM sales s JOIN sales t ON id = t.id', format='sql')
+        self.assertEqual(code, 2)
+        self.assertEqual(result['error']['code'], 'E_BIND')
+
+    def test_sixty_four_grouped_selected_fields_are_supported(self):
+        source = 'SELECT ' + ', '.join('COUNT(*) AS n' + str(i) for i in range(64)) + ' FROM sales GROUP BY id ORDER BY n0'
+        for mode in (False, True):
+            code, result = self.client.call(source, format='sql', optimize=mode)
+            self.assertEqual(code, 0)
+            self.assertEqual(len(result['schema']), 64)
+            self.assertEqual(result['rows'], [[1] * 64, [2] * 64])
+
 if __name__ == '__main__': unittest.main()

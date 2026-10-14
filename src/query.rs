@@ -54,6 +54,11 @@ pub(crate) enum Plan {
         right: Box<Plan>,
         on: Vec<(Expr, Expr)>,
     },
+    SqlJoin {
+        left: Box<Plan>,
+        right: Box<Plan>,
+        on: Vec<(Expr, Expr)>,
+    },
     Aggregate {
         input: Box<Plan>,
         keys: Vec<Named>,
@@ -380,7 +385,7 @@ impl Query {
                         expression(&c.expr, gate, depth + 1)?;
                     }
                 }
-                Plan::Join { left, right, on } => {
+                Plan::Join { left, right, on } | Plan::SqlJoin { left, right, on } => {
                     visit(left, gate, depth + 1)?;
                     visit(right, gate, depth + 1)?;
                     for (a, b) in on {

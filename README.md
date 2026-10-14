@@ -16,7 +16,7 @@
 
 A client should be able to ask a useful question without deciding which tenant data it may read. RillScope explores that boundary inside a small relational compiler: the host fixes authority, the query supplies intent, and the plan must preserve both semantics and scope.
 
-> **Status:** The original Rust JSON/SQL compiler, binder, policy verifier, optimizer and batch executor are implemented. Recorded Windows checks include 32 Rust unit tests, 26 real CLI tests, 1,000 scoped SQLite cases comparing JSON/SQL and optimization modes, and 2,000 malformed inputs. Independent source inspections found defects that were reproduced, fixed and retested. Rust benchmarks/demo, follow-up release review, complete fresh-checkout validation and remote CI remain pending. This is an experimental development build; full release readiness is not established. Read [implementation status](IMPLEMENTATION_STATUS.md) for evidence limits.
+> **Status:** The original Rust JSON/SQL compiler, binder, policy verifier, optimizer and batch executor are implemented. Recorded Windows checks include 34 Rust unit tests, 28 real CLI tests, 1,000 scoped SQLite cases comparing JSON/SQL and optimization modes, and 2,000 malformed inputs. Independent source inspections found defects that were reproduced, fixed and retested. Rust benchmarks/demo, final release review, complete fresh-checkout validation and remote CI remain pending. This is an experimental development build; full release readiness is not established. Read [implementation status](IMPLEMENTATION_STATUS.md) for evidence limits.
 
 ## The experiment
 

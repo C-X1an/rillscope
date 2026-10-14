@@ -221,24 +221,37 @@ impl Binder {
                     schema,
                 )
             }
-            Plan::Join { left, right, on } => {
+            Plan::Join { left, right, on } | Plan::SqlJoin { left, right, on } => {
+                let sql = matches!(plan, Plan::SqlJoin { .. });
                 let left = self.node(left)?;
                 let right = self.node(right)?;
+                let split = left.schema.len();
+                let mut schema = left.schema.clone();
+                schema.extend(right.schema.clone());
                 let mut pairs = Vec::new();
                 for (a, b) in on {
-                    let a = self.expr(a, &left.schema)?;
-                    let b = self.expr(b, &right.schema)?;
+                    let a = self.expr(a, if sql { &schema } else { &left.schema })?;
+                    let b = self.expr(b, if sql { &schema } else { &right.schema })?;
                     if a.data_type != b.data_type {
                         return Err(E::Type.into());
                     }
                     match (a.kind, b.kind) {
-                        (ExprKind::Column(a), ExprKind::Column(b)) => pairs.push((a, b)),
+                        (ExprKind::Column(a), ExprKind::Column(b)) => {
+                            let pair = if !sql {
+                                (a, b)
+                            } else if a < split && b >= split {
+                                (a, b - split)
+                            } else if b < split && a >= split {
+                                (b, a - split)
+                            } else {
+                                return Err(E::Bind.into());
+                            };
+                            pairs.push(pair);
+                        }
                         _ => return Err(E::Unsupported.into()),
                     }
                 }
-                let mut schema = left.schema.clone();
-                schema.extend(right.schema.clone());
-                if schema.len() > 64 {
+                if schema.len() > 256 {
                     return Err(E::Limit.into());
                 }
                 (
@@ -373,11 +386,14 @@ pub(crate) fn bind(
         binder.sources.clear();
     }
     let root = binder.node(&query.plan)?;
-    Ok(BoundPlan {
+    if root.schema.len() > 64 {
+        return Err(E::Limit.into());
+    }
+    Ok(BoundPlan::new(
         root,
         catalog,
         context,
-        sources: binder.sources,
-        trace: vec!["bind_all_references", "lower_policy_scans"],
-    })
+        binder.sources,
+        vec!["bind_all_references", "lower_policy_scans"],
+    ))
 }
