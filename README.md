@@ -8,7 +8,7 @@
 
 [Start](#run-the-reference) · [Architecture](ARCHITECTURE.md) · [Contracts](ACCEPTANCE_SPEC.md) · [Evidence](VERIFICATION_REPORT.md) · [Limits](LIMITATIONS.md)
 
-**Development seed · MIT · No model API required**
+**Experimental Rust engine · MIT · No model API required**
 
 </div>
 
@@ -16,7 +16,7 @@
 
 A client should be able to ask a useful question without deciding which tenant data it may read. RillScope explores that boundary inside a small relational compiler: the host fixes authority, the query supplies intent, and the plan must preserve both semantics and scope.
 
-> **Status:** The Python semantic reference and its tests are executable. The Rust kernel source is prepared but was not compiled in the authoring environment. The full Rust parser, binder, optimizer, general executor and independent plan verifier are **not finished**. Read [implementation status](IMPLEMENTATION_STATUS.md) before interpreting the architecture as delivered functionality.
+> **Status:** The original Rust JSON/SQL compiler, binder, policy verifier, optimizer and batch executor are implemented. Current recorded Windows checks include 29 Rust unit tests, 19 real CLI tests, 1,000 seeded SQLite comparisons with optimization on/off, and 1,000 malformed inputs. Independent review, measured Rust benchmarks/demo, complete clean-checkout release validation and remote CI remain pending. This is an experimental development build; full release readiness is not established. Read [implementation status](IMPLEMENTATION_STATUS.md) for scope and evidence limits.
 
 ## The experiment
 
@@ -24,7 +24,18 @@ A client should be able to ask a useful question without deciding which tenant d
 |:--|:--|:--|
 | A closed query language with explicit types, nullable values and duplicate-preserving rows. | Host-derived policy scans, all-position column checks and bounded execution. | Independent oracle comparisons, targeted negative controls and source-identified command receipts. |
 
-This is **not a DuckDB wrapper**, a production database or a claim of faster query execution. The planned Rust engine owns binding, rewrites and operators. SQLite is a separate test oracle over physically authorized tables.
+The Rust engine owns binding, rewrites and operators. SQLite is a separate test oracle over physically authorized tables. No production use or performance advantage is claimed.
+
+## Run the Rust engine
+
+```sh
+make bootstrap build
+target/debug/rillscope run --catalog examples/catalog.json --context examples/context.json --query examples/query.json
+target/debug/rillscope explain --catalog examples/catalog.json --context examples/context.json --query examples/query.json
+make integration property fuzz
+```
+
+The actual Rust example returns three orders and total 40. Use `examples/forbidden.json` for a typed denial. SQL input uses `--format sql`; stdin uses `--query -`; `--optimize off` disables rewrites. Catalog/context paths and synthetic [test hooks](TEST_HOOKS.md) are trusted host controls. An untrusted client receives only the restricted query interface.
 
 ## Run the reference
 
@@ -53,7 +64,7 @@ The recorded [reference report](docs/demo/reference-report.html) and [desktop ca
 
 ## From query to result
 
-**Target Rust architecture** — not all boxes are implemented yet:
+The implemented Rust pipeline is:
 
 ```mermaid
 flowchart LR
@@ -68,7 +79,9 @@ flowchart LR
 
 | Area | Inspect |
 |:--|:--|
-| Nullable Rust columns, checked arithmetic and scoped scan seed | [`src/lib.rs`](src/lib.rs) |
+| Compiler entry point and opaque verified execution | [`src/lib.rs`](src/lib.rs), [`src/verify.rs`](src/verify.rs), [`src/execute.rs`](src/execute.rs) |
+| Owned nullable columns and original operators | [`src/types.rs`](src/types.rs), [`src/operators/`](src/operators/) |
+| Actual Rust CLI / SQLite and malformed-input checks | [`tests/acceptance_locked/`](tests/acceptance_locked/), [`tests/property/`](tests/property/), [`tests/security/`](tests/security/) |
 | Executable semantic reference | [`tools/reference/engine.py`](tools/reference/engine.py) |
 | SQL-like NULL, duplicate, tenant, binding and SQLite comparisons | [`tests/test_reference.py`](tests/test_reference.py) |
 | Deliberately broken tenant/NULL/join controls | [`scripts/mutation_reference.py`](scripts/mutation_reference.py) |

@@ -1,6 +1,6 @@
 # Verification report
 
-Recorded: 2026-10-14. **This is a verified semantic-reference handoff with an uncompiled Rust seed, not a completed Rust engine.** No cloud deployment, remote GitHub workflow or production use is claimed.
+Historical reference handoff recorded 2026-10-14. The entries below describe the original reference-only authoring environment. Current Rust progress is recorded in IMPLEMENTATION_STATUS.md; independent release readiness and remote CI remain pending. No production use is claimed.
 
 ## Source identity
 
@@ -56,3 +56,4 @@ No weakened tests, silently skipped gates or fabricated performance numbers are 
 ## Clean committed checkout
 
 [Run release-clean-clone](verification/public/release-clean-clone/receipt.json) cloned clean commit `bc25b82a86d147f572b240c37006c82c363960fb` with `git clone --no-local` into a fresh temporary directory and ran `make verify-reference`. The result was PASS for the same 32 tests, contract hashes and Python syntax/whitespace checks. No dependencies were supplied from the original working tree. It used the same operating-system image and Python installation, so this is clean-checkout reproduction, **not an independent-machine or isolated-VM proof**. Rust verification remained false.
+

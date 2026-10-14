@@ -25,8 +25,9 @@ def source_identity(root: Path = ROOT) -> dict:
     for path in sorted(root.rglob('*')):
         rel = path.relative_to(root)
         if any(x in EXCLUDED for x in rel.parts) or not path.is_file(): continue
-        if path.suffix in ('.py', '.rs', '.toml', '.json', '.lock', '.yml', '.yaml') or path.name in ('Makefile', 'ACCEPTANCE_SPEC.md', 'API_SPEC.md', 'ARCHITECTURE.md', 'PRD.md', 'THREAT_MODEL.md'):
-            files.append([rel.as_posix(), digest(path.read_bytes())])
+        if path.is_symlink() or (hasattr(path, 'is_junction') and path.is_junction()):
+            raise ValueError('source identity cannot follow a symbolic link or reparse point')
+        files.append([rel.as_posix(), digest(path.read_bytes())])
     return {'sha256': digest(json.dumps(files, separators=(',', ':')).encode()), 'files': files}
 
 

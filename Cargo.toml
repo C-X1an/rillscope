@@ -4,10 +4,16 @@ version = "0.1.0-dev"
 edition = "2024"
 rust-version = "1.99"
 license = "MIT"
-description = "Experimental policy-aware query execution kernel; full engine under development"
+description = "Experimental policy-aware restricted query compiler and bounded executor"
 publish = false
 
 [dependencies]
+serde = { version = "=1.0.229", features = ["derive"] }
+serde_json = "=1.0.151"
+sha2 = "=0.10.9"
+
+[target.'cfg(unix)'.dependencies]
+signal-hook = "=0.3.18"
 
 [lints.rust]
 unsafe_code = "forbid"
