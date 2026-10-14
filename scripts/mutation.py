@@ -40,7 +40,7 @@ def main():
     for control, relative, old, new, test in CONTROLS:
         with tempfile.TemporaryDirectory(prefix='rillscope-control-') as folder:
             clone = Path(folder) / 'repo'
-            subprocess.run(['git', 'clone', '--no-local', str(ROOT), str(clone)], capture_output=True, check=True)
+            subprocess.run(['git', 'clone', '--no-local', '--config', 'core.autocrlf=false', str(ROOT), str(clone)], capture_output=True, check=True)
             if not clone.resolve().is_relative_to(Path(folder).resolve()): raise RuntimeError('disposable clone boundary failure')
             env = os.environ.copy()
             env['CARGO_TARGET_DIR'] = str(Path(folder) / 'target')
