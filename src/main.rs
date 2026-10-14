@@ -108,6 +108,14 @@ fn cancellation() -> Result<Arc<AtomicBool>> {
 fn run(args: Arguments, cancelled: Arc<AtomicBool>) -> Result<Vec<u8>> {
     let catalog = Catalog::from_bytes(&read(&args.catalog, MAX_CATALOG_BYTES, E::Catalog, false)?)?;
     let synthetic = catalog.snapshot().starts_with("synthetic-");
+    let scan_counter_file = synthetic
+        .then(|| std::env::var_os("RILLSCOPE_TEST_SCAN_COUNTER_FILE"))
+        .flatten();
+    if let Some(path) = &scan_counter_file {
+        File::create(path)
+            .and_then(|mut file| file.write_all(b"0\n"))
+            .map_err(|_| E::Internal)?;
+    }
     let context = Context::from_bytes(
         catalog.clone(),
         &read(&args.context, 1024 * 1024, E::Context, false)?,
@@ -135,7 +143,16 @@ fn run(args: Arguments, cancelled: Arc<AtomicBool>) -> Result<Vec<u8>> {
         let cancel_before_publish = std::env::var_os("RILLSCOPE_TEST_CANCEL_BEFORE_PUBLISH")
             .is_some_and(|value| value == "1");
         let mut sent = false;
+        let mut scans = 0u32;
         budget.set_observer(move |stage| {
+            if stage == "scan_open"
+                && let Some(path) = &scan_counter_file
+            {
+                scans = scans.checked_add(1).ok_or(E::Internal)?;
+                File::create(path)
+                    .and_then(|mut file| writeln!(file, "{scans}"))
+                    .map_err(|_| E::Internal)?;
+            }
             if stage == "join_inner"
                 && !sent
                 && let Some(path) = &phase_file
@@ -163,9 +180,24 @@ struct Failure {
     error: QueryError,
     implementation: &'static str,
 }
+fn argument_strings(args: impl IntoIterator<Item = std::ffi::OsString>) -> Result<Vec<String>> {
+    let mut out = Vec::new();
+    out.try_reserve_exact(13).map_err(|_| E::Input)?;
+    for arg in args {
+        if out.len() >= 13 || arg.len() > 16384 {
+            return Err(E::Input.into());
+        }
+        let arg = arg.into_string().map_err(|_| E::Input)?;
+        if arg.len() > 4096 {
+            return Err(E::Input.into());
+        }
+        out.push(arg);
+    }
+    Ok(out)
+}
 fn main() -> ExitCode {
-    let args: Vec<_> = std::env::args().skip(1).collect();
-    if args == ["--version"] {
+    let args = argument_strings(std::env::args_os().skip(1));
+    if args.as_ref().is_ok_and(|args| args == &["--version"]) {
         return if io::stdout()
             .lock()
             .write_all(b"rillscope 0.1.0-dev\n")
@@ -177,16 +209,18 @@ fn main() -> ExitCode {
         };
     }
     let flag = cancellation();
-    let outcome = flag.and_then(|flag| {
-        arguments(&args)
-            .and_then(|args| run(args, flag.clone()))
-            .and_then(|bytes| {
-                if flag.load(Ordering::Acquire) {
-                    Err(E::Cancelled.into())
-                } else {
-                    Ok(bytes)
-                }
-            })
+    let outcome = args.and_then(|args| {
+        flag.and_then(|flag| {
+            arguments(&args)
+                .and_then(|args| run(args, flag.clone()))
+                .and_then(|bytes| {
+                    if flag.load(Ordering::Acquire) {
+                        Err(E::Cancelled.into())
+                    } else {
+                        Ok(bytes)
+                    }
+                })
+        })
     });
     let (bytes, code) = match outcome {
         Ok(bytes) => (bytes, 0),
@@ -212,4 +246,30 @@ fn main() -> ExitCode {
         return ExitCode::from(6);
     }
     ExitCode::from(code)
+}
+
+#[cfg(test)]
+mod review_tests {
+    use super::*;
+    #[test]
+    fn malformed_os_argument_is_a_value_free_input_error() {
+        #[cfg(unix)]
+        let invalid = {
+            use std::os::unix::ffi::OsStringExt;
+            std::ffi::OsString::from_vec(b"PATH_CANARY_\xff".to_vec())
+        };
+        #[cfg(windows)]
+        let invalid = {
+            use std::os::windows::ffi::OsStringExt;
+            std::ffi::OsString::from_wide(&[0x0050, 0x0041, 0xd800])
+        };
+        let error = argument_strings([invalid]).err();
+        assert_eq!(error.map(|e| e.code), Some(E::Input));
+        assert_eq!(
+            argument_strings((0..14).map(|_| std::ffi::OsString::from("x")))
+                .err()
+                .map(|e| e.code),
+            Some(E::Input)
+        );
+    }
 }

@@ -353,6 +353,25 @@ pub(crate) fn bind(
         hidden: BTreeSet::new(),
         sources: BTreeMap::new(),
     };
+    if let Some(checks) = &query.sql_group_checks {
+        // Resolve original SELECT/GROUP references against the authorized pre-aggregate
+        // schema, so lowering cannot erase ambiguity, a denial, or column identity.
+        let input = binder.node(&checks.input)?;
+        for column in &checks.columns {
+            binder.expr(column, &input.schema)?;
+        }
+        for (selected, grouped) in &checks.matches {
+            if binder.expr(selected, &input.schema)? != binder.expr(grouped, &input.schema)? {
+                return Err(E::Bind.into());
+            }
+        }
+        if checks.invalid_group {
+            return Err(E::Bind.into());
+        }
+        binder.aliases.clear();
+        binder.hidden.clear();
+        binder.sources.clear();
+    }
     let root = binder.node(&query.plan)?;
     Ok(BoundPlan {
         root,

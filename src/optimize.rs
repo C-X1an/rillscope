@@ -50,24 +50,93 @@ fn substitute(expr: &TypedExpr, columns: &Projection) -> Result<TypedExpr> {
         nullable: expr.nullable,
     })
 }
-fn rewrite(node: &mut Node, trace: &mut Vec<&'static str>) -> Result<()> {
+fn expr_depth(expr: &TypedExpr) -> usize {
+    1 + match &expr.kind {
+        ExprKind::Unary(_, a) => expr_depth(a),
+        ExprKind::Binary(_, a, b) => expr_depth(a).max(expr_depth(b)),
+        _ => 0,
+    }
+}
+// Predict expansion without constructing or cloning the expanded expression.
+fn substitution_shape(expr: &TypedExpr, columns: &Projection) -> Option<(usize, usize)> {
+    let shape = match &expr.kind {
+        ExprKind::Column(i) => {
+            let value = &columns.get(*i)?.1;
+            (value.cost() as usize, expr_depth(value))
+        }
+        ExprKind::Literal(_) => (1, 1),
+        ExprKind::Unary(_, a) => {
+            let (n, d) = substitution_shape(a, columns)?;
+            (n.checked_add(1)?, d.checked_add(1)?)
+        }
+        ExprKind::Binary(_, a, b) => {
+            let (an, ad) = substitution_shape(a, columns)?;
+            let (bn, bd) = substitution_shape(b, columns)?;
+            (
+                an.checked_add(bn)?.checked_add(1)?,
+                ad.max(bd).checked_add(1)?,
+            )
+        }
+    };
+    (shape.0 <= 256 && shape.1 <= 32).then_some(shape)
+}
+fn plan_nodes(node: &Node) -> usize {
+    1 + match &node.kind {
+        NodeKind::PolicyScan { .. } => 0,
+        NodeKind::Filter { input, predicate } => plan_nodes(input) + predicate.cost() as usize,
+        NodeKind::Project { input, columns } => {
+            plan_nodes(input)
+                + columns
+                    .iter()
+                    .map(|(_, e)| e.cost() as usize)
+                    .sum::<usize>()
+        }
+        NodeKind::Join { left, right, .. } => plan_nodes(left) + plan_nodes(right),
+        NodeKind::Aggregate {
+            input,
+            keys,
+            aggregates,
+        } => {
+            plan_nodes(input)
+                + keys.iter().map(|(_, e)| e.cost() as usize).sum::<usize>()
+                + aggregates
+                    .iter()
+                    .map(|(_, a)| match a {
+                        Aggregate::CountAll => 0,
+                        Aggregate::Count(e) | Aggregate::Sum(e) => e.cost() as usize,
+                    })
+                    .sum::<usize>()
+        }
+        NodeKind::Sort { input, keys } => {
+            plan_nodes(input) + keys.iter().map(|k| k.expr.cost() as usize).sum::<usize>()
+        }
+        NodeKind::Limit { input, .. } => plan_nodes(input),
+    }
+}
+fn rewrite(
+    node: &mut Node,
+    trace: &mut Vec<&'static str>,
+    nodes: &mut usize,
+    depth: usize,
+) -> Result<()> {
     match &mut node.kind {
         NodeKind::PolicyScan { .. } => {}
         NodeKind::Join { left, right, .. } => {
-            rewrite(left, trace)?;
-            rewrite(right, trace)?;
+            rewrite(left, trace, nodes, depth + 1)?;
+            rewrite(right, trace, nodes, depth + 1)?;
         }
         NodeKind::Filter { input, .. }
         | NodeKind::Project { input, .. }
         | NodeKind::Aggregate { input, .. }
         | NodeKind::Sort { input, .. }
-        | NodeKind::Limit { input, .. } => rewrite(input, trace)?,
+        | NodeKind::Limit { input, .. } => rewrite(input, trace, nodes, depth + 1)?,
     }
     let NodeKind::Filter { input, predicate } = &node.kind else {
         return Ok(());
     };
     if matches!(predicate.kind, ExprKind::Literal(Value::Bool(true))) {
         *node = *input.clone();
+        *nodes = nodes.checked_sub(2).ok_or(E::Plan)?;
         trace.push("remove_true_filter");
         return Ok(());
     }
@@ -79,6 +148,21 @@ fn rewrite(node: &mut Node, trace: &mut Vec<&'static str>) -> Result<()> {
             input: base,
             columns,
         } if columns.iter().all(|(_, e)| e.total()) => {
+            let Some((expanded_nodes, expanded_depth)) = substitution_shape(predicate, columns)
+            else {
+                return Ok(());
+            };
+            let available = 256usize
+                .checked_sub(*nodes)
+                .and_then(|n| n.checked_add(predicate.cost() as usize))
+                .ok_or(E::Plan)?;
+            if expanded_nodes > available || depth + 1 + expanded_depth > 32 {
+                return Ok(());
+            }
+            *nodes = nodes
+                .checked_sub(predicate.cost() as usize)
+                .and_then(|n| n.checked_add(expanded_nodes))
+                .ok_or(E::Plan)?;
             let predicate = substitute(predicate, columns)?;
             let filtered = Node {
                 kind: NodeKind::Filter {
@@ -94,6 +178,9 @@ fn rewrite(node: &mut Node, trace: &mut Vec<&'static str>) -> Result<()> {
             trace.push("push_pure_filter_project");
         }
         NodeKind::Join { left, right, on } => {
+            if depth + 1 + expr_depth(predicate) > 32 {
+                return Ok(());
+            }
             let mut columns = BTreeSet::new();
             refs(predicate, &mut columns);
             let split = left.schema.len();
@@ -358,14 +445,19 @@ pub(crate) fn optimize(mut plan: BoundPlan, enabled: bool) -> Result<BoundPlan> 
         if !seen.insert(before.clone()) {
             return Err(E::Plan.into());
         }
-        rewrite(&mut plan.root, &mut plan.trace)?;
+        let mut nodes = plan_nodes(&plan.root);
+        if nodes > 256 {
+            return Err(E::Plan.into());
+        }
+        rewrite(&mut plan.root, &mut plan.trace, &mut nodes, 1)?;
         if digest(&plan.root) == before {
             converged = true;
             break;
         }
     }
     if !converged {
-        return Err(E::Plan.into());
+        // A bounded pass count limits optimization effort, not accepted query semantics.
+        plan.trace.push("optimization_pass_limit");
     }
     let required = (0..plan.root.schema.len()).collect();
     let (root, _) = prune(&plan.root, &required)?;

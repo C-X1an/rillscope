@@ -41,6 +41,22 @@ class ProductTests(unittest.TestCase):
             self.denied(data, ('E_INPUT', 'E_UNSUPPORTED'))
         self.denied({'op': 'policy_scan', 'table': 'sales'}, ('E_INPUT', 'E_UNSUPPORTED'))
 
+    def test_frontend_and_binding_denials_have_zero_actual_scans(self):
+        counter = Path(self.temp.name) / 'scan-counter.txt'
+        self.client.env['RILLSCOPE_TEST_SCAN_COUNTER_FILE'] = str(counter)
+        code, _ = self.client.call(project(scan(), [('id', column('s.id'))]))
+        self.assertEqual(code, 0)
+        self.assertEqual(counter.read_text().strip(), '1')
+        denied = [(b'{"version":2,"plan":{"op":"scan","table":"sales","alias":"s"}}', ('E_INPUT', 'E_UNSUPPORTED')),
+                  (b'{"version":1,"plan":{"op":"scan","table":"sales","alias":"s"},"extra":1}', ('E_INPUT',)),
+                  ({'op': 'policy_scan', 'table': 'sales'}, ('E_INPUT', 'E_UNSUPPORTED')),
+                  (project(scan(), [('missing', column('s.unknown'))]), ('E_BIND',)),
+                  (filtered(scan(), binary('eq', column('s.grp'), literal(1))), ('E_TYPE',)),
+                  (project(scan(), [('salary', column('s.salary'))]), ('E_FORBIDDEN',))]
+        for query, codes in denied:
+            self.denied(query, codes)
+            self.assertEqual(counter.read_text().strip(), '0')
+
     def test_ac002_sql_json_typed_ordered_equivalence(self):
         sql = 'SELECT id, amount FROM sales WHERE amount > 10 ORDER BY id LIMIT 10'
         plan = {'op': 'limit', 'count': 10, 'input': ordered(project(filtered(scan(), binary('gt', column('s.amount'), literal(10))), [('id', column('s.id')), ('amount', column('s.amount'))]), ['id'])}

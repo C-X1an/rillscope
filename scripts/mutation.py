@@ -14,6 +14,8 @@ CONTROLS = [
     ('forbidden_reference', 'src/bind.rs', 'Expr::Col(name) => {', 'Expr::Col(name) => {\n                if self.hidden.contains(name) { return Ok(TypedExpr { kind: ExprKind::Literal(Value::I64(0)), data_type: DataType::I64, nullable: false }); }', 'verify::tests::denied_filter_is_bound_before_execution'),
     ('forged_provenance', 'src/verify.rs', 'if schema.len() > 64 || schema != node.schema {', 'if schema.len() > 64 {', 'verify::tests::reject_forged_provenance_grant_source_and_snapshot'),
     ('work_cap', 'src/budget.rs', 'if next > self.limits.max_work {', 'if false {', 'budget::tests::charge_never_exceeds_limit_and_cancel_precedes_allocation'),
+    ('expression_temporaries', 'src/operators/stream.rs', 'pub(crate) fn expr_temporary_bytes(expr: &TypedExpr, row: &[Value]) -> Result<usize> {', 'pub(crate) fn expr_temporary_bytes(expr: &TypedExpr, row: &[Value]) -> Result<usize> {\n    if matches!(expr.kind, crate::types::ExprKind::Binary(..)) { return Ok(std::mem::size_of::<Value>()); }', 'execute::tests::expression_string_temporaries_reserve_before_allocation'),
+    ('sort_reorder_checkpoint', 'src/operators/stream.rs', 'budget.observe("sort_reorder_output")?;\n            budget.charge(1)?;', '/* Intentionally removed reorder cancellation/work checkpoint. */', 'operators::stream::review_tests::reorder_observes_mid_loop_cancellation_and_work_limit'),
 ]
 
 def run(command, cwd, out, env):
@@ -63,7 +65,7 @@ def main():
             reports.append(report)
             print(json.dumps({'control': control, 'sequence': [baseline.returncode, mutant.returncode, restored.returncode], 'status': report['status']}), flush=True)
     summary = {'source_commit': commit, 'controls': reports, 'status': 'PASS' if all(r['status'] == 'PASS' for r in reports) else 'FAIL',
-               'scope': 'four selected controls; no broad mutation-coverage percentage is claimed'}
+               'scope': 'six selected Rust controls; no broad mutation-coverage percentage is claimed'}
     (args.out / 'summary.json').write_text(json.dumps(summary, indent=2) + '\n')
     return int(summary['status'] != 'PASS')
 

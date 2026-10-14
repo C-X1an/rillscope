@@ -11,18 +11,20 @@ RillScope is an experimental original Rust restricted-query compiler and executo
 | Opaque VerifiedPlan and independent traversal | Implemented; schema/types/provenance/grants/source identities recomputed; known-bad unit plans rejected |
 | Original pull-based batch engine | Implemented scan/filter/project, duplicate-preserving hash join, nullable aggregation, stable bounded sort, limit |
 | Work, logical reservations, cancellation and collector | Implemented; finite charges, RAII release, typed failures and complete result publication |
-| Optimizer | Implemented projection pruning and pure filter pushdown, with no push beneath PolicyScan; bounded 16-pass convergence and optimization-off mode |
-| Local source checks | PASS at recorded revisions: Rust 1.99 GNU Windows build/fmt/Clippy/check; 29 unit tests; 19 real CLI tests |
-| Generated semantic / malformed corpus | PASS at recorded revisions: 1,000 Rust optimization on/off cases versus physically scoped SQLite; 1,000 finite malformed inputs; raw verdicts preserved |
+| Optimizer | Implemented projection pruning and pure filter pushdown, with no push beneath PolicyScan; predicts expression growth before cloning; stops after 16 passes while preserving a valid plan |
+| Local source checks | PASS at recorded revisions: Rust 1.99 GNU Windows build/fmt/Clippy/check; 32 Rust unit tests; 26 real CLI/system tests |
+| Generated semantic / malformed corpus | PASS at recorded revisions: 1,000 cases comparing both JSON and SQL, optimizer on/off, with scoped SQLite; 2,000 finite malformed inputs (1,000 JSON + 1,000 SQL); raw verdicts preserved |
 | Actual process failure | PASS: CLI killed after a real join checkpoint; catalog raw SHA-256 unchanged; independent rerun succeeded |
 | Linux | Cross-target static check PASS; actual Linux runtime and signal latency NOT RUN |
-| Selected Rust mutations | Harness implemented; execution NOT RUN until the audited candidate is committed |
+| Selected Rust mutations | Four actual PASS-FAIL-PASS controls at the earlier committed candidate; expanded six-control current rerun pending |
 | Rust demo, adapter and browser review | NOT RUN / pending |
 | Rust benchmarks and reference-host targets | NOT YET MEASURED |
-| Fresh complete Rust checkout / independent review | NOT RUN / pending |
-| Public remote repository / CI | NOT RUN; portable gh installed but CLI authentication absent |
+| Independent review | Two separate source inspections identified defects; integrator reproduced failures and fixed/retested them. Reviewers executed no commands; follow-up review/full clean execution remains pending |
+| Resolved licenses / online dependency policy | Actual graph: 26 registry packages and 27 preserved notice files; inventory and online advisory/policy scans PASS at recorded revision/database time |
+| Fresh complete Rust checkout | NOT RUN / pending |
+| Public remote repository / CI | NOT RUN; publication remains pending reviewed export/release preparation |
 
-Recorded checks do not prove complete correctness or complete vulnerability coverage. The 1,000-case generator uses ten small-catalog families; the malformed campaign is finite seeded testing, not a libFuzzer-duration claim. Hardware capacities in PRD remain design capacities unless measured separately. Logical reservations are distinct from process RSS and OS containment.
+Recorded checks do not prove complete correctness or complete vulnerability coverage. The 1,000-case generator uses ten small-catalog families; the malformed campaign is finite seeded testing, not a libFuzzer-duration claim. The reproduced SQL nesting stack overflow, optimizer expansion rejection, grouped qualification error, unsupported SQL ordering acceptance and missing expression reservations have regression tests. Reservations cover expression temporaries; sort reordering now charges/checks every row. Hardware capacities in PRD remain design capacities unless measured separately. Logical reservations are distinct from process RSS and OS containment.
 
 SQL identifiers are normalized to lowercase. Complex unnamed selected expressions receive `_exprN`; use explicit aliases for durable output names. SQL NULL literals infer the other operand's type; a standalone NULL defaults to nullable Int64. GROUP BY selection uses documented group expressions/aggregates. JSON always requires an explicit type for NULL literals. These rules preserve the locked closed language; full SQL compatibility is outside scope.
 

@@ -16,7 +16,7 @@
 
 A client should be able to ask a useful question without deciding which tenant data it may read. RillScope explores that boundary inside a small relational compiler: the host fixes authority, the query supplies intent, and the plan must preserve both semantics and scope.
 
-> **Status:** The original Rust JSON/SQL compiler, binder, policy verifier, optimizer and batch executor are implemented. Current recorded Windows checks include 29 Rust unit tests, 19 real CLI tests, 1,000 seeded SQLite comparisons with optimization on/off, and 1,000 malformed inputs. Independent review, measured Rust benchmarks/demo, complete clean-checkout release validation and remote CI remain pending. This is an experimental development build; full release readiness is not established. Read [implementation status](IMPLEMENTATION_STATUS.md) for scope and evidence limits.
+> **Status:** The original Rust JSON/SQL compiler, binder, policy verifier, optimizer and batch executor are implemented. Recorded Windows checks include 32 Rust unit tests, 26 real CLI tests, 1,000 scoped SQLite cases comparing JSON/SQL and optimization modes, and 2,000 malformed inputs. Independent source inspections found defects that were reproduced, fixed and retested. Rust benchmarks/demo, follow-up release review, complete fresh-checkout validation and remote CI remain pending. This is an experimental development build; full release readiness is not established. Read [implementation status](IMPLEMENTATION_STATUS.md) for evidence limits.
 
 ## The experiment
 
@@ -60,7 +60,7 @@ python3 -m tools.reference.cli \
 
 The synthetic alpha-tenant query returns **3 orders and a total of 40**. The beta-tenant amount is excluded. Change only the query to `examples/forbidden.json` to observe an `E_FORBIDDEN` error. Context and catalog paths are **trusted operator inputs**, not client-controlled parameters.
 
-The recorded [reference report](docs/demo/reference-report.html) and [desktop capture](docs/demo/desktop.png) show the same executed example; they do not depict the unfinished Rust product.
+The recorded [reference report](docs/demo/reference-report.html) and [desktop capture](docs/demo/desktop.png) show the Python-reference example.
 
 ## From query to result
 
@@ -88,7 +88,7 @@ flowchart LR
 | Command capture and output hash verification | [`scripts/evidence.py`](scripts/evidence.py) |
 | Closed query and trusted catalog/context formats | [API contract](API_SPEC.md) |
 
-## Build the Rust kernel
+## Build and check the Rust product
 
 The intended toolchain is pinned to **Rust 1.99.0**. In an environment with rustup and permitted official toolchain access:
 
@@ -97,7 +97,7 @@ make bootstrap
 make build fmt lint check test
 ```
 
-These commands must actually succeed before making a Rust verification claim. `make format` applies rustfmt; `make fmt` checks it. The seed binary only exposes `seed-status`; it deliberately refuses to impersonate the unfinished query CLI.
+These commands must actually succeed before making a Rust verification claim. `make format` applies rustfmt; `make fmt` checks it. The production binary exposes `run`, `explain` and `--version`; the original seed is retained only with its historical tests.
 
 ## Evidence that stays honest
 

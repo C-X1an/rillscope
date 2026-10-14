@@ -71,6 +71,14 @@ pub(crate) enum Plan {
 #[derive(Clone, Debug)]
 pub struct Query {
     pub(crate) plan: Plan,
+    pub(crate) sql_group_checks: Option<SqlGroupChecks>,
+}
+#[derive(Clone, Debug)]
+pub(crate) struct SqlGroupChecks {
+    pub input: Plan,
+    pub columns: Vec<Expr>,
+    pub matches: Vec<(Expr, Expr)>,
+    pub invalid_group: bool,
 }
 struct Gate {
     nodes: usize,
@@ -338,6 +346,7 @@ impl Query {
         }
         Ok(Self {
             plan: plan(get(&value, "plan")?, &mut Gate { nodes: 0, scans: 0 }, 1)?,
+            sql_group_checks: None,
         })
     }
     pub(crate) fn from_plan(plan: Plan) -> Result<Self> {
@@ -406,7 +415,10 @@ impl Query {
             Ok(())
         }
         visit(&plan, &mut Gate { nodes: 0, scans: 0 }, 1)?;
-        Ok(Self { plan })
+        Ok(Self {
+            plan,
+            sql_group_checks: None,
+        })
     }
 }
 

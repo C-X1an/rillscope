@@ -74,6 +74,7 @@ def main():
             try:
                 expected = connection.execute(sql).fetchall()
                 values = []
+                sql_values = []
                 for optimize in (False, True):
                     code, value = client.call(plan, optimize=optimize)
                     if code != 0: raise AssertionError(value)
@@ -82,11 +83,14 @@ def main():
                     values.append(value)
                 if values[0]['schema'] != values[1]['schema']: raise AssertionError('optimization changed schema')
                 compare_rows(values[0]['rows'], values[1]['rows'], values[0]['schema'], is_ordered)
-                if case % 10 == 0:
-                    code, sql_value = client.call(sql, format='sql')
+                for mode in (False, True):
+                    code, sql_value = client.call(sql, format='sql', optimize=mode)
                     if code != 0: raise AssertionError(sql_value)
+                    if [f['type'] for f in sql_value['schema']] != types or [f['nullable'] for f in sql_value['schema']] != nullable: raise AssertionError('independent SQL schema mismatch')
                     compare_rows(sql_value['rows'], expected, sql_value['schema'], is_ordered)
+                    sql_values.append(sql_value)
                 verdict.update(status='PASS', result_digests=[digest([v['schema'], sorted(v['rows'], key=lambda row: json.dumps(row, ensure_ascii=False))]) for v in values])
+                verdict['sql_result_digests'] = [digest([v['schema'], sorted(v['rows'], key=lambda row: json.dumps(row, ensure_ascii=False))]) for v in sql_values]
             except Exception as error:
                 failures += 1
                 verdict['error'] = str(error)

@@ -1,6 +1,6 @@
 //! Bounded original parser for the documented SELECT dialect; unmatched syntax rejects.
 use crate::error::{ErrorCode as E, Result};
-use crate::query::{Agg, Expr, Named, NamedAgg, Plan, Query, SortKey};
+use crate::query::{Agg, Expr, Named, NamedAgg, Plan, Query, SortKey, SqlGroupChecks};
 use crate::types::{BinaryOp, UnaryOp, Value, identifier};
 use std::collections::BTreeSet;
 
@@ -168,13 +168,14 @@ impl Parser {
         }
     }
     fn expression(&mut self, min: u8, depth: usize) -> Result<Scalar> {
-        self.nodes += 1;
-        if self.nodes > 256 || depth > 32 {
+        if depth > 32 {
             return Err(E::Limit.into());
         }
+        let mut added = 1;
         let mut left = if self.word("not") {
             Scalar::Unary(UnaryOp::Not, Box::new(self.expression(3, depth + 1)?))
         } else if self.symbol("(") {
+            added = 0;
             let expr = self.expression(0, depth + 1)?;
             self.expect_symbol(")")?;
             expr
@@ -184,6 +185,7 @@ impl Parser {
                 self.cursor += 1;
                 Scalar::Plain(Expr::Lit(Value::I64(n)))
             } else {
+                added = 2;
                 Scalar::Binary(
                     BinaryOp::Sub,
                     Box::new(Scalar::Plain(Expr::Lit(Value::I64(0)))),
@@ -276,13 +278,14 @@ impl Parser {
                 _ => return Err(E::Unsupported.into()),
             }
         };
+        left = self.admit_scalar(left, added)?;
         loop {
             if min <= 3 && self.word("is") {
                 let not = self.word("not");
                 self.expect_word("null")?;
-                left = Scalar::Unary(UnaryOp::IsNull, Box::new(left));
+                left = self.admit_scalar(Scalar::Unary(UnaryOp::IsNull, Box::new(left)), 1)?;
                 if not {
-                    left = Scalar::Unary(UnaryOp::Not, Box::new(left));
+                    left = self.admit_scalar(Scalar::Unary(UnaryOp::Not, Box::new(left)), 1)?;
                 }
                 continue;
             }
@@ -312,14 +315,31 @@ impl Parser {
                 break;
             }
             self.cursor += 1;
-            self.nodes += 1;
-            if self.nodes > 256 {
-                return Err(E::Limit.into());
-            }
             let right = self.expression(precedence + 1, depth + 1)?;
-            left = Scalar::Binary(op, Box::new(left), Box::new(right));
+            left = self.admit_scalar(Scalar::Binary(op, Box::new(left), Box::new(right)), 1)?;
         }
         Ok(left)
+    }
+    fn admit_scalar(&mut self, expr: Scalar, added: usize) -> Result<Scalar> {
+        self.nodes = self.nodes.checked_add(added).ok_or(E::Limit)?;
+        if self.nodes > 256 {
+            return Err(E::Limit.into());
+        }
+        fn check(expr: &Scalar, depth: usize) -> Result<()> {
+            if depth > 32 {
+                return Err(E::Limit.into());
+            }
+            match expr {
+                Scalar::Unary(_, a) | Scalar::Count(a) | Scalar::Sum(a) => check(a, depth + 1),
+                Scalar::Binary(_, a, b) => {
+                    check(a, depth + 1)?;
+                    check(b, depth + 1)
+                }
+                _ => Ok(()),
+            }
+        }
+        check(&expr, 1)?;
+        Ok(expr)
     }
     fn alias(&mut self, default: String) -> Result<String> {
         if self.word("as") {
@@ -435,11 +455,34 @@ impl Parser {
             vec![]
         };
         let aggregated = !groups.is_empty() || items.iter().any(|i| has_aggregate(&i.expr));
+        let mut group_checks = SqlGroupChecks {
+            input: input.clone(),
+            columns: Vec::new(),
+            matches: Vec::new(),
+            invalid_group: false,
+        };
+        if aggregated {
+            for expr in items.iter().map(|i| &i.expr).chain(groups.iter()) {
+                scalar_columns(expr, &mut group_checks.columns);
+            }
+        }
         let mut aggregates = Vec::new();
         let mut columns = Vec::new();
         for item in items {
             let expr = if aggregated {
-                lower(&item.expr, &groups, &mut aggregates)?
+                match lower(
+                    &item.expr,
+                    &groups,
+                    &mut aggregates,
+                    &mut group_checks.matches,
+                ) {
+                    Ok(expr) => expr,
+                    Err(error) if error.code == E::Bind => {
+                        group_checks.invalid_group = true;
+                        Expr::Null
+                    }
+                    Err(error) => return Err(error),
+                }
             } else {
                 plain(&item.expr)?
             };
@@ -477,6 +520,9 @@ impl Parser {
                     return Err(E::Limit.into());
                 }
                 let expr = plain(&self.expression(0, 1)?)?;
+                if !matches!(&expr, Expr::Col(name) if !name.contains('.')) {
+                    return Err(E::Unsupported.into());
+                }
                 let descending = self.word("desc");
                 if !descending {
                     self.word("asc");
@@ -523,7 +569,11 @@ impl Parser {
         if self.cursor != self.tokens.len() {
             return Err(E::Unsupported.into());
         }
-        Query::from_plan(input)
+        let mut query = Query::from_plan(input)?;
+        if aggregated {
+            query.sql_group_checks = Some(group_checks);
+        }
+        Ok(query)
     }
 }
 fn plain(expr: &Scalar) -> Result<Expr> {
@@ -550,8 +600,41 @@ fn has_column(expr: &Expr) -> bool {
         _ => false,
     }
 }
-fn lower(expr: &Scalar, groups: &[Scalar], aggregates: &mut Vec<NamedAgg>) -> Result<Expr> {
-    if let Some(i) = groups.iter().position(|g| g == expr) {
+fn scalar_columns(expr: &Scalar, out: &mut Vec<Expr>) {
+    match expr {
+        Scalar::Plain(Expr::Col(name)) => out.push(Expr::Col(name.clone())),
+        Scalar::Unary(_, a) | Scalar::Count(a) | Scalar::Sum(a) => scalar_columns(a, out),
+        Scalar::Binary(_, a, b) => {
+            scalar_columns(a, out);
+            scalar_columns(b, out);
+        }
+        _ => {}
+    }
+}
+fn same_group_shape(a: &Scalar, b: &Scalar) -> bool {
+    match (a, b) {
+        (Scalar::Plain(Expr::Col(a)), Scalar::Plain(Expr::Col(b))) => {
+            a == b
+                || ((!a.contains('.') || !b.contains('.'))
+                    && a.rsplit('.').next() == b.rsplit('.').next())
+        }
+        (Scalar::Unary(aop, a), Scalar::Unary(bop, b)) => aop == bop && same_group_shape(a, b),
+        (Scalar::Binary(aop, a, aa), Scalar::Binary(bop, b, bb)) => {
+            aop == bop && same_group_shape(a, b) && same_group_shape(aa, bb)
+        }
+        _ => a == b,
+    }
+}
+fn lower(
+    expr: &Scalar,
+    groups: &[Scalar],
+    aggregates: &mut Vec<NamedAgg>,
+    matches: &mut Vec<(Expr, Expr)>,
+) -> Result<Expr> {
+    if let Some(i) = groups.iter().position(|g| same_group_shape(g, expr)) {
+        if groups[i] != *expr {
+            matches.push((plain(expr)?, plain(&groups[i])?));
+        }
         return Ok(Expr::Col(format!("_key{i}")));
     }
     match expr {
@@ -572,11 +655,14 @@ fn lower(expr: &Scalar, groups: &[Scalar], aggregates: &mut Vec<NamedAgg>) -> Re
             });
             Ok(Expr::Col(name))
         }
-        Scalar::Unary(op, a) => Ok(Expr::Unary(*op, Box::new(lower(a, groups, aggregates)?))),
+        Scalar::Unary(op, a) => Ok(Expr::Unary(
+            *op,
+            Box::new(lower(a, groups, aggregates, matches)?),
+        )),
         Scalar::Binary(op, a, b) => Ok(Expr::Binary(
             *op,
-            Box::new(lower(a, groups, aggregates)?),
-            Box::new(lower(b, groups, aggregates)?),
+            Box::new(lower(a, groups, aggregates, matches)?),
+            Box::new(lower(b, groups, aggregates, matches)?),
         )),
         Scalar::Plain(e) => {
             if has_column(e) {

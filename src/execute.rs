@@ -283,6 +283,36 @@ mod tests {
     }
 
     #[test]
+    fn expression_string_temporaries_reserve_before_allocation() -> Result<()> {
+        let text = "x".repeat(4096);
+        let expression = serde_json::json!({"op":"eq","left":{"lit":text},"right":{"lit":text}});
+        let input = serde_json::json!({"op":"limit","input":{"op":"scan","table":"t","alias":"a"},"count":1});
+        for plan in [
+            serde_json::json!({"op":"project","input":input,"columns":[{"name":"same","expr":expression}]}),
+            serde_json::json!({"op":"filter","input":input,"predicate":expression}),
+            serde_json::json!({"op":"aggregate","input":input,"keys":[{"name":"same","expr":expression}],"aggregates":[{"name":"n","kind":"count_all"}]}),
+            serde_json::json!({"op":"aggregate","input":input,"keys":[],"aggregates":[{"name":"n","kind":"count","expr":expression}]}),
+            serde_json::json!({"op":"sort","input":input,"keys":[{"expr":expression,"direction":"asc","nulls":"last"}]}),
+        ] {
+            let (plan, _) = fixture(plan)?;
+            let mut budget = Budget::new(
+                Limits {
+                    max_reserved_bytes: 4096,
+                    ..Limits::default()
+                },
+                Arc::new(AtomicBool::new(false)),
+                None,
+            )?;
+            assert_eq!(
+                execute(&plan, &mut budget).err().map(|e| e.code),
+                Some(E::Budget)
+            );
+            assert_eq!(budget.reserved_bytes(), 0);
+        }
+        Ok(())
+    }
+
+    #[test]
     fn exploding_join_stops_inside_the_charged_inner_loop() -> Result<()> {
         let rows: Vec<_> = (0..100)
             .map(|_| serde_json::json!(["alpha", 1, 1]))

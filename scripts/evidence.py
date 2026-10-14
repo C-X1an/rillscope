@@ -22,12 +22,19 @@ def digest(data: bytes) -> str: return hashlib.sha256(data).hexdigest()
 
 def source_identity(root: Path = ROOT) -> dict:
     files = []
-    for path in sorted(root.rglob('*')):
-        rel = path.relative_to(root)
-        if any(x in EXCLUDED for x in rel.parts) or not path.is_file(): continue
-        if path.is_symlink() or (hasattr(path, 'is_junction') and path.is_junction()):
-            raise ValueError('source identity cannot follow a symbolic link or reparse point')
-        files.append([rel.as_posix(), digest(path.read_bytes())])
+    pending = [root]
+    while pending:
+        directory = pending.pop()
+        for path in sorted(directory.iterdir()):
+            rel = path.relative_to(root)
+            if path.is_symlink() or (hasattr(path, 'is_junction') and path.is_junction()):
+                raise ValueError('source identity cannot follow a symbolic link or reparse point')
+            if any(x in EXCLUDED - {'verification'} for x in rel.parts): continue
+            if rel.parts[0] == 'verification' and rel.as_posix() not in ('verification', 'verification/spec-lock.json'): continue
+            if path.is_dir(): pending.append(path)
+            elif path.is_file(): files.append([rel.as_posix(), digest(path.read_bytes())])
+            else: raise ValueError('source identity requires regular files/directories')
+    files.sort()
     return {'sha256': digest(json.dumps(files, separators=(',', ':')).encode()), 'files': files}
 
 

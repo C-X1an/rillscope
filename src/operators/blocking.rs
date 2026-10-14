@@ -1,5 +1,5 @@
 //! Duplicate-preserving hash join, nullable aggregation, and fallible stable sort.
-use super::stream::{Frame, Rows, Stream, expr_bytes, row_bytes};
+use super::stream::{Frame, Rows, Stream, expr_bytes, expr_temporary_bytes, row_bytes};
 use crate::budget::{Budget, Reservation};
 use crate::catalog::{Catalog, Context};
 use crate::error::{ErrorCode as E, Result};
@@ -181,16 +181,21 @@ pub(crate) fn aggregate(
                 .iter()
                 .map(|(_, a)| match a {
                     Aggregate::CountAll => Ok(0),
-                    Aggregate::Count(e) | Aggregate::Sum(e) => expr_bytes(e, &row),
+                    Aggregate::Count(e) | Aggregate::Sum(e) => expr_temporary_bytes(e, &row),
                 })
                 .collect::<Result<Vec<_>>>()?
                 .into_iter()
                 .max()
                 .unwrap_or(0);
+            let key_temporary_bytes = keys
+                .iter()
+                .try_fold(0usize, |peak, (_, e)| -> Result<usize> {
+                    Ok(peak.max(expr_temporary_bytes(e, &row)?))
+                })?;
             let _temporary = budget.reserve(
                 key_bytes
                     .checked_mul(2)
-                    .and_then(|n| n.checked_add(aggregate_bytes + 256))
+                    .and_then(|n| n.checked_add(aggregate_bytes.max(key_temporary_bytes) + 256))
                     .ok_or(E::Budget)?,
             )?;
             let cost = keys.iter().map(|(_, e)| e.cost()).sum::<u64>();
@@ -303,6 +308,10 @@ pub(crate) fn sort(input: &mut Stream<'_>, keys: &[OrderKey], budget: &mut Budge
     let mut values: Vec<Vec<Value>> = Vec::new();
     let mut reservation = budget.reserve(rows.data.len().checked_mul(40).ok_or(E::Budget)?)?;
     for row in &rows.data {
+        let expression_bytes = keys.iter().try_fold(0usize, |peak, key| -> Result<usize> {
+            Ok(peak.max(expr_temporary_bytes(&key.expr, row)?))
+        })?;
+        let _expression = budget.reserve(expression_bytes)?;
         let bytes = keys.iter().try_fold(24usize, |sum, key| -> Result<usize> {
             sum.checked_add(expr_bytes(&key.expr, row)?)
                 .ok_or(E::Budget.into())

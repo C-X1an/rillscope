@@ -21,21 +21,30 @@ def main():
     failures = 0
     with tempfile.TemporaryDirectory() as folder, (args.out / 'verdicts.jsonl').open('w') as output:
         client = Client(folder, fixture())
-        for case in range(1000):
-            if case % 5 == 0: data = json.dumps({'version': 1, 'plan': scan(), 'unknown' + str(case): rng.randrange(10000)}).encode()
+        for case in range(2000):
+            format = 'json'
+            if case >= 1000:
+                format = 'sql'
+                family = case % 5
+                if family == 0: data = ('SELECT id' + ' IS NOT NULL' * rng.randrange(100, 2701) + ' FROM sales').encode()
+                elif family == 1: data = b"SELECT read_csv('synthetic.csv') FROM sales"
+                elif family == 2: data = b'\xffSELECT id FROM sales'
+                elif family == 3: data = ('SELECT id FROM sales ORDER BY id + ' + str(rng.randrange(1000))).encode()
+                else: data = b'SELECT id FROM sales; SELECT amount FROM sales'
+            elif case % 5 == 0: data = json.dumps({'version': 1, 'plan': scan(), 'unknown' + str(case): rng.randrange(10000)}).encode()
             elif case % 5 == 1: data = b'{"version":1,"version":1,"plan":{"op":"scan","table":"sales","alias":"s"}}'
             elif case % 5 == 2: data = b'\xff\xfe' + rng.randbytes(rng.randrange(50))
             elif case % 5 == 3: data = b'{"version":1,"plan":{"op":"operator' + str(case).encode() + b'"}}'
             else: data = b'[' * 100 + b'0' + b']' * 100
-            verdict = {'case': case, 'seed': 61425, 'input_sha256': hashlib.sha256(data).hexdigest(), 'status': 'FAIL'}
+            verdict = {'case': case, 'seed': 61425, 'format': format, 'input_sha256': hashlib.sha256(data).hexdigest(), 'status': 'FAIL'}
             try:
-                code, value = client.call(data)
+                code, value = client.call(data, format=format)
                 if code not in (2, 3) or value.get('status') != 'error': raise AssertionError('invalid corpus did not return a typed error')
                 if value['error']['code'] not in ('E_INPUT', 'E_UNSUPPORTED', 'E_LIMIT'): raise AssertionError('unexpected invalid-input error')
                 verdict.update(status='PASS', code=value['error']['code'])
             except Exception as error: failures += 1; verdict['error'] = str(error)
             output.write(json.dumps(verdict) + '\n')
-    result = {'campaign': 'finite seeded malformed JSON corpus', 'cases': 1000, 'seed': 61425, 'failures': failures,
+    result = {'campaign': 'finite seeded malformed JSON and SQL corpus', 'cases': 2000, 'cases_by_format': {'json': 1000, 'sql': 1000}, 'seed': 61425, 'failures': failures,
               'status': 'PASS' if not failures else 'FAIL', 'binary_sha256': hashlib.sha256(BINARY.read_bytes()).hexdigest(),
               'verdicts_sha256': hashlib.sha256((args.out / 'verdicts.jsonl').read_bytes()).hexdigest(), 'libfuzzer_campaign': 'NOT RUN'}
     (args.out / 'summary.json').write_text(json.dumps(result, indent=2) + '\n')

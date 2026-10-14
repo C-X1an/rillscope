@@ -175,7 +175,7 @@ impl Budget {
         self.scans
     }
     pub(crate) fn start_scan(&mut self) -> Result<()> {
-        self.checkpoint()?;
+        self.observe("scan_open")?;
         self.scans = self.scans.checked_add(1).ok_or(E::Budget)?;
         Ok(())
     }
