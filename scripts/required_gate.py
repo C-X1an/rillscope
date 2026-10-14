@@ -15,12 +15,15 @@ commands = {
     'property': [sys.executable, 'tests/property/differential.py', '--out', str(out)],
     'fuzz': [sys.executable, 'tests/security/malformed.py', '--out', str(out)],
     'mutation': [sys.executable, 'scripts/mutation.py', '--out', str(out)],
+    'demo': [sys.executable, 'scripts/demo.py', '--out', str(out)],
 }
 if name in commands:
     selected = [commands[name]]
     if name == 'security':
         selected = [[sys.executable, '-m', 'unittest', 'discover', '-s', 'tests/acceptance_locked', '-v'],
                     commands[name], [sys.executable, 'scripts/license_audit.py']]
+    if name == 'mutation':
+        selected.append([sys.executable, 'scripts/html_mutation.py', '--out', str(out.with_name(out.name + '-html'))])
     failures = []
     for command in selected:
         print(json.dumps({'gate': name, 'command': command, 'scope': 'executed contract/security checks; full release also requires locked release evidence'}), flush=True)

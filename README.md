@@ -16,7 +16,7 @@
 
 A client should be able to ask a useful question without deciding which tenant data it may read. RillScope explores that boundary inside a small relational compiler: the host fixes authority, the query supplies intent, and the plan must preserve both semantics and scope.
 
-> **Status:** The original Rust JSON/SQL compiler, binder, policy verifier, optimizer and batch executor are implemented. Recorded Windows checks include 34 Rust unit tests, 28 real CLI tests, 1,000 scoped SQLite cases comparing JSON/SQL and optimization modes, and 2,000 malformed inputs. Independent source inspections found defects that were reproduced, fixed and retested. Rust benchmarks/demo, final release review, complete fresh-checkout validation and remote CI remain pending. This is an experimental development build; full release readiness is not established. Read [implementation status](IMPLEMENTATION_STATUS.md) for evidence limits.
+> **Status:** The original Rust JSON/SQL compiler, binder, policy verifier, optimizer and batch executor are implemented. Recorded Windows checks include 34 Rust unit tests, 28 CLI/system tests, 1,000 scoped SQLite cases comparing JSON/SQL and optimization modes, and 2,000 malformed inputs. Independent inspections found defects that were reproduced, fixed and retested. The real Rust demo and fixed-scope adapter run locally. Benchmarks, final release review, full fresh-checkout validation and remote CI remain pending. This is an experimental development build; full release readiness is not established. Read [implementation status](IMPLEMENTATION_STATUS.md) for evidence limits.
 
 ## The experiment
 
@@ -33,9 +33,12 @@ make bootstrap build
 target/debug/rillscope run --catalog examples/catalog.json --context examples/context.json --query examples/query.json
 target/debug/rillscope explain --catalog examples/catalog.json --context examples/context.json --query examples/query.json
 make integration property fuzz
+make demo
 ```
 
 The actual Rust example returns three orders and total 40. Use `examples/forbidden.json` for a typed denial. SQL input uses `--format sql`; stdin uses `--query -`; `--optimize off` disables rewrites. Catalog/context paths and synthetic [test hooks](TEST_HOOKS.md) are trusted host controls. An untrusted client receives only the restricted query interface.
+
+`make demo` executes the Rust CLI through [the fixed-scope adapter](tools/fixed_scope.py) and independently materializes each tenant's authorized relation in SQLite. Open its generated offline report, or inspect [the recorded Rust report](docs/demo/rust-report.html), [actual screenshot](docs/demo/rust-desktop.jpg), and [visual/keyboard inspection](docs/demo/rust-visual-review.json). It shows alpha `[[3,40]]`, `E_FORBIDDEN`, and beta `[[1,999]]`. No model keys or cloud service are required. The adapter's client request contains only query format/source and output choice; its constructor's binary/catalog/context paths are trusted host configuration.
 
 ## Run the reference
 

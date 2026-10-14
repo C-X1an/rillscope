@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "policy_revision": "synthetic-r1",
+  "tenant": "beta",
+  "tables": {
+    "sales": {
+      "tenant_column": "tenant",
+      "columns": ["id", "amount"]
+    }
+  }
+}

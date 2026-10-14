@@ -1,0 +1,90 @@
+{
+  "implementation": "rust",
+  "cases": 3,
+  "oracle": "SQLite on independently materialized authorized relations",
+  "sqlite_version": "3.50.4",
+  "binary_sha256": "a3bfd81a4001c1927a4d805de2df8711db650a1e8c1f50be0618350de90c2850",
+  "inputs_sha256": {
+    "examples/catalog.json": "6d3ea6d38d9548faa160ea9656f2ac6d78530fe751b950f3841b09ee6d4503ee",
+    "examples/context.json": "1cd24254af4c0395a2d6d3e2ed4180af40ab1b7a000fb12ee6f5367b944928f5",
+    "examples/context-beta.json": "74a4b355feea7a734c3f3f5dff6483e45a82ec733676284a7ad35f6cba0e25d0",
+    "examples/query.json": "d7ce1756b4dd609a77c826a86a8beb4a2a0a2f515d938d9902d13924d7598c2c",
+    "examples/forbidden.json": "1d721f57d070e67502483f075c39e2f48bdd81d9e79b22ea777d6c97134e5489"
+  },
+  "results_sha256": "de9b57e07cea8d914bc16ff5b43f0c32d7ef03795cf270020f262b8140e9498e",
+  "report_sha256": "ee3188f2c36d95fbf88f98f293dcded72e55f3c36254541a7f167d318e6a64b0",
+  "environment_keys_forwarded": [
+    "SYSTEMROOT",
+    "SystemRoot",
+    "WINDIR",
+    "TEMP",
+    "TMP"
+  ],
+  "browser_visual_review": "NOT RUN by this generator",
+  "process_calls": [
+    {
+      "case": "allowed",
+      "argv_relative_to_repository": [
+        "target/debug/rillscope.exe",
+        "run",
+        "--catalog",
+        "examples/catalog.json",
+        "--context",
+        "examples/context.json",
+        "--query",
+        "-",
+        "--format",
+        "json"
+      ],
+      "stdin_sha256": "d7ce1756b4dd609a77c826a86a8beb4a2a0a2f515d938d9902d13924d7598c2c"
+    },
+    {
+      "case": "denied",
+      "argv_relative_to_repository": [
+        "target/debug/rillscope.exe",
+        "run",
+        "--catalog",
+        "examples/catalog.json",
+        "--context",
+        "examples/context.json",
+        "--query",
+        "-",
+        "--format",
+        "json"
+      ],
+      "stdin_sha256": "1d721f57d070e67502483f075c39e2f48bdd81d9e79b22ea777d6c97134e5489"
+    },
+    {
+      "case": "second",
+      "argv_relative_to_repository": [
+        "target/debug/rillscope.exe",
+        "run",
+        "--catalog",
+        "examples/catalog.json",
+        "--context",
+        "examples/context-beta.json",
+        "--query",
+        "-",
+        "--format",
+        "json"
+      ],
+      "stdin_sha256": "d7ce1756b4dd609a77c826a86a8beb4a2a0a2f515d938d9902d13924d7598c2c"
+    },
+    {
+      "case": "explain",
+      "argv_relative_to_repository": [
+        "target/debug/rillscope.exe",
+        "explain",
+        "--catalog",
+        "examples/catalog.json",
+        "--context",
+        "examples/context.json",
+        "--query",
+        "-",
+        "--format",
+        "json"
+      ],
+      "stdin_sha256": "d7ce1756b4dd609a77c826a86a8beb4a2a0a2f515d938d9902d13924d7598c2c"
+    }
+  ]
+}

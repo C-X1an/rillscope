@@ -1,0 +1,55 @@
+{
+  "review_kind": "agent visual and keyboard inspection in actual Chrome; no human user study",
+  "report_sha256": "ee3188f2c36d95fbf88f98f293dcded72e55f3c36254541a7f167d318e6a64b0",
+  "observed_cases": {
+    "alpha_rows": [
+      [
+        3,
+        40
+      ]
+    ],
+    "denied_code": "E_FORBIDDEN",
+    "beta_rows": [
+      [
+        1,
+        999
+      ]
+    ],
+    "oracle_match_visible": true
+  },
+  "keyboard_actions": [
+    "Tab focused Tenant alpha",
+    "Three Tabs and Enter followed Plan & limits anchor",
+    "Tab and Enter expanded redacted plan"
+  ],
+  "desktop_client_viewport": {
+    "width": 2560,
+    "height": 1353,
+    "document_scroll_width": 2560
+  },
+  "narrow_requested_viewport": {
+    "width": 375,
+    "height": 812
+  },
+  "narrow_observed_client_width": 360,
+  "narrow_document_scroll_width": 360,
+  "generated_html_script_tags": 0,
+  "browser_extension_content_scripts_present": true,
+  "layout_observations": [
+    "Headings, context labels, typed columns and denial readable",
+    "Narrow table has contained horizontal scrolling; page has no horizontal overflow",
+    "Keyboard focus outline visible on disclosure",
+    "Malicious supplied image/event-handler label appears as literal text"
+  ],
+  "screenshots_sha256": {
+    "rust-desktop.jpg": "34368b3170579ce2bed0b4333a89128f77aa516b0dc2110b0ed70bcf7f3ad968",
+    "rust-inspector.jpg": "02359ec72562c2390fa11a3c5fd35398462d8729f23af62c3d5b179991dffde8",
+    "rust-mobile.jpg": "c1c0202613f14994f652f415b3e975057b9ba649bc8c4a45630a35a5de1c90a4",
+    "rust-plan.jpg": "25885949da981a58cb9d97ed27bb3b6e17c7bb968a94ac42fb8412065b94a12b"
+  },
+  "limitations": [
+    "Agent inspection only; no screen-reader user study",
+    "Installed browser extension instrumentation is outside the generated HTML",
+    "These three synthetic outcomes are not full release or performance proof"
+  ]
+}
