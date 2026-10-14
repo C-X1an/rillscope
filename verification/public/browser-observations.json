@@ -1,0 +1,46 @@
+{
+  "implementation": "python-reference",
+  "browser": "Chromium",
+  "version": "144.0.7559.96",
+  "report_sha256": "a4f9a48a70868d2b776aaae8e05d570573813954066eb3fb6be41bbee74eb9d8",
+  "load_method": "in-memory exact HTML bytes; file URL navigation is not tested",
+  "observations": [
+    {
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "name": "desktop",
+      "checks": {
+        "english_lang": true,
+        "one_h1": true,
+        "three_executions": true,
+        "no_page_overflow": true,
+        "reference_label": true,
+        "no_script_errors": true,
+        "no_external_requests": true
+      },
+      "errors": [],
+      "external_requests": []
+    },
+    {
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "name": "mobile",
+      "checks": {
+        "english_lang": true,
+        "one_h1": true,
+        "three_executions": true,
+        "no_page_overflow": true,
+        "reference_label": true,
+        "no_script_errors": true,
+        "no_external_requests": true
+      },
+      "errors": [],
+      "external_requests": []
+    }
+  ],
+  "limitations": "Layout and selected semantic checks only; not a full accessibility audit or Rust end-to-end test."
+}

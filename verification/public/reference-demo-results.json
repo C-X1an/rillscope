@@ -1,0 +1,57 @@
+[
+  [
+    "Authorized aggregate",
+    {
+      "version": 1,
+      "status": "ok",
+      "implementation": "python-reference",
+      "schema": [
+        {
+          "name": "orders",
+          "type": "i64",
+          "nullable": false
+        },
+        {
+          "name": "total",
+          "type": "i64",
+          "nullable": true
+        }
+      ],
+      "rows": [
+        [
+          3,
+          40
+        ]
+      ],
+      "metrics": {
+        "work_units": 22
+      }
+    }
+  ],
+  [
+    "Forbidden column",
+    {
+      "version": 1,
+      "status": "error",
+      "implementation": "python-reference",
+      "error": {
+        "code": "E_FORBIDDEN",
+        "phase": "bind",
+        "message": "column is not available in this scope"
+      }
+    }
+  ],
+  [
+    "Resource exhaustion",
+    {
+      "version": 1,
+      "status": "error",
+      "implementation": "python-reference",
+      "error": {
+        "code": "E_BUDGET",
+        "phase": "execute",
+        "message": "work budget exceeded"
+      }
+    }
+  ]
+]

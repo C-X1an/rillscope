@@ -1,0 +1,5 @@
+python3 scripts/check_contracts.py
+{"locked_files": 6, "mismatches": []}
+python3 scripts/lint_reference.py
+Parsed 16 Python files; 0 syntax/whitespace errors. Not a full type checker.
+python3 -m unittest discover -s tests -v

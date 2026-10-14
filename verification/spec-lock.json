@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "locked_before_product_implementation": true,
+  "files": {
+    "PRD.md": "66084216e750eac4d6a06f4a17d34fb63e12ed666d6cde997133102dc71f59e9",
+    "ACCEPTANCE_SPEC.md": "68bb9420f877b6ee1000f4d333224f104659528bd17819e8040da72d1baa6722",
+    "spec/acceptance.json": "3f75204dd4a77539a6c838cb12cdee0192370785884754a53f533d660866b386",
+    "ARCHITECTURE.md": "8e180d13f6853d98efc0c14c7434fa8484b9ce945a2b2eb1a6492c1def0cf90f",
+    "API_SPEC.md": "330339956e3d213fe3b2373fa102e7b4b9d14bb3249905bb1dd8051bf7bd5652",
+    "THREAT_MODEL.md": "6294bb648ab8726ad9242b90eba9bf78ac3ee9131098242808ed676330620d40"
+  }
+}

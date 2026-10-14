@@ -1,0 +1,44 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'"><title>RillScope | Reference laboratory</title><style>body{max-width:68rem;margin:3rem auto;padding:0 1.5rem;font:17px/1.65 system-ui,sans-serif}header{border-bottom:2px solid;padding-bottom:1.5rem}h1{font-size:3rem;line-height:1.1}h2{margin-top:2rem}pre{overflow:auto;padding:1.25rem;border:1px solid;border-radius:.5rem;font:14px/1.5 monospace}.label{font-weight:700;letter-spacing:.1em;text-transform:uppercase}footer{border-top:1px solid;margin-top:3rem;padding-top:1rem}@media(prefers-color-scheme:dark){body{background:#101820;color:#edf4f8}pre{background:#16232e}}@media(prefers-color-scheme:light){body{background:#fafbfc;color:#182333}pre{background:#fff}}</style></head><body><header><p class="label">RillScope / Executable reference</p><h1>Make query authority<br>part of the plan.</h1><p>Three actual Python-reference executions. No external scripts, requests or model API. This is not the Rust engine, a production security boundary or performance evidence.</p></header><main><section><h2>Authorized aggregate</h2><pre>{
+  &quot;version&quot;: 1,
+  &quot;status&quot;: &quot;ok&quot;,
+  &quot;implementation&quot;: &quot;python-reference&quot;,
+  &quot;schema&quot;: [
+    {
+      &quot;name&quot;: &quot;orders&quot;,
+      &quot;type&quot;: &quot;i64&quot;,
+      &quot;nullable&quot;: false
+    },
+    {
+      &quot;name&quot;: &quot;total&quot;,
+      &quot;type&quot;: &quot;i64&quot;,
+      &quot;nullable&quot;: true
+    }
+  ],
+  &quot;rows&quot;: [
+    [
+      3,
+      40
+    ]
+  ],
+  &quot;metrics&quot;: {
+    &quot;work_units&quot;: 22
+  }
+}</pre></section><section><h2>Forbidden column</h2><pre>{
+  &quot;version&quot;: 1,
+  &quot;status&quot;: &quot;error&quot;,
+  &quot;implementation&quot;: &quot;python-reference&quot;,
+  &quot;error&quot;: {
+    &quot;code&quot;: &quot;E_FORBIDDEN&quot;,
+    &quot;phase&quot;: &quot;bind&quot;,
+    &quot;message&quot;: &quot;column is not available in this scope&quot;
+  }
+}</pre></section><section><h2>Resource exhaustion</h2><pre>{
+  &quot;version&quot;: 1,
+  &quot;status&quot;: &quot;error&quot;,
+  &quot;implementation&quot;: &quot;python-reference&quot;,
+  &quot;error&quot;: {
+    &quot;code&quot;: &quot;E_BUDGET&quot;,
+    &quot;phase&quot;: &quot;execute&quot;,
+    &quot;message&quot;: &quot;work budget exceeded&quot;
+  }
+}</pre></section></main><footer><p>Inputs: repository synthetic catalog and fixed alpha-tenant context. All text is HTML-escaped. Inspect source and verification records before interpreting claims.</p></footer></body></html>

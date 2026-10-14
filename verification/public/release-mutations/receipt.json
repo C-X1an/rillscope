@@ -1,0 +1,175 @@
+{
+  "schema_version": 1,
+  "command": [
+    "python3",
+    "scripts/mutation_reference.py"
+  ],
+  "cwd": "/mnt/data/new_project_handoff/public-repo",
+  "started_utc": "2026-10-14T07:13:19.930742+00:00",
+  "finished_utc": "2026-10-14T07:13:31.113190+00:00",
+  "elapsed_seconds": 11.17337039500012,
+  "exit_code": 0,
+  "execution_outcome": "EXECUTED",
+  "verification_status": "PASS",
+  "environment": {
+    "python": "3.13.5",
+    "sqlite": "3.46.1",
+    "system": "Linux",
+    "machine": "x86_64",
+    "cpu_count": 5
+  },
+  "source_before": {
+    "sha256": "9233be9f70f58433f3b944b7ce72a0f959ac273ad1e3cfcb1eb1a64cc522b369",
+    "files": [
+      [
+        ".github/workflows/release-verification.yml",
+        "9ac205d42c867d8dce498e2fdabac7cfed270c09b405eab150fc8ef9b88c51f9"
+      ],
+      [
+        ".github/workflows/verify.yml",
+        "59dd01ddc314a9c75e668cb767591197bae8569fa28a7c5938a189c1ac59ee20"
+      ],
+      [
+        "ACCEPTANCE_SPEC.md",
+        "68bb9420f877b6ee1000f4d333224f104659528bd17819e8040da72d1baa6722"
+      ],
+      [
+        "API_SPEC.md",
+        "330339956e3d213fe3b2373fa102e7b4b9d14bb3249905bb1dd8051bf7bd5652"
+      ],
+      [
+        "ARCHITECTURE.md",
+        "8e180d13f6853d98efc0c14c7434fa8484b9ce945a2b2eb1a6492c1def0cf90f"
+      ],
+      [
+        "Cargo.lock",
+        "dccec7bbe74101cfb15cd66364a72e1e3fd45887fde59e491fb929f9d4f218b6"
+      ],
+      [
+        "Cargo.toml",
+        "2beadce8ff0aafa2146926f8638d5466bb508f6a5f3768dff15bb1f21f368726"
+      ],
+      [
+        "Makefile",
+        "c1d475a5debb3a51b35e24e92d567e93df5d7f2a5a1bcf974c3180f6d556aa64"
+      ],
+      [
+        "PRD.md",
+        "66084216e750eac4d6a06f4a17d34fb63e12ed666d6cde997133102dc71f59e9"
+      ],
+      [
+        "THREAT_MODEL.md",
+        "6294bb648ab8726ad9242b90eba9bf78ac3ee9131098242808ed676330620d40"
+      ],
+      [
+        "examples/catalog.json",
+        "6d3ea6d38d9548faa160ea9656f2ac6d78530fe751b950f3841b09ee6d4503ee"
+      ],
+      [
+        "examples/context.json",
+        "1cd24254af4c0395a2d6d3e2ed4180af40ab1b7a000fb12ee6f5367b944928f5"
+      ],
+      [
+        "examples/forbidden.json",
+        "1d721f57d070e67502483f075c39e2f48bdd81d9e79b22ea777d6c97134e5489"
+      ],
+      [
+        "examples/query.json",
+        "d7ce1756b4dd609a77c826a86a8beb4a2a0a2f515d938d9902d13924d7598c2c"
+      ],
+      [
+        "rust-toolchain.toml",
+        "2ad6f15416572b4836585087f1d4abc53b8fa2dbd616f8dacfaa587ed6714228"
+      ],
+      [
+        "scripts/benchmark_reference.py",
+        "e4c4bc2ca9e242641bac49449994e088caa3ddf72722b6d002f58693450b4174"
+      ],
+      [
+        "scripts/browser_reference.py",
+        "47c5a8f3a1e082af5ce6db7220b98abc274230d8c09ce85351e840e3545f5a84"
+      ],
+      [
+        "scripts/check_contracts.py",
+        "2694dd7836deab12b02fa675de8eeac9fe6ee694cfec502ed95fd675b3f2e37c"
+      ],
+      [
+        "scripts/clean_verify.py",
+        "42f19ea3bef02b75a879b9a8fe8c8ddc3793d70ab2833444a39f6924141dce9d"
+      ],
+      [
+        "scripts/demo_reference.py",
+        "a4ad42e35a4c4b67038eccc408e8dbcabd50b0127096523923270b4153fb38b0"
+      ],
+      [
+        "scripts/evidence.py",
+        "a33d08300d6625c572ffa1570b89b4022fe64d24d4e496503c9eada0c469fb59"
+      ],
+      [
+        "scripts/lint_reference.py",
+        "db0730d946133bb3c56e38e096e065467428a31f31b1320a702d28448f4507de"
+      ],
+      [
+        "scripts/mutation_reference.py",
+        "221545e91a2f08b40e604266eb719963f2a33f88347c9b8f64e8609f93d4bf65"
+      ],
+      [
+        "scripts/required_gate.py",
+        "a64e372a860028f2c788057092ce4aa39adaa192f00a4f24cf865bca56c94e38"
+      ],
+      [
+        "scripts/teardown.py",
+        "f2ed69e83d18668cb4df08675ed6a2744cad418c4909587caaf0c4bc52bc1990"
+      ],
+      [
+        "spec/acceptance.json",
+        "3f75204dd4a77539a6c838cb12cdee0192370785884754a53f533d660866b386"
+      ],
+      [
+        "src/lib.rs",
+        "1370549b3c4ec6833712ef0071155ed478440bedbdc454246c9ea78e65bc1839"
+      ],
+      [
+        "src/main.rs",
+        "18b13dc52e84b95799ab189cb5b231abaf38c4299ba0a8f567ebf7a58f8abb11"
+      ],
+      [
+        "tests/__init__.py",
+        "8bca292ace663bc878c430f57d307cb0ab8e1e1f484bba926e4ad2e411fce7b7"
+      ],
+      [
+        "tests/test_evidence.py",
+        "7422254ea5536e203a0c66508880ba91071d54e234579734e37eafa1144b7d5b"
+      ],
+      [
+        "tests/test_reference.py",
+        "edce34df75d43c4d89e914f82c7edf4768a5e855652ebf10a486c7780b4fdddf"
+      ],
+      [
+        "tools/reference/__init__.py",
+        "c76ee78d7f6db54f57b9fbd87b0ddb03bfffbd4da10aa32f0dd047be13996933"
+      ],
+      [
+        "tools/reference/cli.py",
+        "062303142effd8f9755b172c5c96be7f08137b6827e532b84a93c72a67101751"
+      ],
+      [
+        "tools/reference/engine.py",
+        "435ede81da6bd8da868b3d541df516b06ff5a644189d7e2c85933075d3472852"
+      ]
+    ]
+  },
+  "source_after_sha256": "9233be9f70f58433f3b944b7ce72a0f959ac273ad1e3cfcb1eb1a64cc522b369",
+  "git": {
+    "commit": null,
+    "dirty": null
+  },
+  "stdout": {
+    "file": "stdout.txt",
+    "sha256": "c39ff3cb6eb999c753b238fd613f15b17b34ed365844f013b289c75c9edb2bdc"
+  },
+  "stderr": {
+    "file": "stderr.txt",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

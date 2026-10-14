@@ -1,0 +1,1 @@
+{"gate": "acceptance", "status": "INCOMPLETE", "reason": "Full Rust implementation and evidence for this gate are not yet present. Implement the gate against locked acceptance criteria; do not replace with a constant success."}

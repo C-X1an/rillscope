@@ -1,0 +1,58 @@
+# Verification report
+
+Recorded: 2026-10-14. **This is a verified semantic-reference handoff with an uncompiled Rust seed, not a completed Rust engine.** No cloud deployment, remote GitHub workflow or production use is claimed.
+
+## Source identity
+
+The runs below share source fingerprint `9233be9f70f58433f3b944b7ce72a0f959ac273ad1e3cfcb1eb1a64cc522b369`. The receipt contains the exact per-file hashes and the command's pre/post identity. The authoring runs preceded Git initialization, so their Git commit is null rather than invented. A subsequent clean committed-checkout reference run is documented below when available.
+
+The fingerprint covers implementation/test/tooling files and locked contracts; it deliberately excludes generated verification artifacts, build/cache directories and most presentation prose. Inspect the file list rather than assuming it hashes the entire repository. Output hashes detect alteration relative to the receipt; they do not authenticate against a privileged person replacing both receipt and output. Independent reruns remain necessary.
+
+## Executed checks
+
+| Run | Status | Exit | Meaning |
+|:--|:--|--:|:--|
+| [release-reference](verification/public/release-reference/receipt.json) | PASS | 0 | 32 reference/tooling tests; one contains 1,000 seeded SQLite comparisons |
+| [release-mutations](verification/public/release-mutations/receipt.json) | PASS | 0 | Three reference mutations: baseline PASS, defect FAIL, restored PASS |
+| [release-benchmark](verification/public/release-benchmark/receipt.json) | PASS | 0 | 30 measured reference samples after three warm-ups |
+| [release-browser](verification/public/release-browser/receipt.json) | PASS | 0 | Two Chromium viewports; seven selected checks each |
+| [release-demo](verification/public/release-demo/receipt.json) | PASS | 0 | Three actual reference outcomes: allowed, forbidden, budget exhausted |
+| [release-rust](verification/public/release-rust/receipt.json) | BLOCKED | 77 | cargo unavailable; no Rust test executed |
+| [release-acceptance](verification/public/release-acceptance/receipt.json) | FAIL | 78 | Explicit incomplete gate; no full acceptance test passed |
+
+The exit-78 gate is an intentional refusal to claim completion, but it remains **FAIL / INCOMPLETE**, not PASS. The missing cargo executable is **BLOCKED**, not a successful Rust test. The 32 passing tests do not imply all 30 canonical Rust acceptance criteria are implemented.
+
+## Test-the-tests
+
+[Mutation raw output](verification/public/release-mutations/stdout.txt) preserves the original file hash, temporary targeted mutation, individual test exit codes and failure messages. Defects bypassed tenant filtering, treated NULL equality as true and deduplicated a duplicate-preserving join. All were detected in disposable copies; the original source was unchanged. These are three selected negative controls, not a comprehensive mutation score.
+
+## Browser and demo
+
+The reference demo actually produced count 3 and sum 40, rejected a forbidden column and rejected work exhaustion. See [recorded outputs](verification/public/reference-demo-results.json) and [offline report](docs/demo/reference-report.html). Chromium rendered the exact HTML bytes in memory at desktop/mobile sizes. File-URL navigation was blocked by an administrator policy and was not bypassed or claimed tested. Both PNGs were visually inspected. Internal code blocks can scroll on mobile; no page-level horizontal overflow was observed. This is not a full accessibility or cross-browser audit.
+
+## Findings corrected during authoring
+
+A final run exposed unclosed SQLite oracle connections: a transaction context manager does not close its connection. The harness now uses `contextlib.closing`; the recorded current reference run contains no ResourceWarnings. Earlier receipts and the initial file-navigation failure are retained in the private handoff, not rewritten into successes.
+
+## Not established
+
+Rust compilation, rustfmt/Clippy, SQL frontend, optimizer, general physical-plan verification, vector/hash operators, allocation accounting, cancellation integration, fuzz campaigns, comprehensive security review, Rust benchmarks, isolated-VM reproduction, independent human/agent verification and public GitHub CI remain unverified or unfinished. The initially read-only independent-verifier phase is specified but was not executed by another reviewer here.
+
+## Reproduce
+
+```sh
+make verify-reference
+make mutation-reference
+make demo-reference
+make benchmark-reference
+# On a clean committed checkout:
+make clean-verify
+# Full product gate; intentionally not green yet:
+make verify
+```
+
+No weakened tests, silently skipped gates or fabricated performance numbers are permitted. [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md) and [CLAIMS_EVIDENCE.md](CLAIMS_EVIDENCE.md) keep delivered reference behavior distinct from the intended Rust contract.
+
+## Clean committed checkout
+
+[Run release-clean-clone](verification/public/release-clean-clone/receipt.json) cloned clean commit `bc25b82a86d147f572b240c37006c82c363960fb` with `git clone --no-local` into a fresh temporary directory and ran `make verify-reference`. The result was PASS for the same 32 tests, contract hashes and Python syntax/whitespace checks. No dependencies were supplied from the original working tree. It used the same operating-system image and Python installation, so this is clean-checkout reproduction, **not an independent-machine or isolated-VM proof**. Rust verification remained false.

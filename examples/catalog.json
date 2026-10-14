@@ -1,0 +1,56 @@
+{
+  "version": 1,
+  "snapshot": "synthetic-v1",
+  "tables": {
+    "sales": {
+      "columns": [
+        {
+          "name": "tenant",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "id",
+          "type": "i64",
+          "nullable": false
+        },
+        {
+          "name": "amount",
+          "type": "i64",
+          "nullable": true
+        },
+        {
+          "name": "secret",
+          "type": "text",
+          "nullable": false
+        }
+      ],
+      "rows": [
+        [
+          "alpha",
+          1,
+          20,
+          "private-a"
+        ],
+        [
+          "beta",
+          2,
+          999,
+          "private-b"
+        ],
+        [
+          "alpha",
+          3,
+          null,
+          "private-c"
+        ],
+        [
+          "alpha",
+          4,
+          20,
+          "private-d"
+        ]
+      ]
+    }
+  }
+}

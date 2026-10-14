@@ -1,0 +1,37 @@
+test_html_escape (test_evidence.EvidenceTests.test_html_escape) ... ok
+test_output_tampering (test_evidence.EvidenceTests.test_output_tampering) ... ok
+test_ambiguous_join (test_reference.ReferenceTests.test_ambiguous_join) ... ok
+test_bind_empty_relation (test_reference.ReferenceTests.test_bind_empty_relation) ... ok
+test_bool_int_not_interchangeable (test_reference.ReferenceTests.test_bool_int_not_interchangeable) ... ok
+test_closed_version (test_reference.ReferenceTests.test_closed_version) ... ok
+test_duplicate_output_names (test_reference.ReferenceTests.test_duplicate_output_names) ... ok
+test_forbidden_columns_in_all_positions (test_reference.ReferenceTests.test_forbidden_columns_in_all_positions) ... ok
+test_group_null (test_reference.ReferenceTests.test_group_null) ... ok
+test_identical_duplicate_join (test_reference.ReferenceTests.test_identical_duplicate_join) ... ok
+test_input_unchanged (test_reference.ReferenceTests.test_input_unchanged) ... ok
+test_invalid_catalog (test_reference.ReferenceTests.test_invalid_catalog) ... ok
+test_json_strict (test_reference.ReferenceTests.test_json_strict) ... ok
+test_limit_zero (test_reference.ReferenceTests.test_limit_zero) ... ok
+test_malformed_null_type_and_shape (test_reference.ReferenceTests.test_malformed_null_type_and_shape) ... ok
+test_no_partial_success (test_reference.ReferenceTests.test_no_partial_success) ... ok
+test_null_and_duplicate_join (test_reference.ReferenceTests.test_null_and_duplicate_join) ... ok
+test_null_filter (test_reference.ReferenceTests.test_null_filter) ... ok
+test_output_limits (test_reference.ReferenceTests.test_output_limits) ... ok
+test_overflow_and_hidden_row_order (test_reference.ReferenceTests.test_overflow_and_hidden_row_order) ... ok
+test_projection_changes_scope (test_reference.ReferenceTests.test_projection_changes_scope) ... ok
+test_reference_is_not_product (test_reference.ReferenceTests.test_reference_is_not_product) ... ok
+test_scalar_empty_aggregate (test_reference.ReferenceTests.test_scalar_empty_aggregate) ... ok
+test_snapshot_is_copied (test_reference.ReferenceTests.test_snapshot_is_copied) ... ok
+test_sort_nulls_both_directions (test_reference.ReferenceTests.test_sort_nulls_both_directions) ... ok
+test_sqlite_differential_1000 (test_reference.ReferenceTests.test_sqlite_differential_1000) ... ok
+test_structural_limit (test_reference.ReferenceTests.test_structural_limit) ... ok
+test_tenant (test_reference.ReferenceTests.test_tenant) ... ok
+test_three_valued_logic (test_reference.ReferenceTests.test_three_valued_logic) ... ok
+test_unavailable_table (test_reference.ReferenceTests.test_unavailable_table) ... ok
+test_unknown_fields (test_reference.ReferenceTests.test_unknown_fields) ... ok
+test_unknown_function (test_reference.ReferenceTests.test_unknown_function) ... ok
+
+----------------------------------------------------------------------
+Ran 32 tests in 0.499s
+
+OK

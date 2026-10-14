@@ -1,0 +1,17 @@
+[package]
+name = "rillscope"
+version = "0.1.0-dev"
+edition = "2024"
+rust-version = "1.99"
+license = "MIT"
+description = "Experimental policy-aware query execution kernel; full engine under development"
+publish = false
+
+[dependencies]
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"

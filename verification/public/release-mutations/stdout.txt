@@ -1,0 +1,92 @@
+{
+  "mutations": [
+    {
+      "mutation": "tenant_bypass",
+      "test": "test_tenant",
+      "implementation": "python-reference",
+      "original_sha256": "435ede81da6bd8da868b3d541df516b06ff5a644189d7e2c85933075d3472852",
+      "old": "if raw[tenant_idx] == self.context[\"tenant\"]:",
+      "new": "if True:",
+      "runs": [
+        {
+          "stage": "baseline",
+          "exit_code": 0,
+          "stdout": "",
+          "stderr": ".\n----------------------------------------------------------------------\nRan 1 test in 0.001s\n\nOK\n"
+        },
+        {
+          "stage": "mutated",
+          "exit_code": 1,
+          "stdout": "",
+          "stderr": "F\n======================================================================\nFAIL: test_tenant (tests.test_reference.ReferenceTests.test_tenant)\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"/tmp/rillscope-mutation-kxgs1k6z/tests/test_reference.py\", line 55, in test_tenant\n    self.assertEqual(self.run_node(project(scan(), 'id'))['rows'], [[1], [3], [4]])\n    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: Lists differ: [[1], [2], [3], [4]] != [[1], [3], [4]]\n\nFirst differing element 1:\n[2]\n[3]\n\nFirst list contains 1 additional elements.\nFirst extra element 3:\n[4]\n\n- [[1], [2], [3], [4]]\n?       -----\n\n+ [[1], [3], [4]]\n\n----------------------------------------------------------------------\nRan 1 test in 0.001s\n\nFAILED (failures=1)\n"
+        },
+        {
+          "stage": "restored",
+          "exit_code": 0,
+          "stdout": "",
+          "stderr": ".\n----------------------------------------------------------------------\nRan 1 test in 0.001s\n\nOK\n"
+        }
+      ],
+      "detected_and_restored": true
+    },
+    {
+      "mutation": "null_equality",
+      "test": "test_null_filter",
+      "implementation": "python-reference",
+      "original_sha256": "435ede81da6bd8da868b3d541df516b06ff5a644189d7e2c85933075d3472852",
+      "old": "if a is None or b is None:\n            return None",
+      "new": "if a is None or b is None:\n            return a is b",
+      "runs": [
+        {
+          "stage": "baseline",
+          "exit_code": 0,
+          "stdout": "",
+          "stderr": ".\n----------------------------------------------------------------------\nRan 1 test in 0.000s\n\nOK\n"
+        },
+        {
+          "stage": "mutated",
+          "exit_code": 1,
+          "stdout": "",
+          "stderr": "F\n======================================================================\nFAIL: test_null_filter (tests.test_reference.ReferenceTests.test_null_filter)\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"/tmp/rillscope-mutation-uf0diaxw/tests/test_reference.py\", line 98, in test_null_filter\n    self.assertEqual(self.run_node(node)['rows'], [])\n    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: Lists differ: [[3, None]] != []\n\nFirst list contains 1 additional elements.\nFirst extra element 0:\n[3, None]\n\n- [[3, None]]\n+ []\n\n----------------------------------------------------------------------\nRan 1 test in 0.001s\n\nFAILED (failures=1)\n"
+        },
+        {
+          "stage": "restored",
+          "exit_code": 0,
+          "stdout": "",
+          "stderr": ".\n----------------------------------------------------------------------\nRan 1 test in 0.001s\n\nOK\n"
+        }
+      ],
+      "detected_and_restored": true
+    },
+    {
+      "mutation": "join_deduplication",
+      "test": "test_identical_duplicate_join",
+      "implementation": "python-reference",
+      "original_sha256": "435ede81da6bd8da868b3d541df516b06ff5a644189d7e2c85933075d3472852",
+      "old": "self.bounded_append(rows, a + b)",
+      "new": "if a + b not in rows:\n                            self.bounded_append(rows, a + b)",
+      "runs": [
+        {
+          "stage": "baseline",
+          "exit_code": 0,
+          "stdout": "",
+          "stderr": ".\n----------------------------------------------------------------------\nRan 1 test in 0.000s\n\nOK\n"
+        },
+        {
+          "stage": "mutated",
+          "exit_code": 1,
+          "stdout": "",
+          "stderr": "F\n======================================================================\nFAIL: test_identical_duplicate_join (tests.test_reference.ReferenceTests.test_identical_duplicate_join)\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"/tmp/rillscope-mutation-l5mw9cpd/tests/test_reference.py\", line 112, in test_identical_duplicate_join\n    self.assertEqual(self.run_node(node, rows)['rows'], [[1, 5, 1, 5]] * 4)\n    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: Lists differ: [[1, 5, 1, 5]] != [[1, 5, 1, 5], [1, 5, 1, 5], [1, 5, 1, 5], [1, 5, 1, 5]]\n\nSecond list contains 3 additional elements.\nFirst extra element 1:\n[1, 5, 1, 5]\n\n- [[1, 5, 1, 5]]\n+ [[1, 5, 1, 5], [1, 5, 1, 5], [1, 5, 1, 5], [1, 5, 1, 5]]\n\n----------------------------------------------------------------------\nRan 1 test in 0.001s\n\nFAILED (failures=1)\n"
+        },
+        {
+          "stage": "restored",
+          "exit_code": 0,
+          "stdout": "",
+          "stderr": ".\n----------------------------------------------------------------------\nRan 1 test in 0.000s\n\nOK\n"
+        }
+      ],
+      "detected_and_restored": true
+    }
+  ],
+  "all_detected": true
+}

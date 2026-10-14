@@ -1,0 +1,7 @@
+# Dependency-free bootstrap lock; validate with cargo in the pinned toolchain.
+# This is not a fabricated resolution of any external package.
+version = 4
+
+[[package]]
+name = "rillscope"
+version = "0.1.0-dev"
