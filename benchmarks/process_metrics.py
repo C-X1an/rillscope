@@ -40,36 +40,54 @@ def windows_usage(process):
 
 def measured_child(command, *, cwd, prefix: Path, timeout=120):
     env = {key: os.environ[key] for key in ENVIRONMENT_KEYS if key in os.environ}
-    prefix.parent.mkdir(parents=True, exist_ok=True)
     clock = time.perf_counter_ns()
-    timed_out = False
-    if os.name == 'nt':
-        process = subprocess.Popen(command, cwd=cwd, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    timed_out = False; process = None; stdout = b''; stderr = b''; elapsed = None
+    usage = {'cpu_user_ns': None, 'cpu_system_ns': None, 'peak_rss_bytes': None,
+             'cpu_rss_status': 'NOT MEASURED', 'cpu_rss_instrument': 'unavailable'}
+    outcome = 'NOT STARTED'; problem = None
+    try:
+        prefix.parent.mkdir(parents=True, exist_ok=True)
+        clock = time.perf_counter_ns()
+        if os.name == 'nt':
+            actual_command = command
+        else:
+            time_binary = Path('/usr/bin/time')
+            if not time_binary.is_file():
+                outcome = 'INSTRUMENT UNAVAILABLE'; raise RuntimeError('GNU time required')
+            usage_path = prefix.with_suffix('.usage.json')
+            actual_command = [str(time_binary), '-f', '{"user_s":%U,"system_s":%S,"max_rss_kib":%M}', '-o', str(usage_path), '--', *command]
+        outcome = 'LAUNCH FAILED'
+        process = subprocess.Popen(actual_command, cwd=cwd, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                   start_new_session=os.name != 'nt')
+        outcome = 'EXECUTED'
         try: stdout, stderr = process.communicate(timeout=timeout)
         except subprocess.TimeoutExpired:
-            timed_out = True; process.kill(); stdout, stderr = process.communicate()
+            timed_out = True; outcome = 'TIMEOUT'
+            if os.name == 'nt': process.kill()
+            else:
+                import signal
+                os.killpg(process.pid, signal.SIGKILL)
+            stdout, stderr = process.communicate()
         elapsed = time.perf_counter_ns() - clock
-        usage = windows_usage(process)
-        code, pid = process.returncode, process.pid
-    else:
-        time_binary = Path('/usr/bin/time')
-        if not time_binary.is_file(): raise RuntimeError('required external GNU time CPU/RSS instrument unavailable')
-        usage_path = prefix.with_suffix('.usage.json')
-        wrapped = [str(time_binary), '-f', '{"user_s":%U,"system_s":%S,"max_rss_kib":%M}', '-o', str(usage_path), '--', *command]
-        process = subprocess.Popen(wrapped, cwd=cwd, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, start_new_session=True)
-        try: stdout, stderr = process.communicate(timeout=timeout)
-        except subprocess.TimeoutExpired:
-            import signal
-            timed_out = True; os.killpg(process.pid, signal.SIGKILL); stdout, stderr = process.communicate()
-        elapsed = time.perf_counter_ns() - clock
-        lines = usage_path.read_text().splitlines() if usage_path.is_file() else []
-        parsed = next((json.loads(line) for line in reversed(lines) if line.startswith('{')), None)
-        usage = {'cpu_user_ns': None if parsed is None else round(parsed['user_s'] * 1e9),
-                 'cpu_system_ns': None if parsed is None else round(parsed['system_s'] * 1e9),
-                 'peak_rss_bytes': None if parsed is None else parsed['max_rss_kib'] * 1024,
-                 'cpu_rss_instrument': 'GNU time on owned command; Linux max RSS converted KiB to bytes',
-                 'cpu_rss_status': 'MEASURED' if parsed is not None else 'NOT MEASURED'}
-        code, pid = process.returncode, process.pid
-    prefix.with_suffix('.stdout').write_bytes(stdout)
-    prefix.with_suffix('.stderr').write_bytes(stderr)
-    return {'exit_code': code, 'pid': pid, 'wall_ns': elapsed, 'timed_out': timed_out, **usage}, stdout, stderr
+        if os.name == 'nt': usage = windows_usage(process)
+        else:
+            lines = usage_path.read_text().splitlines() if usage_path.is_file() else []
+            parsed = next((json.loads(line) for line in reversed(lines) if line.startswith('{')), None)
+            if parsed is None: raise ValueError('GNU time result missing')
+            usage = {'cpu_user_ns': round(parsed['user_s'] * 1e9), 'cpu_system_ns': round(parsed['system_s'] * 1e9),
+                     'peak_rss_bytes': parsed['max_rss_kib'] * 1024, 'cpu_rss_instrument': 'GNU time on owned command; Linux max RSS KiB converted to bytes',
+                     'cpu_rss_status': 'MEASURED'}
+    except (OSError, RuntimeError, ValueError, KeyError, TypeError) as error:
+        problem = type(error).__name__
+        if process is not None and process.poll() is None:
+            process.kill(); stdout, stderr = process.communicate()
+        if outcome == 'EXECUTED': outcome = 'INSTRUMENT FAILED'
+    if elapsed is None: elapsed = time.perf_counter_ns() - clock
+    try:
+        prefix.with_suffix('.stdout').write_bytes(stdout)
+        prefix.with_suffix('.stderr').write_bytes(stderr)
+    except OSError as error:
+        problem = 'artifact write: ' + type(error).__name__; outcome = 'ARTIFACT WRITE FAILED'
+    return {'exit_code': None if process is None else process.returncode,
+            'pid': None if process is None else process.pid, 'wall_ns': elapsed, 'timed_out': timed_out,
+            'process_outcome': outcome, 'instrument_problem': problem, **usage}, stdout, stderr

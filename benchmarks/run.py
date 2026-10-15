@@ -11,6 +11,7 @@ import os
 from pathlib import Path
 import platform
 import random
+import shutil
 import sqlite3
 import statistics
 import subprocess
@@ -23,6 +24,8 @@ sys.path.insert(0, str(ROOT / 'benchmarks'))
 from evidence import source_identity
 from process_metrics import measured_child
 from workloads import SEEDS, descriptors, write_case
+from envelopes import terminal
+from build import verify_build
 
 WARMUPS, REPETITIONS = 5, 30
 MODES = ('rust-on', 'rust-off', 'sqlite')
@@ -121,20 +124,16 @@ def sample(mode, binary, case, description, spec, output, phase, repetition, ord
               'inputs': hashes, **usage, 'stdout_sha256': hashlib.sha256(stdout).hexdigest(),
               'stderr_sha256': hashlib.sha256(stderr).hexdigest(), 'measurement': None,
               'status': 'INVALID', 'problems': []}
+    if usage.get('process_outcome', 'EXECUTED') != 'EXECUTED': record['problems'].append('process/instrument attempt failed')
+    if usage['timed_out']: record['problems'].append('process timeout')
+    if usage['cpu_rss_status'] != 'MEASURED': record['problems'].append('CPU/RSS instrument unavailable')
     try:
-        result = json.loads(stdout)
-        if not isinstance(result, dict) or result.get('status') not in ('ok', 'error'):
-            raise ValueError('not a terminal envelope')
+        result = terminal(stdout, stderr, usage['exit_code'], mode)
         record['status'] = result['status'].upper()
         record['result_digest'] = semantic_digest(result, spec['ordered'])
         if result['status'] == 'error': record['error_code'] = result['error']['code']
         if result['status'] == 'ok' and result['schema'] != spec['schema']:
             record['problems'].append('independent expected schema mismatch')
-        if stderr: record['problems'].append('unexpected stderr')
-        if (usage['exit_code'] == 0) != (result['status'] == 'ok' or mode == 'sqlite'):
-            record['problems'].append('exit code/envelope disagreement')
-        if usage['timed_out']: record['problems'].append('process timeout')
-        if usage['cpu_rss_status'] != 'MEASURED': record['problems'].append('CPU/RSS instrument unavailable')
         if not measurement.is_file():
             record['problems'].append('measurement artifact missing')
         else:
@@ -156,6 +155,8 @@ def sample(mode, binary, case, description, spec, output, phase, repetition, ord
                 if key in data: record[key] = data[key]
         if result['status'] == 'error' and mode != 'sqlite' and result['error']['code'] not in ('E_BUDGET', 'E_OUTPUT_LIMIT'):
             record['problems'].append('unexpected product rejection')
+        if description.get('expected_product_status') and mode != 'sqlite' and record.get('error_code', record['status']) != description['expected_product_status']:
+            record['problems'].append('predetermined control outcome mismatch')
         return record, result
     except (ValueError, KeyError, TypeError) as error:
         record['problems'].append('invalid result/instrumentation: ' + type(error).__name__)
@@ -178,7 +179,21 @@ def summarize_case(records):
     return summary
 
 
-def execute_case(binary, description, seed, directory, stream):
+def pair_verdict(triplet, spec):
+    oracle = next(result for record, result in triplet if record['mode'] == 'sqlite')
+    modes = {}
+    for record, result in triplet:
+        problems = []
+        if result is None: problems.append('terminal result unavailable')
+        if result is not None and result['status'] == 'ok' and record['mode'] != 'sqlite':
+            if oracle is None or oracle['status'] != 'ok': problems.append('successful Rust output has no successful independent oracle')
+            elif canonical(result, spec['ordered']) != canonical(oracle, spec['ordered']): problems.append('independent SQLite result mismatch')
+        exact = result is not None and result['status'] == 'ok' and oracle is not None and oracle['status'] == 'ok' and canonical(result, spec['ordered']) == canonical(oracle, spec['ordered'])
+        modes[record['mode']] = {'problems': problems, 'oracle_comparison': 'EXACT' if exact else 'NO SUCCESSFUL RESULT TO COMPARE'}
+    return {'phase': triplet[0][0]['phase'], 'repetition': triplet[0][0]['repetition'], 'modes': modes}
+
+
+def execute_case(binary, description, seed, directory, stream, pairing_stream):
     case = directory / 'inputs'
     spec = write_case(case, description, seed)
     hashes = {name: sha(case / name) for name in ('catalog.json', 'context.json', 'query.json', 'case.json')}
@@ -192,20 +207,12 @@ def execute_case(binary, description, seed, directory, stream):
                 record, result = sample(mode, binary, case, description, spec, directory / 'raw', phase, repetition, index, hashes)
                 record.update(workload=description['id'], seed=seed)
                 triplet.append((record, result))
-            oracle = next(result for record, result in triplet if record['mode'] == 'sqlite')
-            for record, result in triplet:
-                if result is not None and result['status'] == 'ok' and record['mode'] != 'sqlite':
-                    if oracle is None or oracle['status'] != 'ok':
-                        record['problems'].append('successful Rust output has no successful independent oracle')
-                    elif canonical(result, spec['ordered']) != canonical(oracle, spec['ordered']):
-                        record['problems'].append('independent SQLite result mismatch')
-                if description.get('expected_product_status') and record['mode'] != 'sqlite':
-                    if record.get('error_code', record['status']) != description['expected_product_status']:
-                        record['problems'].append('predetermined control outcome mismatch')
-                # Legitimate finite-budget/output rejection remains a recorded outcome, never a successful query.
-                record['oracle_comparison'] = 'EXACT' if result is not None and result['status'] == 'ok' and oracle is not None and oracle['status'] == 'ok' and canonical(result, spec['ordered']) == canonical(oracle, spec['ordered']) else 'NO SUCCESSFUL RESULT TO COMPARE'
-                if record['problems']: invalid += 1
+                # Persist each completed/failed attempt before starting the next mode.
                 stream.write(encode(record) + '\n'); stream.flush(); records.append(record)
+            verdict = pair_verdict(triplet, spec)
+            verdict.update(workload=description['id'], seed=seed)
+            pairing_stream.write(encode(verdict) + '\n'); pairing_stream.flush()
+            invalid += sum(bool(record['problems'] or verdict['modes'][record['mode']]['problems']) for record, _ in triplet)
     after = {name: sha(case / name) for name in hashes}
     summary = {'workload': description, 'seed': seed, 'inputs': hashes,
                'input_identity_stable': hashes == after, 'invalid_observations': invalid,
@@ -223,8 +230,8 @@ def batch_rejection(binary, out):
     command = command_for('rust-on', binary, case, case / 'measurement.json', description)
     usage, stdout, stderr = measured_child(command, cwd=ROOT, prefix=case / 'actual')
     try:
-        value = json.loads(stdout)
-        passed = usage['exit_code'] != 0 and not stderr and value['status'] == 'error' and value['error']['code'] == 'E_CONTEXT' and 'rows' not in value
+        value = terminal(stdout, stderr, usage['exit_code'], 'rust-on')
+        passed = value['status'] == 'error' and value['error']['code'] == 'E_CONTEXT'
     except (ValueError, KeyError, TypeError):
         passed = False
     record = {'batch_rows': 4096, 'status': 'PASS' if passed else 'FAIL', **usage,
@@ -240,14 +247,21 @@ def main():
     parser.add_argument('--out', type=Path, required=True)
     parser.add_argument('--binary', type=Path, default=ROOT / 'target/release' / ('rillscope-measure.exe' if os.name == 'nt' else 'rillscope-measure'))
     parser.add_argument('--profile', choices=('full', 'instrumentation-pilot'), default='full')
+    parser.add_argument('--build-receipt', type=Path, required=True)
     args = parser.parse_args()
     binary = args.binary.resolve()
     if not binary.is_file(): raise SystemExit('FAIL: build the release rillscope-measure binary first')
+    build = verify_build(args.build_receipt, binary, name='rillscope-measure')
+    build_hash = sha(args.build_receipt)
     if args.out.exists(): raise SystemExit('FAIL: output must be a new directory; no overwrites or omitted original runs')
     args.out.mkdir(parents=True)
     identity = source_identity(ROOT)
     binary_hash = sha(binary)
-    compiler = subprocess.run(['rustc', '--version', '--verbose'], capture_output=True, text=True, check=True).stdout
+    compiler = build['compiler']
+    build_out = args.out / 'build'
+    build_out.mkdir()
+    for name in ('build.json', 'cargo.stdout', 'cargo.stderr'):
+        shutil.copyfile(args.build_receipt.parent / name, build_out / name)
     commit = subprocess.run(['git', 'rev-parse', 'HEAD'], cwd=ROOT, capture_output=True, text=True, check=True).stdout.strip()
     dirty = bool(subprocess.run(['git', 'status', '--porcelain'], cwd=ROOT, capture_output=True, text=True, check=True).stdout.strip())
     chosen = descriptors()
@@ -262,9 +276,10 @@ def main():
                   chosen[-1]]
         chosen = [dict(row, expected_product_status='E_BUDGET' if row['family'] == 'budget' else 'OK') for row in chosen]
         seeds = SEEDS[:1]
-    manifest = {'schema_version': 1, 'profile': args.profile, 'started_utc': dt.datetime.now(dt.timezone.utc).isoformat(),
+    manifest = {'schema_version': 2, 'profile': args.profile, 'started_utc': dt.datetime.now(dt.timezone.utc).isoformat(),
                 'source': identity, 'commit': commit, 'dirty': dirty, 'binary_sha256': binary_hash,
                 'cargo_lock_sha256': sha(ROOT / 'Cargo.lock'), 'compiler': compiler, 'build_profile': 'release',
+                'build_receipt_sha256': build_hash, 'build': build,
                 'environment': environment(), 'warmups': WARMUPS, 'repetitions': REPETITIONS, 'seeds': seeds,
                 'chosen_workloads': chosen, 'expected_cases': len(chosen) * len(seeds),
                 'expected_observations': len(chosen) * len(seeds) * (WARMUPS + REPETITIONS) * len(MODES),
@@ -278,24 +293,25 @@ def main():
     (args.out / 'manifest.json').write_text(json.dumps(manifest, indent=2) + '\n', encoding='utf-8')
     batch_control = batch_rejection(binary, args.out)
     summaries = []
-    with (args.out / 'samples.jsonl').open('x', encoding='utf-8', newline='\n') as stream:
+    with (args.out / 'samples.jsonl').open('x', encoding='utf-8', newline='\n') as stream, (args.out / 'pair-verdicts.jsonl').open('x', encoding='utf-8', newline='\n') as pairing_stream:
         for description in chosen:
             for seed in seeds:
                 case = args.out / (description['id'] + '-seed' + str(seed))
-                summary = execute_case(binary, description, seed, case, stream)
+                summary = execute_case(binary, description, seed, case, stream, pairing_stream)
                 summaries.append(summary)
                 print(encode({'completed_cases': len(summaries), 'expected_cases': manifest['expected_cases'],
                               'workload': description['id'], 'seed': seed, 'invalid_observations': summary['invalid_observations']}), flush=True)
-    stable = identity['sha256'] == source_identity(ROOT)['sha256'] and binary_hash == sha(binary)
+    stable = identity['sha256'] == source_identity(ROOT)['sha256'] and binary_hash == sha(binary) and build_hash == sha(args.build_receipt)
     complete = len(summaries) == manifest['expected_cases'] and all(row['input_identity_stable'] for row in summaries)
     invalid = sum(row['invalid_observations'] for row in summaries) + int(batch_control['status'] != 'PASS')
-    result = {'schema_version': 1, 'profile': args.profile, 'completed_cases': len(summaries),
+    result = {'schema_version': 2, 'profile': args.profile, 'completed_cases': len(summaries),
               'expected_cases': manifest['expected_cases'], 'complete_grid': args.profile == 'full' and complete,
               'invalid_observations': invalid, 'source_binary_inputs_stable': stable and complete,
               'batch_limit_control': batch_control,
               'instrumentation_status': 'PASS' if stable and complete and invalid == 0 else 'FAIL',
               'release_status': 'NOT EVALUATED: reference host/cancellation and final release evidence are separate',
               'finished_utc': dt.datetime.now(dt.timezone.utc).isoformat(), 'samples_sha256': sha(args.out / 'samples.jsonl'),
+              'pair_verdicts_sha256': sha(args.out / 'pair-verdicts.jsonl'),
               'summaries': summaries}
     (args.out / 'results.json').write_text(json.dumps(result, indent=2) + '\n', encoding='utf-8')
     print(encode({key: value for key, value in result.items() if key != 'summaries'}))

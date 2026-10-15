@@ -26,10 +26,14 @@ An initial six-case instrument pilot retained all 630 observations but failed so
 
 The locked PRD caps batches at 1024 and allows trusted callers only to tighten limits. The earlier supporting suggestion of 4096 is therefore exercised as an expected `E_CONTEXT` rejection control; it does not authorize relaxing the product limit. Throughput runs use 128 and 1024. This preserves the locked contract.
 
+An independent performance source inspection subsequently found insufficient summary/build/error validation and incorrectly realized workload dimensions. Those findings have explicit failing integrator probes and fixes. Group cardinality now counts distinct authorized group values including NULL, and the 100,000-group case uses 200,000 input rows to realize that dimension. Join key coverage is guaranteed in authorized rows; the composite component independently distinguishes collisions. The equal-sort variant has equal complete keys. Actual realized shapes are retained in each case. Historical pilot PASS records remain dated instrument evidence rather than qualifying current performance claims.
+
+Current instrumentation requires a successful actual Cargo build receipt from a new target directory, with source/lock/toolchain, observed optimization profile and executable digests. Every process attempt is journaled before the next mode starts; pairing verdicts are separate. Failed terminal objects cannot contain rows/schema, and exit codes must match the API. The checker validates case and top-level summaries against retained samples. Source-bound schema-2 pilot validation has passed; the complete grid is still NOT RUN. Failed cold builds and failed long-path attempts are retained. Compact owned artifact paths resolve the observed Windows GNU/Python path limits without changing OS policy.
+
 ```sh
 make benchmark-pilot      # fixed instrument controls; explicitly not the full grid
 make benchmark-local      # all 410 cases on the actual available host
-python3 benchmarks/verify.py .local-runs/bench/<run>
+python3 benchmarks/verify.py .local-runs/bench/<run>/grid
 make benchmark            # dedicated reference preflight, full grid, Linux cancel campaign
 ```
 

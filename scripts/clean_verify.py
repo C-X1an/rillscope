@@ -59,6 +59,9 @@ def main():
     marker.write_text(json.dumps({'fresh_clone_root': str(clone), 'commit': commit,
                                  'source_sha256': identity['sha256']}) + '\n')
     env = os.environ.copy(); env['RILLSCOPE_CLEAN_SCOPE_FILE'] = str(marker)
+    target_directory = clone / 'target'
+    if target_directory.exists(): raise ValueError('fresh clone already has build output')
+    env['CARGO_TARGET_DIR'] = 'target'  # Every command below has cwd=clone; avoid GNU absolute-path limits.
     targets = ['bootstrap', 'verify', 'demo']
     # A failed make verify stops its dependency sequence. Retain that failure and
     # execute subsequent independent gates explicitly; never relabel the aggregate.
@@ -77,6 +80,7 @@ def main():
     report = {'mode': 'fresh-committed-Rust-checkout', 'status': 'PASS' if passed else 'FAIL',
               'commit': commit, 'source_sha256': identity['sha256'], 'source_stable': stable,
               'same_os_and_toolchain_installation': True, 'target_directory_was_fresh': True,
+              'cargo_target_dir_enforced_inside_fresh_clone': True,
               'commands': results, 'finished_utc': dt.datetime.now(dt.timezone.utc).isoformat()}
     (out / 'results.json').write_text(json.dumps(report, indent=2) + '\n')
     print(json.dumps(report, indent=2))

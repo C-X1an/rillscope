@@ -278,6 +278,13 @@ pub struct Column {
 }
 impl Column {
     pub fn from_values(dtype: DataType, values: &[Value]) -> Result<Self> {
+        Self::from_values_checked(dtype, values, &mut || Ok(()))
+    }
+    fn from_values_checked(
+        dtype: DataType,
+        values: &[Value],
+        checkpoint: &mut impl FnMut() -> Result<()>,
+    ) -> Result<Self> {
         let mut validity = Validity::new(values.len())?;
         let mut ints = Vec::new();
         let mut bools = Vec::new();
@@ -293,6 +300,7 @@ impl Column {
             offsets.push(0);
         }
         for (i, value) in values.iter().enumerate() {
+            checkpoint()?;
             if value.data_type() != dtype {
                 return Err(E::Type.into());
             }
@@ -383,24 +391,47 @@ pub struct Batch {
 }
 impl Batch {
     pub fn from_rows(fields: Vec<Field>, rows: &[Row]) -> Result<Self> {
+        Self::from_rows_checked(fields, rows, &mut || Ok(()))
+    }
+    pub(crate) fn from_rows_checked(
+        fields: Vec<Field>,
+        rows: &[Row],
+        checkpoint: &mut impl FnMut() -> Result<()>,
+    ) -> Result<Self> {
         // Internal joins/group lowering can carry four bounded scan schemas.
         // The binder and verifier separately enforce the public 64-column result cap.
-        if fields.len() > 256 || rows.iter().any(|r| r.len() != fields.len()) {
+        if fields.len() > 256 {
             return Err(E::Plan.into());
+        }
+        for row in rows {
+            checkpoint()?;
+            if row.len() != fields.len() {
+                return Err(E::Plan.into());
+            }
         }
         let mut columns = Vec::new();
         columns
             .try_reserve_exact(fields.len())
             .map_err(|_| E::Budget)?;
         for (i, field) in fields.iter().enumerate() {
-            let values: Vec<_> = rows
-                .iter()
-                .map(|r| r.get(i).cloned().ok_or(E::Plan.into()))
-                .collect::<Result<_>>()?;
-            if !field.nullable && values.iter().any(Value::is_null) {
-                return Err(E::Type.into());
+            checkpoint()?;
+            let mut values = Vec::new();
+            values
+                .try_reserve_exact(rows.len())
+                .map_err(|_| E::Budget)?;
+            for row in rows {
+                checkpoint()?;
+                let value = row.get(i).ok_or(E::Plan)?;
+                if !field.nullable && value.is_null() {
+                    return Err(E::Type.into());
+                }
+                values.push(value.clone());
             }
-            columns.push(Column::from_values(field.data_type, &values)?);
+            columns.push(Column::from_values_checked(
+                field.data_type,
+                &values,
+                checkpoint,
+            )?);
         }
         Ok(Self {
             fields,

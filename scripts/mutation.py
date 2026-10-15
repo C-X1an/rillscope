@@ -18,6 +18,7 @@ CONTROLS = [
     ('sort_reorder_checkpoint', 'src/operators/stream.rs', 'budget.observe("sort_reorder_output")?;\n            budget.charge(1)?;', '/* Intentionally removed reorder cancellation/work checkpoint. */', 'operators::stream::review_tests::reorder_observes_mid_loop_cancellation_and_work_limit'),
     ('binding_identity_anchor', 'src/verify.rs', '!plan.binding_identity_matches()', 'false', 'verify::tests::reject_context_and_snapshot_substitution_before_verification'),
     ('retained_schema_reservation', 'src/execute.rs', 'let schema_reservation = budget.reserve(schema_bytes(plan.root())?)?;', 'let schema_reservation = budget.reserve(0)?;', 'execute::tests::empty_result_schema_is_reserved_and_retained'),
+    ('batch_conversion_checkpoint', 'src/operators/stream.rs', 'budget.observe("batch_conversion_chunk")?;', '/* Intentionally removed conversion checkpoint. */', 'operators::stream::review_tests::batch_conversion_observes_mid_column_cancellation'),
 ]
 
 def run(command, cwd, out, env):

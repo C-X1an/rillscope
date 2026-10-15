@@ -12,16 +12,16 @@ RillScope is an experimental original Rust restricted-query compiler and executo
 | Original pull-based batch engine | Implemented scan/filter/project, duplicate-preserving hash join, nullable aggregation, stable bounded sort, limit |
 | Work, logical reservations, cancellation and collector | Implemented; finite charges, RAII release, typed failures and complete result publication |
 | Optimizer | Implemented projection pruning and pure filter pushdown, with no push beneath PolicyScan; predicts growth before cloning; bounded traversal and 16-pass convergence, with E_PLAN for nonconvergence |
-| Local source checks | PASS at recorded revisions: Rust 1.99 GNU Windows build/fmt/Clippy/check; 34 Rust unit tests; 28 real CLI/system tests |
+| Local source checks | PASS at recorded revisions: Rust 1.99 GNU Windows build/fmt/Clippy/check; 35 Rust unit tests; 28 real CLI/system tests plus two adapter/report tests |
 | Generated semantic / malformed corpus | PASS at recorded revisions: 1,000 cases comparing both JSON and SQL, optimizer on/off, with scoped SQLite; 2,000 finite malformed inputs (1,000 JSON + 1,000 SQL); raw verdicts preserved |
 | Actual process failure | PASS: CLI killed after a real join checkpoint; catalog raw SHA-256 unchanged; independent rerun succeeded |
 | Linux | Cross-target static check PASS; actual Linux runtime and signal latency NOT RUN |
 | Selected Rust mutations | Eight actual Rust PASS-FAIL-PASS controls at committed source 842eb118; actual HTML escape PASS-FAIL-PASS at d134878 |
 | Rust demo, adapter and browser review | PASS: actual alpha/denial/beta Rust calls with scoped SQLite; two adapter/HTML tests; real Chrome desktop/narrow captures and keyboard inspection |
-| Rust benchmarks and reference-host targets | Synthetic release measurement binary and complete grid runner implemented; 630-observation instrument pilot PASS after recorded failed run/fix; full grid and dedicated Linux target measurements pending |
-| Independent review | Four independent source inspections at two pinned revisions identified defects; integrator reproduced failures and fixed/retested them. Reviewers executed no commands; final release review/full clean execution remains pending |
+| Rust benchmarks and reference-host targets | Actual source-bound release build and 630-observation schema-2 instrument pilot PASS; failed attempts retained. Independent performance findings reproduced/fixed; full 410-case grid and dedicated Linux target measurements pending |
+| Independent review | Five independent source inspections at three pinned revisions identified defects; integrator reproduced failures and fixed/retested them. Reviewers executed no commands; final release review/full clean execution remains pending |
 | Resolved licenses / online dependency policy | Actual graph: 26 registry packages and 27 preserved notice files; inventory and online advisory/policy scans PASS at recorded revision/database time |
-| Fresh complete Rust checkout | NOT RUN / pending |
+| Fresh complete Rust checkout | Actual frozen 444fbf9 checkout executed: bootstrap/demo/reference/property/malformed/nine selected mutation controls/online policy PASS; aggregate verify FAIL, Windows symlink setup FAIL, reference benchmark BLOCKED. Final corrected source reproduction pending |
 | Public remote repository / CI | NOT RUN; publication remains pending reviewed export/release preparation |
 
 Recorded checks do not prove complete correctness or complete vulnerability coverage. The 1,000-case generator uses ten small-catalog families; the malformed campaign is finite seeded testing, not a libFuzzer-duration claim. The reproduced SQL nesting stack overflow, optimizer expansion rejection, grouped qualification error, unsupported SQL ordering acceptance and missing expression reservations have regression tests. Reservations cover expression temporaries; sort reordering now charges/checks every row. Hardware capacities in PRD remain design capacities unless measured separately. Logical reservations are distinct from process RSS and OS containment.

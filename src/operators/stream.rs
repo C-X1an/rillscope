@@ -31,14 +31,22 @@ impl Rows {
         let bytes = batch.row_bytes(row)?;
         self.push_with(bytes, || batch.row(row))
     }
-    pub fn frame(self, fields: &[Field], budget: &Budget) -> Result<Frame> {
+    pub fn frame(self, fields: &[Field], budget: &mut Budget) -> Result<Frame> {
         let bytes = self
             .bytes
             .checked_mul(2)
             .and_then(|x| x.checked_add(fields.len() * 128 + 256))
             .ok_or(E::Budget)?;
         let reservation = budget.reserve(bytes)?;
-        let batch = Batch::from_rows(fields.to_vec(), &self.data)?;
+        let mut steps = 0usize;
+        let batch = Batch::from_rows_checked(fields.to_vec(), &self.data, &mut || {
+            steps = steps.checked_add(1).ok_or(E::Budget)?;
+            if steps.is_multiple_of(1024) {
+                budget.observe("batch_conversion_chunk")?;
+            }
+            Ok(())
+        })?;
+        budget.checkpoint()?;
         Ok(Frame {
             batch,
             _reservation: reservation,
@@ -351,6 +359,46 @@ mod review_tests {
         Arc,
         atomic::{AtomicBool, Ordering},
     };
+    #[test]
+    fn batch_conversion_observes_mid_column_cancellation() -> Result<()> {
+        use crate::types::DataType;
+        use std::sync::{
+            Arc,
+            atomic::{AtomicBool, AtomicUsize, Ordering},
+        };
+        let flag = Arc::new(AtomicBool::new(false));
+        let observed = Arc::new(AtomicUsize::new(0));
+        let mut budget = Budget::new(crate::budget::Limits::default(), flag.clone(), None)?;
+        let mut rows = Rows::new(&budget)?;
+        let fields: Vec<_> = (0..64)
+            .map(|i| Field {
+                name: format!("c{i}"),
+                data_type: DataType::I64,
+                nullable: false,
+            })
+            .collect();
+        for _ in 0..1024 {
+            let row = vec![Value::I64(7); 64];
+            rows.push_with(row_bytes(&row)?, || Ok(row))?;
+        }
+        let calls = observed.clone();
+        budget.set_observer(move |stage| {
+            if stage == "batch_conversion_chunk" && calls.fetch_add(1, Ordering::AcqRel) == 2 {
+                flag.store(true, Ordering::Release);
+            }
+            Ok(())
+        });
+        assert_eq!(
+            rows.frame(&fields, &mut budget)
+                .err()
+                .map(|error| error.code),
+            Some(E::Cancelled)
+        );
+        assert_eq!(observed.load(Ordering::Acquire), 3);
+        assert_eq!(budget.reserved_bytes(), 0);
+        Ok(())
+    }
+
     #[test]
     fn reorder_observes_mid_loop_cancellation_and_work_limit() -> Result<()> {
         let cancelled = Arc::new(AtomicBool::new(false));

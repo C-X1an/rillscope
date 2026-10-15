@@ -35,11 +35,9 @@ security-online:
 	cargo audit
 	cargo deny check
 benchmark-local:
-	$(CARGO) build --release --locked
-	$(PYTHON) benchmarks/run.py --out .local-runs/bench/full-$$(date +%s)-$$$$
+	$(PYTHON) benchmarks/dispatch.py --profile full
 benchmark-pilot:
-	$(CARGO) build --release --locked
-	$(PYTHON) benchmarks/run.py --profile instrumentation-pilot --out .local-runs/bench/pilot-$$(date +%s)-$$$$
+	$(PYTHON) benchmarks/dispatch.py --profile instrumentation-pilot
 clean-verify:
 	$(PYTHON) scripts/clean_verify.py
 verify: contracts build fmt lint check test integration acceptance security security-online property fuzz mutation benchmark demo clean-verify

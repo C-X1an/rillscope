@@ -16,16 +16,16 @@ def descriptors():
         for skew in ('uniform', 'heavy'):
             for composite in (False, True):
                 out.append({'id': f'B02-k{keys}-{skew}-composite{int(composite)}', 'family': 'join',
-                            'rows': keys * 2, 'keys': keys, 'skew': skew, 'composite': composite, 'null_percent': 10, 'batch_rows': 1024})
+                            'rows': keys * 3, 'keys': keys, 'skew': skew, 'composite': composite, 'null_percent': 10, 'batch_rows': 1024})
     for groups in (0, 10, 1000, 100000):
-        out.append({'id': f'B03-g{groups}', 'family': 'aggregate', 'rows': 0 if groups == 0 else 100000,
+        out.append({'id': f'B03-g{groups}', 'family': 'aggregate', 'rows': 0 if groups == 0 else max(100000, groups * 2),
                     'groups': groups, 'null_percent': 10, 'batch_rows': 1024})
     out.append({'id': 'B03-all-null', 'family': 'aggregate', 'rows': 10000, 'groups': 0,
                 'all_null': True, 'null_percent': 100, 'batch_rows': 1024})
     for size in (10000, 100000):
         for order in ('ordered', 'reverse', 'random', 'equal'):
             out.append({'id': f'B04-n{size}-{order}', 'family': 'sort', 'rows': size, 'order': order,
-                        'null_percent': 10, 'batch_rows': 1024})
+                        'null_percent': 0 if order == 'equal' else 10, 'batch_rows': 1024})
     out.append({'id': 'B06-tiny-work', 'family': 'budget', 'rows': 100, 'keys': 1, 'skew': 'heavy',
                 'null_percent': 0, 'batch_rows': 1024, 'max_work': 1000})
     return out
@@ -39,19 +39,32 @@ def make_catalog(description, seed):
                       {'name': 'grp', 'type': 'text', 'nullable': True}, {'name': 'flag', 'type': 'bool', 'nullable': True},
                       {'name': 'hidden', 'type': 'text', 'nullable': False}]
     sales, lookup = [], []
+    authorized_seen = 0
     for i in range(description['rows']):
         nullable = rng.randrange(100) < description['null_percent']
         family = description['family']
         tenant = 'alpha' if family == 'filter' or i % 4 != 3 else 'beta'
+        authorized_ordinal = authorized_seen
+        if tenant == 'alpha': authorized_seen += 1
         key = i
         if family in ('join', 'budget'):
-            key = 0 if description['skew'] == 'heavy' and rng.randrange(100) < 80 else i % description['keys']
+            ordinal = authorized_ordinal if tenant == 'alpha' else i
+            key = 0 if description['skew'] == 'heavy' and rng.randrange(100) < 80 else ordinal % description['keys']
             if nullable: key = None
+            # Coverage is guaranteed inside the authorized relation, independently of tenant/NULL/skew.
+            if tenant == 'alpha' and authorized_ordinal < description['keys']: key = authorized_ordinal
         elif family == 'sort' and description['order'] == 'equal': key = 1
         group = None if nullable else 'g' + str(i % max(1, description.get('groups', 100)))
+        if family == 'aggregate' and description.get('groups', 0):
+            groups = description['groups']
+            if tenant == 'alpha' and authorized_ordinal < groups:
+                group = None if authorized_ordinal == groups - 1 else 'g' + str(authorized_ordinal)
+            else:
+                group = None if nullable else 'g' + str(i % max(1, groups - 1))
         amount = None if nullable or description.get('all_null') else i % 100
+        if family == 'sort' and description['order'] == 'equal': amount = 0
         if family in ('join', 'budget'):
-            group = None if key is None else 'g' + str(key % 7)
+            group = None if key is None else 'g' + str(i % 7)
         sales.append([tenant, key, amount, group, None if nullable else i % 2 == 0, 'SYNTHETIC_HIDDEN'])
         if family in ('join', 'budget'):
             lookup.append([tenant, key, group, None if nullable else i % 2 == 0, 'SYNTHETIC_LOOKUP_HIDDEN'])
@@ -106,6 +119,31 @@ def write_case(directory: Path, description, seed):
     request, sql, schema, ordered = query(description)
     for name, value in [('catalog.json', catalog), ('context.json', context()), ('query.json', request)]:
         (directory / name).write_bytes(json.dumps(value, ensure_ascii=False, separators=(',', ':')).encode())
-    spec = {'description': description, 'seed': seed, 'sql': sql, 'schema': schema, 'ordered': ordered}
+    realized = realized_shape(catalog)
+    if description['family'] == 'aggregate' and description.get('groups', 0):
+        if realized['authorized_distinct_group_values_including_null'] != description['groups']:
+            raise ValueError('advertised authorized group cardinality not realized')
+    if description['family'] in ('join', 'budget'):
+        if realized['authorized_distinct_nonnull_keys'] != description['keys']:
+            raise ValueError('advertised authorized join key cardinality not realized')
+        if description.get('composite') and not realized['first_key_collisions_with_distinct_second_keys']:
+            raise ValueError('composite components are not independently distinguishing')
+    if description['family'] == 'sort' and description['order'] == 'equal' and realized['authorized_distinct_complete_sort_keys'] != 1:
+        raise ValueError('equal sort workload does not have equal complete keys')
+    spec = {'description': description, 'seed': seed, 'sql': sql, 'schema': schema, 'ordered': ordered,
+            'realized_shape': realized, 'group_cardinality_definition': 'authorized distinct group values including NULL',
+            'null_percent_definition': 'nominal seeded selection; mandatory authorized key/group coverage may override key NULLs'}
     (directory / 'case.json').write_bytes(json.dumps(spec, ensure_ascii=False).encode())
     return spec
+
+
+def realized_shape(catalog):
+    rows = [row for row in catalog['tables']['sales']['rows'] if row[0] == 'alpha']
+    components = {}
+    for row in rows:
+        if row[1] is not None and row[3] is not None: components.setdefault(row[1], set()).add(row[3])
+    return {'authorized_rows': len(rows), 'authorized_null_join_keys': sum(row[1] is None for row in rows),
+            'authorized_distinct_nonnull_keys': len({row[1] for row in rows if row[1] is not None}),
+            'authorized_distinct_group_values_including_null': len({row[3] for row in rows}),
+            'authorized_distinct_complete_sort_keys': len({(row[1], row[2]) for row in rows}),
+            'first_key_collisions_with_distinct_second_keys': any(len(values) > 1 for values in components.values())}

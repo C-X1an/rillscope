@@ -54,5 +54,41 @@
   "claims-link-audit": {
     "path": "verification/product/runs/claims-link-audit.json",
     "sha256": "6b8efae1d549a016fb1223f68d668d6ceb14d181ccfcae7857d0ceb48250ee69"
+  },
+  "performance-fixed-core": {
+    "path": "verification/product/runs/performance-fixed-core.json",
+    "sha256": "cf5078460c1e3d76cb4d4b24a8367bcc0233ee1f87b41715d3ba7a882ded64ae"
+  },
+  "performance-validator-controls": {
+    "path": "verification/product/runs/performance-validator-controls.json",
+    "sha256": "4bdfb1623f875aade7a6b32cca164417f3f79e95dcd6bcea074f00d1f39e76fa"
+  },
+  "performance-counterexamples-before": {
+    "path": "verification/product/runs/performance-counterexamples-before.json",
+    "sha256": "38fecb022330d25b8495d6c057c2b0ca19c086adc8d9c812c71c984bc803227b"
+  },
+  "performance-counterexamples-after": {
+    "path": "verification/product/runs/performance-counterexamples-after.json",
+    "sha256": "638e8cfba47451e926105765b3e840bae4d71c7ed389e203cd83f1eb75e020e2"
+  },
+  "fresh-rust-candidate-failed": {
+    "path": "verification/product/runs/fresh-rust-candidate-failed.json",
+    "sha256": "5b855578cc26033c5102bcffc69b1a261d3238c8371178b5f3750ec53295a577"
+  },
+  "source-bound-pilot-v2": {
+    "path": "verification/product/runs/source-bound-pilot-v2.json",
+    "sha256": "a49e889d4621c21a66a92ce4c08f5e9eeb1b14bd837c5c85013ebe0a17957b5d"
+  },
+  "performance-fixed-differential": {
+    "path": "verification/product/runs/performance-fixed-differential.json",
+    "sha256": "91f81f17172e71090af9a23621df4bb6da65d25e78cc1dc34899a715dc5a0b28"
+  },
+  "performance-fixed-malformed": {
+    "path": "verification/product/runs/performance-fixed-malformed.json",
+    "sha256": "eea94a882e58fd44307b6190fb89a8d8e83a47eecf6624fcc75df2c753966e84"
+  },
+  "source-bound-pilot-controls": {
+    "path": "verification/product/runs/source-bound-pilot-controls.json",
+    "sha256": "da94eec57fbf72ecde82851a593d6c338412e20fcd5e75987b97a35f14e7ef4e"
   }
 }
