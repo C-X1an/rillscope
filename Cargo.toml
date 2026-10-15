@@ -6,6 +6,7 @@ rust-version = "1.99"
 license = "MIT"
 description = "Experimental policy-aware restricted query compiler and bounded executor"
 publish = false
+default-run = "rillscope"
 
 [dependencies]
 serde = { version = "=1.0.229", features = ["derive"] }

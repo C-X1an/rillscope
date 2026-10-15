@@ -1,0 +1,273 @@
+{
+  "schema_version": 1,
+  "criteria": {
+    "AC-001": {
+      "status": "PASS",
+      "runs": [
+        "rust-core-and-contracts"
+      ],
+      "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
+    },
+    "AC-002": {
+      "status": "PASS",
+      "runs": [
+        "rust-core-and-contracts"
+      ],
+      "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
+    },
+    "AC-003": {
+      "status": "PASS",
+      "runs": [
+        "rust-core-and-contracts",
+        "ambiguous-zero-scan"
+      ],
+      "scope": "Unknown, type-mismatched and ambiguous columns denied before actual scan counters advance"
+    },
+    "AC-004": {
+      "status": "PASS",
+      "runs": [
+        "rust-core-and-contracts"
+      ],
+      "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
+    },
+    "AC-005": {
+      "status": "PASS",
+      "runs": [
+        "rust-core-and-contracts"
+      ],
+      "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
+    },
+    "AC-006": {
+      "status": "PASS",
+      "runs": [
+        "differential-json-sql"
+      ],
+      "scope": "1000 deterministic small-catalog cases, JSON/SQL on/off against physically scoped SQLite; all verdicts retained"
+    },
+    "AC-007": {
+      "status": "PASS",
+      "runs": [
+        "rust-core-and-contracts"
+      ],
+      "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
+    },
+    "AC-008": {
+      "status": "NOT RUN",
+      "runs": [
+        "rust-demo"
+      ],
+      "scope": "Actual Rust/browser demo exists; locked fresh-checkout precondition still pending"
+    },
+    "AC-009": {
+      "status": "PASS",
+      "runs": [
+        "rust-core-and-contracts"
+      ],
+      "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
+    },
+    "AC-010": {
+      "status": "PASS",
+      "runs": [
+        "rust-core-and-contracts"
+      ],
+      "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
+    },
+    "AC-011": {
+      "status": "PASS",
+      "runs": [
+        "rust-core-and-contracts"
+      ],
+      "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
+    },
+    "AC-012": {
+      "status": "PASS",
+      "runs": [
+        "rust-core-and-contracts",
+        "eight-rust-controls"
+      ],
+      "scope": "Known-bad physical plans and selected real PASS-FAIL-PASS controls; source revisions are recorded"
+    },
+    "AC-013": {
+      "status": "PASS",
+      "runs": [
+        "rust-core-and-contracts"
+      ],
+      "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
+    },
+    "AC-014": {
+      "status": "PASS",
+      "runs": [
+        "rust-core-and-contracts"
+      ],
+      "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
+    },
+    "AC-015": {
+      "status": "PASS",
+      "runs": [
+        "rust-core-and-contracts",
+        "eight-rust-controls",
+        "benchmark-final-pilot"
+      ],
+      "scope": "Finite input/work/output regression cases and actual tightened work control; no OS memory containment claim"
+    },
+    "AC-016": {
+      "status": "BLOCKED",
+      "runs": [],
+      "scope": "Windows actual symlink setup failed with privilege error 1314; other exporter controls do not substitute for it"
+    },
+    "AC-017": {
+      "status": "PASS",
+      "runs": [
+        "rust-core-and-contracts"
+      ],
+      "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
+    },
+    "AC-018": {
+      "status": "PASS",
+      "runs": [
+        "rust-core-and-contracts"
+      ],
+      "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
+    },
+    "AC-019": {
+      "status": "PASS",
+      "runs": [
+        "rust-core-and-contracts"
+      ],
+      "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
+    },
+    "AC-020": {
+      "status": "PASS",
+      "runs": [
+        "rust-core-and-contracts"
+      ],
+      "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
+    },
+    "AC-021": {
+      "status": "NOT YET MEASURED",
+      "runs": [
+        "benchmark-final-pilot"
+      ],
+      "scope": "630-observation instrument pilot completed; complete 410-case grid still required"
+    },
+    "AC-022": {
+      "status": "BLOCKED",
+      "runs": [],
+      "scope": "Actual dedicated 4-core/8-GiB Linux reference host unavailable; no target result claimed"
+    },
+    "AC-023": {
+      "status": "BLOCKED",
+      "runs": [],
+      "scope": "Actual Linux reference host required; prepared signal campaign and Windows hard-kill evidence are not substitutes"
+    },
+    "AC-024": {
+      "status": "NOT RUN",
+      "runs": [],
+      "scope": "New committed full Rust checkout verification pending; prior reference-only clone is separate"
+    },
+    "AC-025": {
+      "status": "PASS",
+      "runs": [
+        "rust-core-and-contracts",
+        "malformed-json-sql"
+      ],
+      "scope": "Static forbid-unsafe/lint and 2000 finite malformed JSON/SQL cases; no libFuzzer-duration claim"
+    },
+    "AC-026": {
+      "status": "PASS",
+      "runs": [
+        "rust-core-and-contracts"
+      ],
+      "scope": "Eight executed evidence-runner controls include success/failure/timeout/missing executable and input/output tampering"
+    },
+    "AC-027": {
+      "status": "NOT RUN",
+      "runs": [],
+      "scope": "Public status/link/digest audit and final independent wording review pending"
+    },
+    "AC-028": {
+      "status": "PASS",
+      "runs": [
+        "rust-core-and-contracts",
+        "rust-demo"
+      ],
+      "scope": "Actual fixed-scope Rust adapter/report runs with minimal OS environment, no required model/cloud keys"
+    },
+    "AC-029": {
+      "status": "PASS",
+      "runs": [
+        "rust-core-and-contracts",
+        "rust-demo",
+        "html-escape-control"
+      ],
+      "scope": "Actual escaped Rust text output and HTML control; separate agent visual/keyboard record, no user study"
+    },
+    "AC-030": {
+      "status": "NOT RUN",
+      "runs": [
+        "dependency-policy"
+      ],
+      "scope": "Actual lock/license/notice and online policy scans recorded; final release wording review pending"
+    }
+  },
+  "artifacts": {
+    "rust-core-and-contracts": {
+      "path": "verification/product/runs/rust-core-and-contracts.json",
+      "sha256": "932ded75b8e61769a86a6d395305cd06b8e70e7118240b1344301c14c8418b29"
+    },
+    "differential-json-sql": {
+      "path": "verification/product/runs/differential-json-sql.json",
+      "sha256": "c4ccb7b24047bd70344fdf549b867bd35638895aac8eb6e21344689a7e1441b9"
+    },
+    "malformed-json-sql": {
+      "path": "verification/product/runs/malformed-json-sql.json",
+      "sha256": "6da0cbecc1c280269ef1f4887c4c5849ec23c569406fb9048cbd7cfc722f3155"
+    },
+    "eight-rust-controls": {
+      "path": "verification/product/runs/eight-rust-controls.json",
+      "sha256": "e8c2387bceb0b152409d02ae762ed4fd7fd27b10453ba60e2ec0d353437b81b4"
+    },
+    "html-escape-control": {
+      "path": "verification/product/runs/html-escape-control.json",
+      "sha256": "7721d11f90c2ee88ebe9994162bcdf6ceedfc3b78d6b1796a7afe966e2c18dd4"
+    },
+    "benchmark-instrument-pilot": {
+      "path": "verification/product/runs/benchmark-instrument-pilot.json",
+      "sha256": "7133f787870a64e4d00d66952a3d568bb379480a4ae4c743b25915933b3c2876"
+    },
+    "benchmark-pilot-failed": {
+      "path": "verification/product/runs/benchmark-pilot-failed.json",
+      "sha256": "cc3cbc9bee3aba54da8f586dc027a12386502ddc595ddb24e972e2c0188c20ba"
+    },
+    "dependency-policy": {
+      "path": "verification/product/runs/dependency-policy.json",
+      "sha256": "72e1a089867cdf4d6670b8fb79cef4731e7dfb13476b9148109b09a7505bd178"
+    },
+    "rust-demo": {
+      "path": "verification/product/runs/rust-demo.json",
+      "sha256": "f1452e87d43a8a1844d4e447cc3500dcc023c064d1d2e2cc8286c3fb7e590fd4"
+    },
+    "benchmark-final-pilot": {
+      "path": "verification/product/runs/benchmark-final-pilot.json",
+      "sha256": "1cf2fc8cbccb9dc554dfe29c4224c0f2865ff303d39f52f2efe9d99f4d641959"
+    },
+    "public-integrity-controls": {
+      "path": "verification/product/runs/public-integrity-controls.json",
+      "sha256": "cb082ab0b75311b956383d40a80ff85da5cb1ff50290d8272f22c3fd9cde7ac8"
+    },
+    "benchmark-artifact-control": {
+      "path": "verification/product/runs/benchmark-artifact-control.json",
+      "sha256": "ef070db034b76d82a8a81b651e4cf62ab84343e17295657c07db598f419f76fb"
+    },
+    "ambiguous-zero-scan": {
+      "path": "verification/product/runs/ambiguous-zero-scan.json",
+      "sha256": "b96eb5d605552a9e57101aa24e803cbbcfc7b0c42f3b7ff7ea2c5a2af87662fa"
+    },
+    "claims-link-audit": {
+      "path": "verification/product/runs/claims-link-audit.json",
+      "sha256": "6b8efae1d549a016fb1223f68d668d6ceb14d181ccfcae7857d0ceb48250ee69"
+    }
+  },
+  "release_status": "INCOMPLETE",
+  "classification": "author-assessed criterion coverage, linked to actual scoped run summaries; not an independent certification"
+}

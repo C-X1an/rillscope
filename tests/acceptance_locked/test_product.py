@@ -53,6 +53,9 @@ class ProductTests(unittest.TestCase):
                   (project(scan(), [('missing', column('s.unknown'))]), ('E_BIND',)),
                   (filtered(scan(), binary('eq', column('s.grp'), literal(1))), ('E_TYPE',)),
                   (project(scan(), [('salary', column('s.salary'))]), ('E_FORBIDDEN',))]
+        ambiguous_join = {'op': 'join', 'left': scan(alias='a'), 'right': scan(alias='b'),
+                          'on': [{'left': column('a.id'), 'right': column('b.id')}]}
+        denied.append((project(ambiguous_join, [('id', column('id'))]), ('E_BIND',)))
         for query, codes in denied:
             self.denied(query, codes)
             self.assertEqual(counter.read_text().strip(), '0')

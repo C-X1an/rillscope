@@ -1,0 +1,58 @@
+{
+  "rust-core-and-contracts": {
+    "path": "verification/product/runs/rust-core-and-contracts.json",
+    "sha256": "932ded75b8e61769a86a6d395305cd06b8e70e7118240b1344301c14c8418b29"
+  },
+  "differential-json-sql": {
+    "path": "verification/product/runs/differential-json-sql.json",
+    "sha256": "c4ccb7b24047bd70344fdf549b867bd35638895aac8eb6e21344689a7e1441b9"
+  },
+  "malformed-json-sql": {
+    "path": "verification/product/runs/malformed-json-sql.json",
+    "sha256": "6da0cbecc1c280269ef1f4887c4c5849ec23c569406fb9048cbd7cfc722f3155"
+  },
+  "eight-rust-controls": {
+    "path": "verification/product/runs/eight-rust-controls.json",
+    "sha256": "e8c2387bceb0b152409d02ae762ed4fd7fd27b10453ba60e2ec0d353437b81b4"
+  },
+  "html-escape-control": {
+    "path": "verification/product/runs/html-escape-control.json",
+    "sha256": "7721d11f90c2ee88ebe9994162bcdf6ceedfc3b78d6b1796a7afe966e2c18dd4"
+  },
+  "benchmark-instrument-pilot": {
+    "path": "verification/product/runs/benchmark-instrument-pilot.json",
+    "sha256": "7133f787870a64e4d00d66952a3d568bb379480a4ae4c743b25915933b3c2876"
+  },
+  "benchmark-pilot-failed": {
+    "path": "verification/product/runs/benchmark-pilot-failed.json",
+    "sha256": "cc3cbc9bee3aba54da8f586dc027a12386502ddc595ddb24e972e2c0188c20ba"
+  },
+  "dependency-policy": {
+    "path": "verification/product/runs/dependency-policy.json",
+    "sha256": "72e1a089867cdf4d6670b8fb79cef4731e7dfb13476b9148109b09a7505bd178"
+  },
+  "rust-demo": {
+    "path": "verification/product/runs/rust-demo.json",
+    "sha256": "f1452e87d43a8a1844d4e447cc3500dcc023c064d1d2e2cc8286c3fb7e590fd4"
+  },
+  "benchmark-final-pilot": {
+    "path": "verification/product/runs/benchmark-final-pilot.json",
+    "sha256": "1cf2fc8cbccb9dc554dfe29c4224c0f2865ff303d39f52f2efe9d99f4d641959"
+  },
+  "public-integrity-controls": {
+    "path": "verification/product/runs/public-integrity-controls.json",
+    "sha256": "cb082ab0b75311b956383d40a80ff85da5cb1ff50290d8272f22c3fd9cde7ac8"
+  },
+  "benchmark-artifact-control": {
+    "path": "verification/product/runs/benchmark-artifact-control.json",
+    "sha256": "ef070db034b76d82a8a81b651e4cf62ab84343e17295657c07db598f419f76fb"
+  },
+  "ambiguous-zero-scan": {
+    "path": "verification/product/runs/ambiguous-zero-scan.json",
+    "sha256": "b96eb5d605552a9e57101aa24e803cbbcfc7b0c42f3b7ff7ea2c5a2af87662fa"
+  },
+  "claims-link-audit": {
+    "path": "verification/product/runs/claims-link-audit.json",
+    "sha256": "6b8efae1d549a016fb1223f68d668d6ceb14d181ccfcae7857d0ceb48250ee69"
+  }
+}

@@ -1,5 +1,15 @@
 # Verification report
 
+## Current original Rust development evidence
+
+The original compiler/executor and fixed-scope inspector are implemented. [Curated product run summaries](verification/product/artifact-catalog.json) preserve actual exit/status, raw output digests, source-file hashes, environment and selected test/campaign observations without publishing private commands or internal logs. The [criterion index](verification/product/index.json) and [claims table](CLAIMS_EVIDENCE.md) distinguish recorded scoped successes from incomplete locked requirements. `python3 scripts/release_audit.py` checks status/link/hash consistency; `--require-all` additionally refuses unproved or historical release coverage. It does not execute product queries or provide independent authentication.
+
+Recorded Windows checks include 34 Rust unit tests, 30 actual CLI/adapter/report tests, 1000 JSON/SQL optimizer/SQLite cases, 2000 finite malformed inputs, eight Rust mutation controls and an actual HTML escape control. The current reference/evidence suite contains 41 tests. A 630-observation original-Rust instrumentation pilot and actual batch-bound rejection control have executed; the complete five-seed performance grid and dedicated Linux reference targets remain pending. Historical and current run identities are kept distinct.
+
+Four independent agent source inspections at two pinned revisions produced findings before integrator fixes/retests; those reviewers executed no commands. Final independent release inspection, complete fresh Rust checkout verification and actual remote CI are still pending. The Windows symlink setup failed with privilege error 1314. No full phase or release is declared complete, and no production use, speed advantage or measured reference target is claimed.
+
+## Historical reference handoff
+
 Historical reference handoff recorded 2026-10-14. The entries below describe the original reference-only authoring environment. Current Rust progress is recorded in IMPLEMENTATION_STATUS.md; independent release readiness and remote CI remain pending. No production use is claimed.
 
 ## Source identity

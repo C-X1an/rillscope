@@ -1,4 +1,4 @@
-name: Development source checks
+name: Rust product checks (reference targets separate)
 on:
   push:
     branches: [main]
@@ -19,14 +19,44 @@ jobs:
           persist-credentials: false
       - run: make verify-reference mutation-reference
       - run: make demo-reference benchmark-reference
-  rust-kernel:
+  rust-product:
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - run: make bootstrap
-      - run: make build fmt lint check test
-  # Full acceptance is not hidden in a skipped/always-green job. It is a separate
-  # release gate below and explicitly fails until the real engine is finished.
+      - run: make build fmt lint check test verify-reference integration
+      - run: make property fuzz mutation demo security
+      - run: make benchmark-pilot
+      - run: python3 benchmarks/cancellation.py --out .local-runs/ci-linux-cancellation
+      - name: Retain synthetic reproducibility artifacts
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: synthetic-product-evidence
+          retention-days: 7
+          include-hidden-files: true
+          if-no-files-found: error
+          path: |
+            .local-runs/property-*/summary.json
+            .local-runs/property-*/verdicts.jsonl
+            .local-runs/fuzz-*/summary.json
+            .local-runs/fuzz-*/verdicts.jsonl
+            .local-runs/demo-*/report.html
+            .local-runs/demo-*/manifest.json
+            .local-runs/bench/pilot-*/
+            .local-runs/ci-linux-cancellation/
+  # These are executed product contracts/campaigns on a shared Linux runner.
+  # Green here does not establish the dedicated reference host or full release.
+  dependency-policy:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: make bootstrap
+      - run: cargo install cargo-audit --version 0.22.2 --locked
+      - run: cargo install cargo-deny --version 0.20.2 --locked
+      - run: make security-online

@@ -6,7 +6,7 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 errors = []
 count = 0
-for folder in ('tools', 'tests', 'scripts'):
+for folder in ('tools', 'tests', 'scripts', 'benchmarks'):
     for file in (ROOT / folder).rglob('*.py'):
         text = file.read_text(); count += 1
         try: ast.parse(text, filename=str(file.relative_to(ROOT)))
