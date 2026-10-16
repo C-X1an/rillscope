@@ -161,6 +161,7 @@ def main():
         summary = {'status':'PASS', 'campaign':'actual-final-publication-decision',
                    'binary_sha256':build['bins']['rillscope']['sha256'], 'source_sha256':build['source']['sha256'],
                    'gdb_version':subprocess.check_output([shutil.which('gdb'),'--version'],text=True,timeout=10).splitlines()[0],
+                   'gdb_sha256':hashlib.sha256(Path(shutil.which('gdb')).read_bytes()).hexdigest(),
                    'results':results, 'scope':'unchanged Rust build; actual signals before/after terminal commitment; no latency claim'}
         (out / 'summary.json').write_text(json.dumps(summary,indent=2)+'\n'); print(json.dumps(summary,indent=2)); return 0
     except Exception as error:

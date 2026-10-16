@@ -65,6 +65,7 @@ def coverage(data, root=None):
                          'test_nonexecutable_launch_retains_failed_receipt', 'test_timeout_stops_owned_descendant_before_next_gate',
                          'test_timeout_stops_descendant_after_its_root_has_exited',
                          'test_successful_parent_stops_detached_output_worker_before_receipt',
+                         'test_successful_parent_stops_new_session_worker_before_receipt',
                          'test_external_input_mutation_prevents_verification_pass',
                          'test_external_stdin_and_file_inputs_have_actual_hashes'}
     if evidence_controls <= names and {'scripts/evidence.py', 'tests/test_evidence.py'} <= sources: result.add('AC-026')
@@ -73,6 +74,18 @@ def coverage(data, root=None):
         # Existing narrow budget cases alone do not establish the now-known conversion guarantee.
         result.discard('AC-015')
     for observation in data.get('observations', []):
+        if (observation.get('status') == 'PASS' and observation.get('campaign') == 'fresh-committed-Rust-demo'
+                and observation.get('fresh_checkout') is True and observation.get('recorded_make_demo_status') == 'PASS'
+                and observation.get('current_execution_source_identity_matches') is True
+                and observation.get('implementation') == 'rust' and observation.get('cases') == 3
+                and observation.get('oracle_match') is True and observation.get('browser_review_status') == 'RECORDED'
+                and re.fullmatch('[0-9a-f]{40}',observation.get('fresh_checkout_commit',''))
+                and re.fullmatch('[0-9a-f]{64}',observation.get('report_sha256',''))
+                and re.fullmatch('[0-9a-f]{64}',observation.get('browser_record_sha256',''))
+                and len(observation.get('actual_screenshot_sha256',[])) >= 2
+                and all(re.fullmatch('[0-9a-f]{64}',value) for value in observation['actual_screenshot_sha256'])
+                and 'scripts/verify_demo_evidence.py' in sources):
+            result.add('AC-008')
         if (observation.get('license_audit_status') == 'PASS' and observation.get('errors') == []
                 and observation.get('first_party_license') == 'MIT' and observation.get('registry_packages', 0) > 0
                 and observation.get('preserved_notice_files', 0) >= observation['registry_packages']
@@ -122,7 +135,7 @@ def coverage(data, root=None):
 
 def required_sources(identifier, root):
     if identifier in {'AC-016'}: return {'scripts/export_policy.py', 'tests/security/test_export.py'}
-    if identifier == 'AC-026': return {'scripts/evidence.py','scripts/owned_process.py', 'tests/test_evidence.py','tests/test_review_427.py'}
+    if identifier == 'AC-026': return {'scripts/evidence.py','scripts/owned_process.py', 'tests/test_evidence.py','tests/test_review_427.py','tests/test_review_e7.py'}
     if identifier == 'AC-027': return {'scripts/release_audit.py', 'scripts/evidence_coverage.py', 'CLAIMS_EVIDENCE.md'}
     if identifier == 'AC-030':
         inventory = json.loads((root / 'licenses/dependency-inventory.json').read_bytes())
@@ -137,9 +150,17 @@ def required_sources(identifier, root):
             path.relative_to(root).as_posix() for path in (root / 'licenses').rglob('*') if path.is_file()}
     core = {file.relative_to(root).as_posix() for file in (root / 'src').rglob('*.rs') if 'bin' not in file.parts and file.name != 'seed.rs'}
     core |= {'Cargo.toml', 'Cargo.lock', 'ACCEPTANCE_SPEC.md', 'spec/acceptance.json', 'verification/spec-lock.json'}
+    if identifier == 'AC-024':
+        # A historical fresh checkout cannot approve a changed verification
+        # recipe or a narrowed test/measurement/security procedure.
+        core |= {'Makefile','rust-toolchain.toml','deny.toml'}
+        for folder in ('scripts','tests','tools','benchmarks','.github'):
+            core |= {path.relative_to(root).as_posix() for path in (root / folder).rglob('*')
+                     if path.is_file() and path.suffix in ('.py','.yml','.yaml')}
     if identifier in {'AC-008','AC-029'}:
         core |= {'scripts/demo.py','tools/fixed_scope.py','tests/acceptance_locked/test_demo.py',
                  'tests/acceptance_locked/product_helpers.py'}
+        if identifier == 'AC-008': core.add('scripts/verify_demo_evidence.py')
     if identifier in {'AC-021', 'AC-022', 'AC-023'}:
         core |= {file.relative_to(root).as_posix() for file in (root / 'benchmarks').glob('*.py')}
         core.add('src/bin/rillscope-measure.rs')

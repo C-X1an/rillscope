@@ -78,6 +78,10 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: Install official Ubuntu debugger for final-decision controls
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends gdb
       - run: make bootstrap build
       - run: make publication-check
       - name: Retain actual transport observations

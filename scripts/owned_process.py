@@ -1,10 +1,95 @@
-"""Windows job ownership is established before a captured command can run."""
+"""Establish process ownership before captured commands can create descendants."""
 import ctypes
 from ctypes import wintypes
 import time
 import os
 from pathlib import Path
 import signal
+
+
+class LinuxOwnedChildren:
+    """Adopt session-changing descendants in an isolated single-command runner.
+
+    PR_SET_CHILD_SUBREAPER changes this calling process only, without privileges:
+    https://man7.org/linux/man-pages/man2/PR_SET_CHILD_SUBREAPER.2const.html
+    pidfds signal only currently owned children. This is lifetime management,
+    not an adversarial process sandbox or a change to system security policy.
+    """
+    def __init__(self):
+        self.active = False
+        if not hasattr(os,'pidfd_open') or not hasattr(signal,'pidfd_send_signal'):
+            raise OSError('Linux pidfd ownership unavailable')
+        if self.children(): raise OSError('owned command runner must start without other children')
+        self.libc = ctypes.CDLL(None,use_errno=True)
+        self.libc.prctl.restype = ctypes.c_int
+        previous = ctypes.c_int()
+        self.control(37,ctypes.byref(previous))  # PR_GET_CHILD_SUBREAPER
+        self.previous = previous.value
+        self.control(36,ctypes.c_ulong(1))  # PR_SET_CHILD_SUBREAPER
+        self.active = True
+
+    def control(self,option,value):
+        if self.libc.prctl(ctypes.c_int(option),value,ctypes.c_ulong(0),ctypes.c_ulong(0),ctypes.c_ulong(0)) != 0:
+            raise OSError(ctypes.get_errno(),'owned child subreaper operation failed')
+
+    @staticmethod
+    def children():
+        result = set()
+        # Include children of any thread; refuse a shared runner at entry.
+        for thread in (Path('/proc') / str(os.getpid()) / 'task').iterdir():
+            try: result.update(int(value) for value in (thread / 'children').read_text().split())
+            except (FileNotFoundError,ProcessLookupError): continue
+        return result
+
+    def terminate(self,root_pid):
+        record = {'status':'PASS','method':'Linux owned subreaper children with pidfd SIGKILL',
+                  'owned_root_pid':root_pid,'signalled_children':0,'reaped_descendants':0}
+        deadline = time.monotonic()+5; quiet = 0
+        try:
+            while time.monotonic() < deadline:
+                active = 0
+                for pid in self.children():
+                    handle = None
+                    try:
+                        handle = os.pidfd_open(pid,0)
+                        fields = (Path('/proc') / str(pid) / 'stat').read_text().rsplit(')',1)[1].split()
+                        if int(fields[1]) != os.getpid():
+                            raise OSError('child ownership changed before termination')
+                        if fields[0] not in ('Z','X'):
+                            active += 1
+                            signal.pidfd_send_signal(handle,signal.SIGKILL,None,0)
+                            record['signalled_children'] += 1
+                        if pid != root_pid:
+                            reaped,_ = os.waitpid(pid,os.WNOHANG)
+                            record['reaped_descendants'] += int(reaped != 0)
+                    except (FileNotFoundError,ProcessLookupError): pass
+                    finally:
+                        if handle is not None: os.close(handle)
+                # Reparenting is observed after killing intermediates. The root
+                # remains for Popen to reap, preserving its actual exit status.
+                quiet = quiet+1 if active == 0 else 0
+                if quiet >= 2:
+                    return dict(record,remaining_active_processes=0)
+                time.sleep(.01)
+        except (OSError,ValueError,IndexError) as error:
+            return dict(record,status='FAIL',error=type(error).__name__)
+        return dict(record,status='FAIL',error='owned children remained active after termination')
+
+    def close(self):
+        if not self.active: return {'status':'PASS','subreaper_attribute_restored':True}
+        try:
+            self.control(36,ctypes.c_ulong(self.previous))
+            self.active = False
+            return {'status':'PASS','subreaper_attribute_restored':True}
+        except OSError as error:
+            return {'status':'FAIL','subreaper_attribute_restored':False,'restore_error':type(error).__name__}
+
+    def finish(self,root_pid):
+        record = self.terminate(root_pid)
+        restored = self.close()
+        if restored['status'] != 'PASS': record['status'] = 'FAIL'
+        record.update({key:value for key,value in restored.items() if key != 'status'})
+        return record
 
 
 def terminate_posix_group(pid):

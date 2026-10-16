@@ -36,7 +36,7 @@ class ReviewE7(unittest.TestCase):
                                               'consumed_work','visible_work','peak_reserved_bytes',
                                               'execution_only_ns','serialization_ns')}}
         valid = {'wall_ns':1,'cpu_user_ns':1,'cpu_system_ns':1,'peak_rss_bytes':1,
-                 'cpu_rss_status':'MEASURED','process_outcome':'EXECUTED','timed_out':False,'exit_code':0}
+                 'cpu_rss_status':'MEASURED','process_outcome':'EXECUTED','timed_out':False,'exit_code':0,'pid':1}
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)
             usage = dict(valid)

@@ -4,21 +4,21 @@
     "AC-001": {
       "status": "PASS",
       "runs": [
-        "review-427-native-fixed"
+        "review-e7-native-fixed"
       ],
       "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
     },
     "AC-002": {
       "status": "PASS",
       "runs": [
-        "review-427-native-fixed"
+        "review-e7-native-fixed"
       ],
       "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
     },
     "AC-003": {
       "status": "PASS",
       "runs": [
-        "review-427-native-fixed",
+        "review-e7-native-fixed",
         "ambiguous-zero-scan"
       ],
       "scope": "Unknown, type-mismatched and ambiguous columns denied before actual scan counters advance"
@@ -26,14 +26,14 @@
     "AC-004": {
       "status": "PASS",
       "runs": [
-        "review-427-native-fixed"
+        "review-e7-native-fixed"
       ],
       "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
     },
     "AC-005": {
       "status": "PASS",
       "runs": [
-        "review-427-native-fixed"
+        "review-e7-native-fixed"
       ],
       "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
     },
@@ -47,42 +47,42 @@
     "AC-007": {
       "status": "PASS",
       "runs": [
-        "review-427-native-fixed"
+        "review-e7-native-fixed"
       ],
       "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
     },
     "AC-008": {
-      "status": "NOT RUN",
+      "status": "PASS",
       "runs": [
-        "rust-demo"
+        "fresh-rust-demo-current"
       ],
-      "scope": "Actual Rust/browser demo exists; locked fresh-checkout precondition still pending"
+      "scope": "Actual committed fresh checkout make demo; current execution/renderer bytes match, report SHA and three real Chrome captures/keyboard record revalidated; integrator visual check, no user study"
     },
     "AC-009": {
       "status": "PASS",
       "runs": [
-        "review-427-native-fixed"
+        "review-e7-native-fixed"
       ],
       "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
     },
     "AC-010": {
       "status": "PASS",
       "runs": [
-        "review-427-native-fixed"
+        "review-e7-native-fixed"
       ],
       "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
     },
     "AC-011": {
       "status": "PASS",
       "runs": [
-        "review-427-native-fixed"
+        "review-e7-native-fixed"
       ],
       "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
     },
     "AC-012": {
       "status": "PASS",
       "runs": [
-        "review-427-native-fixed",
+        "review-e7-native-fixed",
         "eight-rust-controls"
       ],
       "scope": "Known-bad physical plans and selected real PASS-FAIL-PASS controls; source revisions are recorded"
@@ -90,21 +90,21 @@
     "AC-013": {
       "status": "PASS",
       "runs": [
-        "review-427-native-fixed"
+        "review-e7-native-fixed"
       ],
       "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
     },
     "AC-014": {
       "status": "PASS",
       "runs": [
-        "review-427-native-fixed"
+        "review-e7-native-fixed"
       ],
       "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
     },
     "AC-015": {
       "status": "PASS",
       "runs": [
-        "review-427-native-fixed",
+        "review-e7-native-fixed",
         "eight-rust-controls",
         "source-bound-pilot-v2"
       ],
@@ -118,28 +118,28 @@
     "AC-017": {
       "status": "PASS",
       "runs": [
-        "review-427-native-fixed"
+        "review-e7-native-fixed"
       ],
       "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
     },
     "AC-018": {
       "status": "NOT RUN",
       "runs": [
-        "review-427-native-fixed"
+        "review-e7-native-fixed"
       ],
       "scope": "Existing pre-publication hook passes; precise terminal-commit versus transport boundary requires the new Linux experiment and contract clarification"
     },
     "AC-019": {
       "status": "PASS",
       "runs": [
-        "review-427-native-fixed"
+        "review-e7-native-fixed"
       ],
       "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
     },
     "AC-020": {
       "status": "PASS",
       "runs": [
-        "review-427-native-fixed"
+        "review-e7-native-fixed"
       ],
       "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
     },
@@ -170,7 +170,7 @@
     "AC-025": {
       "status": "PASS",
       "runs": [
-        "review-427-native-fixed",
+        "review-e7-native-fixed",
         "review-followup-malformed"
       ],
       "scope": "Static forbid-unsafe/lint and 2000 finite malformed JSON/SQL cases; no libFuzzer-duration claim"
@@ -178,7 +178,7 @@
     "AC-026": {
       "status": "NOT RUN",
       "runs": [
-        "review-427-native-fixed"
+        "review-e7-native-fixed"
       ],
       "scope": "Prior narrow controls pass; the new independent review identified a Linux new-session descendant gap requiring its actual regression and repair"
     },
@@ -192,7 +192,7 @@
     "AC-028": {
       "status": "PASS",
       "runs": [
-        "review-427-native-fixed",
+        "review-e7-native-fixed",
         "rust-demo"
       ],
       "scope": "Actual fixed-scope Rust adapter/report runs with minimal OS environment, no required model/cloud keys"
@@ -200,7 +200,7 @@
     "AC-029": {
       "status": "PASS",
       "runs": [
-        "review-427-native-fixed",
+        "review-e7-native-fixed",
         "rust-demo",
         "review-427-html-controls"
       ],
@@ -394,6 +394,34 @@
     "review-427-artifact-control-timeout": {
       "path": "verification/product/runs/review-427-artifact-control-timeout.json",
       "sha256": "f238acb0b16d9297c9d24fffbe7d6bf913dd9b4f3e225bae96a9e037fa4101c7"
+    },
+    "review-e7-native-fixed": {
+      "path": "verification/product/runs/review-e7-native-fixed.json",
+      "sha256": "161705c330416a57e0baf7dd0bee1115ca2f2b0be1e6d70661bd35a30a45e0b3"
+    },
+    "review-e7-controls-before": {
+      "path": "verification/product/runs/review-e7-controls-before.json",
+      "sha256": "cbd6da2ce3faae23dd76f277fda07e04d07a4bc584bba3195f0e20069d50e791"
+    },
+    "review-e7-provenance-before": {
+      "path": "verification/product/runs/review-e7-provenance-before.json",
+      "sha256": "84c8ddcd9311477f8dd3441783a0af194dd96a12beb6db03c1c9ce0dc79b9228"
+    },
+    "review-e7-provenance-after": {
+      "path": "verification/product/runs/review-e7-provenance-after.json",
+      "sha256": "629e0e10cc3c518cd2da3978e372ddad09a0f2c0ba1c9279441f4b7eb0cd8cc2"
+    },
+    "nullable-sort-current": {
+      "path": "verification/product/runs/nullable-sort-current.json",
+      "sha256": "4c2881179947f674765837c21abef9bb9caf54f421751dab1d3f57be93696067"
+    },
+    "fresh-rust-demo-current": {
+      "path": "verification/product/runs/fresh-rust-demo-current.json",
+      "sha256": "4e28580aa8b18d2f29337a5112731cf406993e8f4f567169619b05ebc31d61fe"
+    },
+    "review-e7-linux-ci": {
+      "path": "verification/product/runs/review-e7-linux-ci.json",
+      "sha256": "d93d614441fb85d4c6db8bf51b0e86065873bac72e9917aa50468e2eab77cd70"
     }
   },
   "release_status": "INCOMPLETE",

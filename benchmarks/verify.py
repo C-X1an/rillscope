@@ -13,6 +13,7 @@ from run import METRICS, MODES, REPETITIONS, WARMUPS, semantic_digest, sha, summ
 from workloads import SEEDS, descriptors, sort_null_descriptors, query, context, make_catalog, validate_workload_catalog, sort_input_characterization
 from envelopes import terminal
 from evidence import source_identity
+from process_metrics import process_problems
 
 
 def sample_problems(row, value, measurement, description, spec, hashes, stdout):
@@ -84,10 +85,12 @@ def verify(directory, require_current_product=False):
             errors.append('retained build receipt changed')
         if build['status'] != 'PASS' or build['exit_code'] != 0 or build['source']['sha256'] != manifest['source']['sha256'] or build['source_after_sha256'] != manifest['source']['sha256']:
             errors.append('build/source identity mismatch')
+        if build.get('fresh_target_directory') is not True or build.get('problems') != []:
+            errors.append('fresh successful build provenance missing')
         if build['bins']['rillscope-measure']['sha256'] != manifest['binary_sha256'] or build['profile'] != 'release':
             errors.append('source-bound release artifact mismatch')
         for item in build['bins'].values():
-            if item['actual_profile']['opt_level'] != '3' or item['actual_profile']['debug_assertions'] or item['actual_profile']['test']:
+            if item['actual_profile']['opt_level'] != '3' or item['actual_profile']['debug_assertions'] is not False or item['actual_profile']['test'] is not False:
                 errors.append('actual Cargo build profile mismatch')
         for name in ('stdout', 'stderr'):
             if sha(directory / 'build' / ('cargo.' + name)) != build['raw_' + name + '_sha256']:
@@ -168,8 +171,7 @@ def verify(directory, require_current_product=False):
                 if sha(case / 'raw' / (tag + '.measurement.json')) != row.get('measurement_sha256'):
                     errors.append('measurement artifact digest changed: ' + tag)
                 if row['problems']: errors.append('invalid observation retained: ' + tag)
-                if row['cpu_rss_status'] != 'MEASURED' or any(row.get(key) is None or row[key] < 0 for key in ('wall_ns', 'cpu_user_ns', 'cpu_system_ns', 'peak_rss_bytes')):
-                    errors.append('missing/invalid owned process measurement: ' + tag)
+                errors.extend(problem + ': ' + tag for problem in process_problems(row,require_process_fields=version >= 3))
                 value = terminal(stdout, stderr, row['exit_code'], row['mode'])
                 errors.extend(problem + ': ' + tag for problem in sample_problems(row, value, measurement, validation_description, spec, hashes, stdout))
                 if version >= 3:

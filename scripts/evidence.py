@@ -14,7 +14,7 @@ import subprocess
 import sys
 import time
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from owned_process import WindowsJob, terminate_posix_group
+from owned_process import WindowsJob, LinuxOwnedChildren, terminate_posix_group
 
 ROOT = Path(__file__).resolve().parents[1]
 EXCLUDED = {'.git', '.local-runs', '__pycache__', 'target', 'verification'}
@@ -70,6 +70,7 @@ def verify_receipt(path: Path) -> bool:
 def run_owned(command, *, cwd, timeout, stdin_data):
     """Stop this command's owned descendants before final provenance capture."""
     job = WindowsJob() if os.name == 'nt' else None
+    linux = LinuxOwnedChildren() if sys.platform.startswith('linux') else None
     options = {'creationflags': subprocess.CREATE_NEW_PROCESS_GROUP | WindowsJob.CREATE_SUSPENDED} if job else {'start_new_session': True}
     try:
       with subprocess.Popen(command, cwd=cwd, stdin=subprocess.PIPE if stdin_data is not None else subprocess.DEVNULL,
@@ -80,7 +81,7 @@ def run_owned(command, *, cwd, timeout, stdin_data):
                 process.kill(); process.communicate(); raise
         try:
             stdout, stderr = process.communicate(stdin_data, timeout=timeout)
-            cleanup = job.terminate() if job else terminate_posix_group(process.pid)
+            cleanup = job.terminate() if job else (linux.finish(process.pid) if linux else terminate_posix_group(process.pid))
             return process.returncode, stdout, stderr, 'EXECUTED' if cleanup['status'] != 'FAIL' else 'CLEANUP_FAILED', cleanup
         except subprocess.TimeoutExpired as expired:
             cleanup = {'status': 'PASS', 'owned_root_pid': process.pid}
@@ -88,7 +89,7 @@ def run_owned(command, *, cwd, timeout, stdin_data):
                 if job:
                     cleanup.update(job.terminate())
                 else:
-                    cleanup.update(terminate_posix_group(process.pid))
+                    cleanup.update(linux.terminate(process.pid) if linux else terminate_posix_group(process.pid))
             except (OSError, subprocess.TimeoutExpired) as error:
                 cleanup.update(status='FAIL', error=type(error).__name__)
             if cleanup['status'] != 'PASS': process.kill()
@@ -100,9 +101,17 @@ def run_owned(command, *, cwd, timeout, stdin_data):
                 stdout, stderr = expired.stdout or b'', expired.stderr or b''
                 process.stdout.close(); process.stderr.close()
                 process.kill(); process.wait(timeout=5)
+            if linux:
+                final = linux.finish(process.pid)
+                cleanup['after_capture_drain'] = final
+                if final['status'] != 'PASS': cleanup['status'] = 'FAIL'
             return 124, stdout, stderr, 'TIMEOUT', cleanup
     finally:
         if job: job.close()
+        if linux and linux.active:
+            # Unexpected launch/capture errors still cannot leave owned workers.
+            linux.terminate(None)
+            linux.close()
 
 
 def main() -> int:

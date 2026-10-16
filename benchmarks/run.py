@@ -172,9 +172,8 @@ def sample(mode, binary, case, description, spec, output, phase, repetition, ord
               'stderr_sha256': hashlib.sha256(stderr).hexdigest(), 'measurement': None,
               'process_measurement_sha256': sha(prefix.with_suffix('.process.json')),
               'status': 'INVALID', 'problems': []}
-    if usage.get('process_outcome', 'EXECUTED') != 'EXECUTED': record['problems'].append('process/instrument attempt failed')
-    if usage['timed_out']: record['problems'].append('process timeout')
-    if usage['cpu_rss_status'] != 'MEASURED': record['problems'].append('CPU/RSS instrument unavailable')
+    from process_metrics import process_problems
+    record['problems'].extend(process_problems(usage))
     try:
         result = terminal(stdout, stderr, usage['exit_code'], mode)
         record['status'] = result['status'].upper()

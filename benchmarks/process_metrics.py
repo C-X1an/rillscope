@@ -38,6 +38,24 @@ def windows_usage(process):
             'cpu_rss_instrument': 'Windows GetProcessTimes/K32GetProcessMemoryInfo on owned process handle',
             'cpu_rss_status': 'MEASURED' if cpu_ok and rss_ok else 'NOT MEASURED'}
 
+def process_problems(usage, *, require_process_fields=True):
+    """Reject malformed instrumentation before it can enter distributions."""
+    problems = []
+    for name in ('wall_ns','cpu_user_ns','cpu_system_ns','peak_rss_bytes'):
+        value = usage.get(name)
+        if type(value) is not int or value < 0 or (name in ('wall_ns','peak_rss_bytes') and value == 0):
+            problems.append('invalid owned process metric: ' + name)
+    if usage.get('cpu_rss_status') != 'MEASURED': problems.append('CPU/RSS instrument unavailable')
+    if require_process_fields:
+        if usage.get('process_outcome') != 'EXECUTED': problems.append('process/instrument attempt failed')
+        if usage.get('timed_out') is not False: problems.append('process timeout or invalid timeout flag')
+        if type(usage.get('exit_code')) is not int or usage['exit_code'] < 0:
+            problems.append('invalid owned process exit code')
+        if type(usage.get('pid')) is not int or usage['pid'] <= 0: problems.append('invalid owned process PID')
+        if usage.get('instrument_problem') is not None: problems.append('instrument reports a failure')
+    return problems
+
+
 def measured_child(command, *, cwd, prefix: Path, timeout=120):
     env = {key: os.environ[key] for key in ENVIRONMENT_KEYS if key in os.environ}
     clock = time.perf_counter_ns()
@@ -74,6 +92,12 @@ def measured_child(command, *, cwd, prefix: Path, timeout=120):
             lines = usage_path.read_text().splitlines() if usage_path.is_file() else []
             parsed = next((json.loads(line) for line in reversed(lines) if line.startswith('{')), None)
             if parsed is None: raise ValueError('GNU time result missing')
+            import math
+            if any(type(parsed.get(key)) not in (int,float) or not math.isfinite(parsed[key]) or parsed[key] < 0
+                   for key in ('user_s','system_s')):
+                raise ValueError('GNU time CPU metric is not finite nonnegative numeric data')
+            if type(parsed.get('max_rss_kib')) is not int or parsed['max_rss_kib'] <= 0:
+                raise ValueError('GNU time RSS metric is not a positive integer')
             usage = {'cpu_user_ns': round(parsed['user_s'] * 1e9), 'cpu_system_ns': round(parsed['system_s'] * 1e9),
                      'peak_rss_bytes': parsed['max_rss_kib'] * 1024, 'cpu_rss_instrument': 'GNU time on owned command; Linux max RSS KiB converted to bytes',
                      'cpu_rss_status': 'MEASURED'}
