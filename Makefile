@@ -44,6 +44,7 @@ benchmark-sort-null:
 publication-check: build
 	$(PYTHON) tests/system/publication_boundary.py --out .local-runs/publication-boundary-$$(date +%s)-$$$$
 	$(PYTHON) tests/system/publication_decision.py --out .local-runs/publication-decision-$$(date +%s)-$$$$
+	$(PYTHON) tests/system/publication_mutation.py --out .local-runs/publication-control-$$(date +%s)-$$$$
 clean-verify:
 	$(PYTHON) scripts/clean_verify.py
 verify: contracts build fmt lint check test integration acceptance security security-online property fuzz mutation benchmark benchmark-sort-null publication-check demo clean-verify

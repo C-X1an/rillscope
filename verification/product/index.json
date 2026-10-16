@@ -4,21 +4,21 @@
     "AC-001": {
       "status": "PASS",
       "runs": [
-        "review-e7-native-fixed"
+        "review-72-native-fixed"
       ],
       "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
     },
     "AC-002": {
       "status": "PASS",
       "runs": [
-        "review-e7-native-fixed"
+        "review-72-native-fixed"
       ],
       "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
     },
     "AC-003": {
       "status": "PASS",
       "runs": [
-        "review-e7-native-fixed",
+        "review-72-native-fixed",
         "ambiguous-zero-scan"
       ],
       "scope": "Unknown, type-mismatched and ambiguous columns denied before actual scan counters advance"
@@ -26,14 +26,14 @@
     "AC-004": {
       "status": "PASS",
       "runs": [
-        "review-e7-native-fixed"
+        "review-72-native-fixed"
       ],
       "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
     },
     "AC-005": {
       "status": "PASS",
       "runs": [
-        "review-e7-native-fixed"
+        "review-72-native-fixed"
       ],
       "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
     },
@@ -47,42 +47,42 @@
     "AC-007": {
       "status": "PASS",
       "runs": [
-        "review-e7-native-fixed"
+        "review-72-native-fixed"
       ],
       "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
     },
     "AC-008": {
       "status": "PASS",
       "runs": [
-        "fresh-rust-demo-current"
+        "fresh-rust-demo-bound"
       ],
-      "scope": "Actual committed fresh checkout make demo; current execution/renderer bytes match, report SHA and three real Chrome captures/keyboard record revalidated; integrator visual check, no user study"
+      "scope": "Actual fresh make demo; captured generator path/hash bind the report, current execution/renderer bytes match and actual Chrome/keyboard record is retained; integrator visual check, no user study"
     },
     "AC-009": {
       "status": "PASS",
       "runs": [
-        "review-e7-native-fixed"
+        "review-72-native-fixed"
       ],
       "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
     },
     "AC-010": {
       "status": "PASS",
       "runs": [
-        "review-e7-native-fixed"
+        "review-72-native-fixed"
       ],
       "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
     },
     "AC-011": {
       "status": "PASS",
       "runs": [
-        "review-e7-native-fixed"
+        "review-72-native-fixed"
       ],
       "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
     },
     "AC-012": {
       "status": "PASS",
       "runs": [
-        "review-e7-native-fixed",
+        "review-72-native-fixed",
         "eight-rust-controls"
       ],
       "scope": "Known-bad physical plans and selected real PASS-FAIL-PASS controls; source revisions are recorded"
@@ -90,56 +90,58 @@
     "AC-013": {
       "status": "PASS",
       "runs": [
-        "review-e7-native-fixed"
+        "review-72-native-fixed"
       ],
       "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
     },
     "AC-014": {
       "status": "PASS",
       "runs": [
-        "review-e7-native-fixed"
+        "review-72-native-fixed"
       ],
       "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
     },
     "AC-015": {
       "status": "PASS",
       "runs": [
-        "review-e7-native-fixed",
+        "review-72-native-fixed",
         "eight-rust-controls",
         "source-bound-pilot-v2"
       ],
       "scope": "Finite input/work/output regression cases and actual tightened work control; no OS memory containment claim"
     },
     "AC-016": {
-      "status": "BLOCKED",
-      "runs": [],
-      "scope": "Windows actual symlink setup failed with privilege error 1314; other exporter controls do not substitute for it"
+      "status": "PASS",
+      "runs": [
+        "review-e7-linux-export-observed"
+      ],
+      "scope": "Actual successful public Ubuntu rust-product job executed all four exporter controls including symbolic-link rejection; selected source bytes still match, no local Windows privilege claim"
     },
     "AC-017": {
       "status": "PASS",
       "runs": [
-        "review-e7-native-fixed"
+        "review-72-native-fixed"
       ],
       "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
     },
     "AC-018": {
       "status": "NOT RUN",
       "runs": [
-        "review-e7-native-fixed"
+        "review-72-native-fixed"
       ],
       "scope": "Existing pre-publication hook passes; precise terminal-commit versus transport boundary requires the new Linux experiment and contract clarification"
     },
     "AC-019": {
       "status": "PASS",
       "runs": [
-        "review-e7-native-fixed"
+        "review-72-native-fixed"
       ],
       "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
     },
     "AC-020": {
       "status": "PASS",
       "runs": [
-        "review-e7-native-fixed"
+        "review-72-native-fixed"
       ],
       "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
     },
@@ -170,17 +172,18 @@
     "AC-025": {
       "status": "PASS",
       "runs": [
-        "review-e7-native-fixed",
+        "review-72-native-fixed",
         "review-followup-malformed"
       ],
       "scope": "Static forbid-unsafe/lint and 2000 finite malformed JSON/SQL cases; no libFuzzer-duration claim"
     },
     "AC-026": {
-      "status": "NOT RUN",
+      "status": "PASS",
       "runs": [
-        "review-e7-native-fixed"
+        "review-72-native-fixed",
+        "review-72-linux-owned-controls"
       ],
-      "scope": "Prior narrow controls pass; the new independent review identified a Linux new-session descendant gap requiring its actual regression and repair"
+      "scope": "Current local runner controls and actual successful Ubuntu reference-job descendant/input/output controls, including new-session worker cleanup; selected remote source bytes match; whole-workflow status is separate"
     },
     "AC-027": {
       "status": "NOT RUN",
@@ -192,7 +195,7 @@
     "AC-028": {
       "status": "PASS",
       "runs": [
-        "review-e7-native-fixed",
+        "review-72-native-fixed",
         "rust-demo"
       ],
       "scope": "Actual fixed-scope Rust adapter/report runs with minimal OS environment, no required model/cloud keys"
@@ -200,7 +203,7 @@
     "AC-029": {
       "status": "PASS",
       "runs": [
-        "review-e7-native-fixed",
+        "review-72-native-fixed",
         "rust-demo",
         "review-427-html-controls"
       ],
@@ -422,6 +425,50 @@
     "review-e7-linux-ci": {
       "path": "verification/product/runs/review-e7-linux-ci.json",
       "sha256": "d93d614441fb85d4c6db8bf51b0e86065873bac72e9917aa50468e2eab77cd70"
+    },
+    "fresh-rust-demo-bound": {
+      "path": "verification/product/runs/fresh-rust-demo-bound.json",
+      "sha256": "c33fa1db34c831c47c00eb5202a0d65637c3aa9466891e625e9f8c276ac74868"
+    },
+    "review-e7-linux-export-observed": {
+      "path": "verification/product/runs/review-e7-linux-export-observed.json",
+      "sha256": "4b171f0f11d492b5a39da26744b32b4dc765ea77e3f85d3069a255effc4f761d"
+    },
+    "review-72-linux-owned-controls": {
+      "path": "verification/product/runs/review-72-linux-owned-controls.json",
+      "sha256": "29d804bced43356ebcea8be12d7bf7936dd2ab939c5baad2141c82fd2ca66f98"
+    },
+    "review-72-association-before": {
+      "path": "verification/product/runs/review-72-association-before.json",
+      "sha256": "ea4ddc1954a790c072d484c23d3bddcce5f579a49a38ff126dcd4f25e7a9d4c5"
+    },
+    "review-72-association-after": {
+      "path": "verification/product/runs/review-72-association-after.json",
+      "sha256": "fddbad8243b23e39f696b0176f875bcfb60d277e0e41c436986a2bc0c300d44d"
+    },
+    "review-72-demo-binding-before": {
+      "path": "verification/product/runs/review-72-demo-binding-before.json",
+      "sha256": "379f0759b2bac110e4c0c62b5adbee9fff47ad1703786470f324ca3e09919153"
+    },
+    "review-72-demo-binding-after": {
+      "path": "verification/product/runs/review-72-demo-binding-after.json",
+      "sha256": "1e48dbbc4f58ac7a759ace42364ba69d251903f152f6b605dc52f1d69a3ea40f"
+    },
+    "review-72-native-fixed": {
+      "path": "verification/product/runs/review-72-native-fixed.json",
+      "sha256": "e9cfdb8bd512ee88aa817b6c7ffde76f5144d48aafff3ac8cdb83765b78f882b"
+    },
+    "review-72-public-demo-before": {
+      "path": "verification/product/runs/review-72-public-demo-before.json",
+      "sha256": "4892bb733f6821184e4c49541a8669e42aac33c68ca231ae0cc16684dae8c3c7"
+    },
+    "review-72-public-demo-after": {
+      "path": "verification/product/runs/review-72-public-demo-after.json",
+      "sha256": "d40578a323ca7578fb192e68f71f473011a76181aa4ba27bedff4e295dc66612"
+    },
+    "review-72-reference-closure": {
+      "path": "verification/product/runs/review-72-reference-closure.json",
+      "sha256": "b901337aacac6fe39fd1f833b8161d103feae36229af8c66c1d0923867719f3e"
     }
   },
   "release_status": "INCOMPLETE",

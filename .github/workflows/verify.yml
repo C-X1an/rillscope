@@ -95,6 +95,17 @@ jobs:
           path: |
             .local-runs/publication-boundary-*/
             .local-runs/publication-decision-*/
+            .local-runs/publication-control-*/commands/
+            .local-runs/publication-control-*/summary.json
+            .local-runs/publication-control-*/source.*.rs
+            .local-runs/publication-control-*/checkout/.local-runs/baseline/
+            .local-runs/publication-control-*/checkout/.local-runs/mutant/
+            .local-runs/publication-control-*/checkout/.local-runs/restored/
+            .local-runs/publication-control-*/checkout/.local-runs/build/*/build.json
+            .local-runs/publication-control-*/checkout/.local-runs/build/*/cargo.stdout
+            .local-runs/publication-control-*/checkout/.local-runs/build/*/cargo.stderr
+            .local-runs/publication-control-*/checkout/.local-runs/build/*/compiler.stdout
+            .local-runs/publication-control-*/checkout/.local-runs/build/*/compiler.stderr
             .local-runs/build/*/build.json
             .local-runs/build/*/compiler.stdout
             .local-runs/build/*/compiler.stderr

@@ -21,6 +21,27 @@ from build import verify_build
 def sha(path): return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def bind_generator_observation(receipt_path, receipt, fresh, demo):
+    """Bind selected bytes to the generator output inside the actual receipt."""
+    if Path(receipt['cwd']).resolve() != fresh:
+        raise ValueError('demo receipt working directory differs from the fresh checkout')
+    observations = []
+    for line in (receipt_path.parent / receipt['stdout']['file']).read_text(encoding='utf-8').splitlines():
+        try: value = json.loads(line)
+        except json.JSONDecodeError: continue
+        if isinstance(value,dict) and value.get('implementation') == 'rust' and 'report' in value:
+            observations.append(value)
+    if len(observations) != 1:
+        raise ValueError('expected exactly one captured demo generator observation')
+    observation = observations[0]
+    path = Path(observation['report'])
+    if not path.is_absolute(): path = fresh / path
+    if (path.resolve() != demo / 'report.html' or observation.get('report_sha256') != sha(demo / 'report.html')
+            or observation.get('cases') != 3 or observation.get('oracle_match') is not True):
+        raise ValueError('selected report differs from the captured generator observation')
+    return observation
+
+
 def main():
     parser = argparse.ArgumentParser(); parser.add_argument('--fresh-checkout',type=Path,required=True)
     parser.add_argument('--demo-dir',type=Path,required=True); parser.add_argument('--demo-receipt',type=Path,required=True)
@@ -38,6 +59,7 @@ def main():
             or receipt['git'] != {'commit':commit,'dirty':False}
             or receipt['source_before']['sha256'] != identity['sha256'] or receipt['source_after_sha256'] != identity['sha256']
             or receipt['command'][:2] != ['make','demo']): raise ValueError('no stable actual fresh make demo receipt')
+    bind_generator_observation(args.demo_receipt,receipt,fresh,demo)
     captured = dict(identity['files']); current = dict(source_identity(ROOT)['files'])
     # This current verifier is bound by its own command receipt. The recorded
     # fresh invocation must match every execution/renderer/contract dependency.
@@ -76,7 +98,8 @@ def main():
         screenshots.append(sha(path))
     result = {'status':'PASS','campaign':'fresh-committed-Rust-demo', 'fresh_checkout_commit':commit,
               'fresh_checkout':True,'recorded_make_demo_status':'PASS','current_execution_source_identity_matches':True,
-              'implementation':'rust','cases':3,'report_sha256':sha(report),'results_sha256':sha(results),
+              'implementation':'rust','cases':3,'captured_generator_report_matches':True,
+              'report_sha256':sha(report),'results_sha256':sha(results),
               'binary_sha256':sha(binary),'browser_review_status':'RECORDED','browser_record_sha256':sha(args.browser_record),
               'actual_screenshot_sha256':screenshots,'oracle_match':True,
               'scope':'revalidated actual fresh demo plus integrator browser record; no new query execution, user study or independent visual audit'}

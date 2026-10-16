@@ -74,9 +74,29 @@ def coverage(data, root=None):
         # Existing narrow budget cases alone do not establish the now-known conversion guarantee.
         result.discard('AC-015')
     for observation in data.get('observations', []):
+        if (observation.get('status') == 'PASS' and observation.get('campaign') == 'observed-public-linux-CI'
+                and observation.get('remote_repository') == 'C-X1an/rillscope'
+                and observation.get('remote_job_conclusion') == 'success'
+                and 'ubuntu-24.04' in observation.get('remote_runner_labels',[])
+                and re.fullmatch('[0-9a-f]{40}',observation.get('remote_commit',''))
+                and re.fullmatch('[0-9a-f]{64}',observation.get('remote_log_sha256',''))
+                and 'scripts/verify_ci_observations.py' in sources):
+            from verify_ci_observations import REMOTE_SOURCES
+            remote = dict(observation.get('remote_source_files',[]))
+            remote_names = set(observation.get('remote_python_test_names',[]))
+            def remote_matches(identifier):
+                return all((root / name).is_file() and remote.get(name) == hashlib.sha256((root / name).read_bytes()).hexdigest()
+                           for name in REMOTE_SOURCES[identifier])
+            if (observation.get('remote_job_name') == 'rust-product' and remote_matches('AC-016')
+                    and {'test_symbolic_link_is_rejected','test_even_allowlisted_env_resume_marker_and_credentials_fail',
+                         'test_exact_allowlist_and_missing_files','test_real_staging_and_zip_have_exact_regular_allowlist'} <= remote_names):
+                result.add('AC-016')
+            if remote_matches('AC-026') and evidence_controls <= remote_names:
+                result.update(('AC-026','LINUX-COMMAND-LIFETIME'))
         if (observation.get('status') == 'PASS' and observation.get('campaign') == 'fresh-committed-Rust-demo'
                 and observation.get('fresh_checkout') is True and observation.get('recorded_make_demo_status') == 'PASS'
                 and observation.get('current_execution_source_identity_matches') is True
+                and observation.get('captured_generator_report_matches') is True
                 and observation.get('implementation') == 'rust' and observation.get('cases') == 3
                 and observation.get('oracle_match') is True and observation.get('browser_review_status') == 'RECORDED'
                 and re.fullmatch('[0-9a-f]{40}',observation.get('fresh_checkout_commit',''))
@@ -134,8 +154,8 @@ def coverage(data, root=None):
 
 
 def required_sources(identifier, root):
-    if identifier in {'AC-016'}: return {'scripts/export_policy.py', 'tests/security/test_export.py'}
-    if identifier == 'AC-026': return {'scripts/evidence.py','scripts/owned_process.py', 'tests/test_evidence.py','tests/test_review_427.py','tests/test_review_e7.py'}
+    if identifier in {'AC-016'}: return {'scripts/export_policy.py', 'tests/security/test_export.py','scripts/verify_ci_observations.py'}
+    if identifier == 'AC-026': return {'scripts/evidence.py','scripts/owned_process.py', 'tests/test_evidence.py','tests/test_review_427.py','tests/test_review_e7.py','scripts/verify_ci_observations.py'}
     if identifier == 'AC-027': return {'scripts/release_audit.py', 'scripts/evidence_coverage.py', 'CLAIMS_EVIDENCE.md'}
     if identifier == 'AC-030':
         inventory = json.loads((root / 'licenses/dependency-inventory.json').read_bytes())

@@ -87,8 +87,23 @@ def audit(index, require_all=False):
                 if not {'FULL-GRID-CAPTURE','FULL-GRID-VALIDATION','NULL-SORT-VALIDATION'} <= subjects:
                     errors.append('criterion-specific executed observation missing: ' + identifier)
                     errors.append('full captured grid and current-product artifact validation missing: ' + identifier)
+            elif identifier == 'AC-026':
+                if not {'AC-026','LINUX-COMMAND-LIFETIME'} <= subjects:
+                    errors.append('current runner controls and actual Linux descendant-lifetime evidence missing: ' + identifier)
             elif identifier not in subjects: errors.append('criterion-specific executed observation missing: ' + identifier)
-            supplied = set().union(*({source for source, _ in data.get('source_files', [])} for data in selected))
+            # Coverage and freshness must come from the same qualifying run.
+            # A current exit-zero receipt cannot refresh an unrelated old proof.
+            if identifier == 'AC-030':
+                source_candidates = [data for data in selected if 'LICENSE-NOTICES' in coverage(data,ROOT)]
+            elif identifier == 'AC-021':
+                source_candidates = [data for data in selected if
+                                     {'FULL-GRID-VALIDATION','NULL-SORT-VALIDATION'} & coverage(data,ROOT)]
+            elif identifier == 'AC-025':
+                source_candidates = [data for data in selected if 'MALFORMED-CORPUS' in coverage(data,ROOT)
+                                     or {'fmt','lint','check','test'} <= set(data.get('executed_targets',[]))]
+            else:
+                source_candidates = [data for data in selected if identifier in coverage(data,ROOT)]
+            supplied = set().union(*({source for source, _ in data.get('source_files', [])} for data in source_candidates))
             needed = required_sources(identifier, ROOT)
             missing = needed - supplied
             if missing: errors.append('criterion source coverage missing: ' + identifier + ': ' + ', '.join(sorted(missing)))
@@ -98,9 +113,6 @@ def audit(index, require_all=False):
                 # Its proof-link/status fields cannot hash their own future receipt.
                 if identifier == 'AC-027' and source == 'CLAIMS_EVIDENCE.md': continue
                 if identifier == 'AC-030' and source in reviewed_words: continue
-                source_candidates = selected
-                if identifier == 'AC-030': source_candidates = [data for data in selected if 'LICENSE-NOTICES' in coverage(data,ROOT)]
-                elif identifier == 'AC-027': source_candidates = [data for data in selected if 'AC-027' in coverage(data,ROOT)]
                 file = public_file(source,allow_missing=True)
                 current = digest(file) if file.is_file() else None
                 if current is None or not any([source,current] in data['source_files'] for data in source_candidates):

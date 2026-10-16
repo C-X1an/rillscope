@@ -40,6 +40,7 @@ gdb.execute('set confirm off')
 gdb.execute('set disable-randomization off')
 gdb.execute('set debuginfod enabled off')
 gdb.execute('handle SIGINT nostop print pass')
+gdb.execute('handle SIGTERM nostop print pass')
 point = gdb.Breakpoint(config['source'] + ':' + str(config['line']), internal=True)
 gdb.execute('run > ' + shlex.quote(str(stdout)) + ' 2> ' + shlex.quote(str(stderr)))
 if point.hit_count != 1:
@@ -53,6 +54,7 @@ record = {'case':config['case'], 'stopped_source_line':sal.line,
           'stdout_bytes_at_decision_stop':stdout.stat().st_size,
           'instruction_window':gdb.execute('x/16i $pc', to_string=True),
           'signal_method':None, 'handler_return_syscall_observed':False}
+(out / 'decision-function-disassembly.txt').write_text(gdb.execute('disassemble /r',to_string=True))
 point.delete()
 if config['signal']:
     before = set(gdb.breakpoints() or [])
@@ -61,18 +63,18 @@ if config['signal']:
     if len(added) != 1:
         raise RuntimeError('cannot identify the owned signal-return catchpoint')
     catch = added.pop()
-    signal_output = gdb.execute('signal SIGINT', to_string=True)
+    signal_output = gdb.execute('signal ' + config['signal'], to_string=True)
     (out / 'signal-stop.txt').write_text(signal_output)
     if catch.hit_count != 1 or not re.search(r'Catchpoint\s+\d+\s+\(call to syscall [\'\"]?rt_sigreturn', signal_output):
         raise RuntimeError('actual signal handler return was not observed')
     if stdout.stat().st_size != 0 or stderr.stat().st_size != 0:
         raise RuntimeError('output escaped before the controlled handler returned')
-    record.update(signal_method='GDB signal SIGINT to the owned stopped inferior',
+    record.update(signal_method='GDB signal ' + config['signal'] + ' to the owned stopped inferior',
                   handler_return_syscall_observed=True,
                   stdout_bytes_at_handler_return=stdout.stat().st_size)
     catch.delete()
 gdb.execute('continue')
-if len(exits) != 1 or exits[0] != config['expected_exit']:
+if len(exits) != 1:
     raise RuntimeError('unexpected actual inferior exit status: ' + repr(exits))
 record['inferior_exit_code'] = exits[0]
 (out / 'debugger-observation.json').write_text(json.dumps(record, indent=2) + '\n')
@@ -103,10 +105,12 @@ def observe(out, case, line, deliver_signal, expected_exit):
               'line':line, 'signal':deliver_signal, 'expected_exit':expected_exit}
     driver = out / 'control.py'
     driver.write_text(DRIVER.replace('CONFIG_JSON', repr(json.dumps(config))), encoding='utf-8')
+    if any(value in str(driver) for value in ('\r','\n')):
+        raise ValueError('debugger command-file path contains a line break')
     args = [str(BINARY), 'run', '--catalog', str(out / 'catalog.json'),
             '--context', str(out / 'context.json'), '--query', str(out / 'query.json')]
     command = [shutil.which('gdb'), '--nx', '--batch', '-iex', 'set auto-load off',
-               '-ex', 'source ' + json.dumps(str(driver)), '--args', *args]
+               '-ex', 'source ' + str(driver), '--args', *args]
     # Disable network debuginfo lookup and preserve ordinary ASLR. Tracing must be
     # allowed already; no ptrace, seccomp or administrator policy is modified.
     env_keys = ('PATH','HOME','LANG','LC_ALL','TMPDIR')
@@ -125,11 +129,16 @@ def observe(out, case, line, deliver_signal, expected_exit):
     (out / 'process.json').write_text(json.dumps({'exit_code':code,'outcome':outcome,'cleanup':cleanup}, indent=2)+'\n')
     if code != 0 or outcome != 'EXECUTED':
         raise RuntimeError('debugger experiment did not complete; preserve raw diagnostics')
-    observed = json.loads((out / 'debugger-observation.json').read_bytes())
+    observation_path = out / 'debugger-observation.json'
+    if not observation_path.is_file():
+        raise RuntimeError('GDB produced no boundary observation; inspect retained gdb.stdout.txt/gdb.stderr.txt')
+    observed = json.loads(observation_path.read_bytes())
     payload = (out / 'stdout.bin').read_bytes()
     if (out / 'stderr.bin').read_bytes():
         raise RuntimeError('unexpected product stderr')
     response = json.loads(payload)
+    if observed['inferior_exit_code'] != expected_exit:
+        raise RuntimeError('actual terminal exit differs: expected ' + str(expected_exit) + ', observed ' + str(observed['inferior_exit_code']))
     if payload.count(b'\n') != 1 or not payload.endswith(b'\n') or response.get('implementation') != 'rust':
         raise RuntimeError('product did not emit exactly one Rust terminal object')
     if expected_exit == 4:
@@ -145,7 +154,9 @@ def observe(out, case, line, deliver_signal, expected_exit):
 
 
 def main():
-    parser = argparse.ArgumentParser(); parser.add_argument('--out',type=Path,required=True); args = parser.parse_args()
+    parser = argparse.ArgumentParser(); parser.add_argument('--out',type=Path,required=True)
+    parser.add_argument('--before-sigint-only',action='store_true',help='bounded behavioral mutation control; default runs both signals on both sides')
+    args = parser.parse_args()
     if platform.system() != 'Linux' or platform.machine() != 'x86_64' or shutil.which('gdb') is None:
         print(json.dumps({'status':'BLOCKED','reason':'actual Linux x86_64 and permitted existing GDB required'})); return 77
     out = args.out.resolve()
@@ -155,14 +166,20 @@ def main():
     try:
         before = decision_line('if flag.load(Ordering::Acquire) {')
         after = decision_line('let (bytes, code) = match outcome {')
-        results = [observe(out / 'no-signal', 'no-signal', before, False, 0),
-                   observe(out / 'before-commit', 'before-commit', before, True, 4),
-                   observe(out / 'after-commit-before-write', 'after-commit-before-write', after, True, 0)]
+        results = [observe(out / 'no-signal', 'no-signal', before, None, 0)]
+        for name in (('SIGINT',) if args.before_sigint_only else ('SIGINT','SIGTERM')):
+            case = 'before-commit-' + name.lower()
+            results.append(observe(out / case,case,before,name,4))
+            if not args.before_sigint_only:
+                case = 'after-commit-before-write-' + name.lower()
+                results.append(observe(out / case,case,after,name,0))
         summary = {'status':'PASS', 'campaign':'actual-final-publication-decision',
                    'binary_sha256':build['bins']['rillscope']['sha256'], 'source_sha256':build['source']['sha256'],
                    'gdb_version':subprocess.check_output([shutil.which('gdb'),'--version'],text=True,timeout=10).splitlines()[0],
                    'gdb_sha256':hashlib.sha256(Path(shutil.which('gdb')).read_bytes()).hexdigest(),
-                   'results':results, 'scope':'unchanged Rust build; actual signals before/after terminal commitment; no latency claim'}
+                   'selected_case_scope':'no-signal and before-SIGINT control only' if args.before_sigint_only else 'no-signal and both sides for SIGINT/SIGTERM',
+                   'results':results, 'contract_qualification':'NOT ESTABLISHED: AC-018 clarification disposition and independent assessment required',
+                   'scope':'unchanged Rust build; actual signals before/after terminal commitment; experiment observations only, no AC-018 compliance or latency claim'}
         (out / 'summary.json').write_text(json.dumps(summary,indent=2)+'\n'); print(json.dumps(summary,indent=2)); return 0
     except Exception as error:
         (out / 'failure.json').write_text(json.dumps({'status':'FAIL','reason':str(error),'error':type(error).__name__},indent=2)+'\n')
