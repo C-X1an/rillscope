@@ -201,10 +201,17 @@ def sample(mode, binary, case, description, spec, output, phase, repetition, ord
                     record['problems'].append('logical memory reservation exceeds configured limit')
             for key in METRICS:
                 if key in data: record[key] = data[key]
+            if mode != 'sqlite' and result['status'] == 'ok':
+                if any(type(data.get(key)) is not int or data[key] < 0 for key in ('execution_only_ns','serialization_ns')):
+                    record['problems'].append('successful Rust execution/serialization timing missing')
+                elif data['execution_only_ns'] > data['execution_call_wall_ns']:
+                    record['problems'].append('execution timer exceeds enclosing call')
         if result['status'] == 'error' and mode != 'sqlite' and result['error']['code'] not in ('E_BUDGET', 'E_OUTPUT_LIMIT'):
             record['problems'].append('unexpected product rejection')
         if description.get('expected_product_status') and mode != 'sqlite' and record.get('error_code', record['status']) != description['expected_product_status']:
             record['problems'].append('predetermined control outcome mismatch')
+        if description.get('allowed_product_statuses') and mode != 'sqlite' and record.get('error_code',record['status']) not in description['allowed_product_statuses']:
+            record['problems'].append('predetermined capacity outcome mismatch')
         return record, result
     except (ValueError, KeyError, TypeError) as error:
         record['problems'].append('invalid result/instrumentation: ' + type(error).__name__)
@@ -233,6 +240,9 @@ def pair_verdict(triplet, spec):
     for record, result in triplet:
         problems = []
         if result is None: problems.append('terminal result unavailable')
+        if record['mode'] != 'sqlite' and result is not None and spec['description'].get('expected_product_status'):
+            actual = result['error']['code'] if result['status'] == 'error' else 'OK'
+            if actual != spec['description']['expected_product_status']: problems.append('required product outcome mismatch')
         if record['mode'] == 'sqlite' and result is not None:
             actual = result['error']['code'] if result['status'] == 'error' else 'OK'
             if actual != spec['description'].get('expected_oracle_status', 'OK'):

@@ -32,6 +32,7 @@ jobs:
       - run: make benchmark-pilot
       - run: python3 benchmarks/dispatch.py --profile cancellation-only
       - name: Retain synthetic reproducibility artifacts
+        if: ${{ always() }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: synthetic-product-evidence
@@ -47,6 +48,14 @@ jobs:
             .local-runs/demo-*/manifest.json
             .local-runs/bench/p-*/grid/
             .local-runs/bench/c-*/cancel/
+            .local-runs/build/*/build.json
+            .local-runs/build/*/cargo.stdout
+            .local-runs/build/*/cargo.stderr
+            .local-runs/build/*/compiler.stdout
+            .local-runs/build/*/compiler.stderr
+            .local-runs/mutation-*/*.json
+            .local-runs/mutation-*/*.stdout.txt
+            .local-runs/mutation-*/*.stderr.txt
   # These are executed product contracts/campaigns on a shared Linux runner.
   # Green here does not establish the dedicated reference host or full release.
   dependency-policy:

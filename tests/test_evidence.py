@@ -67,6 +67,17 @@ class EvidenceTests(unittest.TestCase):
             self.assertFalse(marker.exists(), 'timed-out worker survived into a subsequent gate')
             self.assertEqual(receipt['process_cleanup']['status'], 'PASS')
 
+    def test_timeout_stops_descendant_after_its_root_has_exited(self):
+        with tempfile.TemporaryDirectory() as folder:
+            marker = Path(folder) / 'survived-exited-root'
+            worker = 'import time; from pathlib import Path; time.sleep(3); Path(' + repr(str(marker)) + ').write_text("survived")'
+            parent = 'import subprocess,sys; subprocess.Popen([sys.executable,"-c",' + repr(worker) + ']); print("root-exiting",flush=True)'
+            receipt = self.run_receipt([sys.executable, '-c', parent], timeout=1)
+            time.sleep(3)
+            self.assertFalse(marker.exists(), 'worker survived its exited root and evidence timeout')
+            self.assertEqual(receipt['execution_outcome'], 'TIMEOUT')
+            self.assertEqual(receipt['process_cleanup']['status'], 'PASS')
+
     def test_output_tampering(self):
         evidence = module('evidence')
         with tempfile.TemporaryDirectory() as folder:

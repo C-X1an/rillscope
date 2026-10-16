@@ -25,7 +25,8 @@ def main():
         subprocess.run(['git', 'clone', '--no-local', '--config', 'core.autocrlf=false', str(ROOT), str(clone)], capture_output=True, check=True)
         if not clone.resolve().is_relative_to(Path(folder).resolve()): raise RuntimeError('clone boundary failure')
         env = os.environ.copy(); env['CARGO_TARGET_DIR'] = str(clone / 'target')
-        built, build_receipt = run(['cargo', 'build', '--locked', '--bin', 'rillscope'], clone, args.out / 'build', env)
+        build_command = [sys.executable,'scripts/product_build.py']
+        built, build_receipt = run(build_command, clone, args.out / 'build-baseline', env)
         if built.returncode: raise RuntimeError('fresh actual Rust binary did not build')
         command = [sys.executable, 'tests/acceptance_locked/test_demo.py', '-v', 'RustDemo.test_actual_text_output_and_supplied_labels_are_escaped_offline']
         path = clone / 'scripts/demo.py'; original = path.read_bytes(); text = original.decode()
@@ -36,14 +37,19 @@ def main():
             raise RuntimeError('selected actual baseline did not run and pass')
         path.write_text(text.replace(anchor, 'label'), encoding='utf-8', newline='\n')
         mutant_sha = hashlib.sha256(path.read_bytes()).hexdigest()
+        rebuilt, mutant_build = run(build_command, clone, args.out / 'build-mutant', env)
+        if rebuilt.returncode: raise RuntimeError('mutant stage has no valid actual build provenance')
         mutant, broken = run(command, clone, args.out / 'mutant', env)
         path.write_bytes(original)
+        rebuilt, restored_build = run(build_command, clone, args.out / 'build-restored', env)
+        if rebuilt.returncode: raise RuntimeError('restored stage has no valid actual build provenance')
         restored, after = run(command, clone, args.out / 'restored', env)
         detected = mutant.returncode != 0 and b'Ran 1 test' in mutant.stdout + mutant.stderr and b'AssertionError' in mutant.stdout + mutant.stderr
         healthy = restored.returncode == 0 and path.read_bytes() == original
         summary = {'control': 'offline_html_escape', 'source_commit': commit, 'path': 'scripts/demo.py',
                    'original_sha256': hashlib.sha256(original).hexdigest(), 'mutant_sha256': mutant_sha,
                    'restored_sha256': hashlib.sha256(path.read_bytes()).hexdigest(), 'build': build_receipt,
+                   'mutant_build':mutant_build,'restored_build':restored_build,
                    'baseline': before, 'mutant': broken, 'restored': after,
                    'status': 'PASS' if detected and healthy else 'FAIL', 'actual_rust_result_tested': True}
         (args.out / 'summary.json').write_text(json.dumps(summary, indent=2) + '\n')

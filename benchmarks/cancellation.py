@@ -41,6 +41,8 @@ def verify_cancellation(directory):
     result = json.loads((directory / 'results.json').read_bytes())
     rows = [json.loads(line) for line in (directory / 'samples.jsonl').read_text().splitlines()]
     errors = []
+    if result.get('source_binary_input_identity_stable') is not True:
+        errors.append('cancellation source/binary/input identity unstable')
     expected = {(seed, phase, index) for seed in SEEDS for phase, count in (('warmup', WARMUPS), ('measured', REPETITIONS)) for index in range(count)}
     counts = Counter((row['seed'], row['phase'], row['repetition']) for row in rows)
     if set(counts) != expected or any(value != 1 for value in counts.values()): errors.append('missing/extra/duplicate cancellation observation')
@@ -69,6 +71,7 @@ def verify_cancellation(directory):
         if input_hashes[row['seed']] != row['inputs']: errors.append('cancellation input digest changed')
         if row['problems']: errors.append('invalid cancellation observation retained')
     expected_summary = cancellation_summary(rows, result['source_binary_input_identity_stable'])
+    if expected_summary['status'] != 'PASS': errors.append('cancellation campaign did not pass')
     if any(result.get(key) != value for key, value in expected_summary.items()): errors.append('cancellation summary differs from retained observations')
     return {'status': 'FAIL' if errors else 'PASS', 'observations_checked': len(rows), 'errors': errors,
             'scope': 'retained cancellation events/artifacts only; this validator performed no signal experiment'}
@@ -89,7 +92,7 @@ def main():
     build = verify_build(args.build_receipt, binary, name='rillscope')
     build_hash = sha(args.build_receipt)
     (args.out / 'build').mkdir()
-    for name in ('build.json', 'cargo.stdout', 'cargo.stderr'):
+    for name in ('build.json', 'cargo.stdout', 'cargo.stderr', 'compiler.stdout', 'compiler.stderr'):
         shutil.copyfile(args.build_receipt.parent / name, args.out / 'build' / name)
     binary_hash = sha(binary)
     identity = source_identity(ROOT)

@@ -13,6 +13,8 @@ import sqlite3
 import subprocess
 import sys
 import time
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from owned_process import WindowsJob
 
 ROOT = Path(__file__).resolve().parents[1]
 EXCLUDED = {'.git', '.local-runs', '__pycache__', 'target', 'verification'}
@@ -67,22 +69,24 @@ def verify_receipt(path: Path) -> bool:
 
 def run_owned(command, *, cwd, timeout, stdin_data):
     """Stop this command's owned descendants before returning a timeout receipt."""
-    options = {'creationflags': subprocess.CREATE_NEW_PROCESS_GROUP} if os.name == 'nt' else {'start_new_session': True}
-    with subprocess.Popen(command, cwd=cwd, stdin=subprocess.PIPE if stdin_data is not None else subprocess.DEVNULL,
-                          stdout=subprocess.PIPE, stderr=subprocess.PIPE, **options) as process:
+    job = WindowsJob() if os.name == 'nt' else None
+    options = {'creationflags': subprocess.CREATE_NEW_PROCESS_GROUP | WindowsJob.CREATE_SUSPENDED} if job else {'start_new_session': True}
+    try:
+      with subprocess.Popen(command, cwd=cwd, stdin=subprocess.PIPE if stdin_data is not None else subprocess.DEVNULL,
+                            stdout=subprocess.PIPE, stderr=subprocess.PIPE, **options) as process:
+        if job:
+            try: job.assign_and_resume(process)
+            except OSError:
+                process.kill(); process.communicate(); raise
         try:
             stdout, stderr = process.communicate(stdin_data, timeout=timeout)
-            return process.returncode, stdout, stderr, 'EXECUTED', {'status': 'NOT REQUIRED'}
+            cleanup = job.terminate() if job else {'status':'NOT REQUIRED'}
+            return process.returncode, stdout, stderr, 'EXECUTED' if cleanup['status'] != 'FAIL' else 'CLEANUP_FAILED', cleanup
         except subprocess.TimeoutExpired as expired:
             cleanup = {'status': 'PASS', 'owned_root_pid': process.pid}
             try:
-                if os.name == 'nt':
-                    # The still-live root PID bounds taskkill to this command's tree.
-                    killed = subprocess.run(['taskkill', '/PID', str(process.pid), '/T', '/F'],
-                                            capture_output=True, timeout=10)
-                    cleanup.update(method='taskkill /PID owned-root /T /F', exit_code=killed.returncode,
-                                   stdout_sha256=digest(killed.stdout), stderr_sha256=digest(killed.stderr))
-                    if killed.returncode: cleanup['status'] = 'FAIL'
+                if job:
+                    cleanup.update(job.terminate())
                 else:
                     cleanup['method'] = 'SIGKILL owned process group'
                     os.killpg(process.pid, signal.SIGKILL)
@@ -98,6 +102,8 @@ def run_owned(command, *, cwd, timeout, stdin_data):
                 process.stdout.close(); process.stderr.close()
                 process.kill(); process.wait(timeout=5)
             return 124, stdout, stderr, 'TIMEOUT', cleanup
+    finally:
+        if job: job.close()
 
 
 def main() -> int:

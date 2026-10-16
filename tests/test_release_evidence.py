@@ -12,10 +12,37 @@ sys.path.insert(0, str(ROOT / 'scripts'))
 sys.path.insert(0, str(ROOT / 'benchmarks'))
 import release_audit
 from run import distribution
-from evidence_coverage import coverage
+from evidence_coverage import coverage, wording_hashes
+import tempfile
 
 
 class PublicEvidenceTests(unittest.TestCase):
+    def test_wording_review_is_invalidated_by_changed_added_or_deleted_prose(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder).resolve(); path = root / 'README.md'; path.write_text('Experimental unit fixture.\n')
+            observation = {'review_kind':'independent-public-wording','review_status':'PASS','unsupported_maturity_claims':[],
+                           'inspection_only':True,'reviewed_wording_sha256':wording_hashes(root)}
+            data = {'source_files':[],'observations':[observation]}
+            self.assertIn('PUBLIC-WORDING',coverage(data,root))
+            path.write_text('Production ready; unmeasured latency is guaranteed.\n')
+            self.assertNotIn('PUBLIC-WORDING',coverage(data,root))
+            path.write_text('Experimental unit fixture.\n'); added = root / 'new-claim.md'; added.write_text('Unit added document.\n')
+            self.assertNotIn('PUBLIC-WORDING',coverage(data,root))
+            added.unlink(); path.unlink()
+            self.assertNotIn('PUBLIC-WORDING',coverage(data,root))
+
+    def test_only_machine_claim_metadata_is_separately_live_validated(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder).resolve(); path = root / 'CLAIMS_EVIDENCE.md'
+            original = '| C-027: Evidence | NFR-004 | current proof | [old-run](verification/old.json) | NOT RUN |\n'
+            path.write_text(original); before = wording_hashes(root)
+            path.write_text(original.replace('[old-run](verification/old.json)','[new-run](verification/new.json)').replace('NOT RUN','PASS'))
+            self.assertEqual(wording_hashes(root),before)
+            path.write_text(original.replace('C-027: Evidence','C-027: Production ready'))
+            self.assertNotEqual(wording_hashes(root),before)
+            path.write_text(original.replace('[old-run](verification/old.json)','Production ready [old-run](verification/old.json)'))
+            self.assertNotEqual(wording_hashes(root),before)
+
     def test_claim_markdown_destination_must_match_index_artifact(self):
         path = ROOT / 'CLAIMS_EVIDENCE.md'
         original = Path.read_text

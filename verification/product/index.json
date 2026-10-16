@@ -4,21 +4,21 @@
     "AC-001": {
       "status": "PASS",
       "runs": [
-        "review-final-source-core"
+        "current-native-product"
       ],
       "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
     },
     "AC-002": {
       "status": "PASS",
       "runs": [
-        "review-final-source-core"
+        "current-native-product"
       ],
       "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
     },
     "AC-003": {
       "status": "PASS",
       "runs": [
-        "review-final-source-core",
+        "current-native-product",
         "ambiguous-zero-scan"
       ],
       "scope": "Unknown, type-mismatched and ambiguous columns denied before actual scan counters advance"
@@ -26,14 +26,14 @@
     "AC-004": {
       "status": "PASS",
       "runs": [
-        "review-final-source-core"
+        "current-native-product"
       ],
       "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
     },
     "AC-005": {
       "status": "PASS",
       "runs": [
-        "review-final-source-core"
+        "current-native-product"
       ],
       "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
     },
@@ -47,7 +47,7 @@
     "AC-007": {
       "status": "PASS",
       "runs": [
-        "review-final-source-core"
+        "current-native-product"
       ],
       "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
     },
@@ -61,28 +61,28 @@
     "AC-009": {
       "status": "PASS",
       "runs": [
-        "review-final-source-core"
+        "current-native-product"
       ],
       "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
     },
     "AC-010": {
       "status": "PASS",
       "runs": [
-        "review-final-source-core"
+        "current-native-product"
       ],
       "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
     },
     "AC-011": {
       "status": "PASS",
       "runs": [
-        "review-final-source-core"
+        "current-native-product"
       ],
       "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
     },
     "AC-012": {
       "status": "PASS",
       "runs": [
-        "review-final-source-core",
+        "current-native-product",
         "eight-rust-controls"
       ],
       "scope": "Known-bad physical plans and selected real PASS-FAIL-PASS controls; source revisions are recorded"
@@ -90,21 +90,21 @@
     "AC-013": {
       "status": "PASS",
       "runs": [
-        "review-final-source-core"
+        "current-native-product"
       ],
       "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
     },
     "AC-014": {
       "status": "PASS",
       "runs": [
-        "review-final-source-core"
+        "current-native-product"
       ],
       "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
     },
     "AC-015": {
       "status": "PASS",
       "runs": [
-        "review-final-source-core",
+        "current-native-product",
         "eight-rust-controls",
         "source-bound-pilot-v2"
       ],
@@ -118,28 +118,28 @@
     "AC-017": {
       "status": "PASS",
       "runs": [
-        "review-final-source-core"
+        "current-native-product"
       ],
       "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
     },
     "AC-018": {
       "status": "PASS",
       "runs": [
-        "review-final-source-core"
+        "current-native-product"
       ],
       "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
     },
     "AC-019": {
       "status": "PASS",
       "runs": [
-        "review-final-source-core"
+        "current-native-product"
       ],
       "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
     },
     "AC-020": {
       "status": "PASS",
       "runs": [
-        "review-final-source-core"
+        "current-native-product"
       ],
       "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
     },
@@ -170,7 +170,7 @@
     "AC-025": {
       "status": "PASS",
       "runs": [
-        "review-final-source-core",
+        "current-native-product",
         "review-followup-malformed"
       ],
       "scope": "Static forbid-unsafe/lint and 2000 finite malformed JSON/SQL cases; no libFuzzer-duration claim"
@@ -178,19 +178,21 @@
     "AC-026": {
       "status": "PASS",
       "runs": [
-        "review-final-source-core"
+        "lifecycle-tooling-validation"
       ],
-      "scope": "Executed source-bound suites include launch failure retention, input/output provenance and actual timeout descendant cleanup controls; Linux branch execution remains separate"
+      "scope": "Executed evidence controls include real exited-root worker cleanup and retained launch/input/output provenance; Linux branch execution remains separate"
     },
     "AC-027": {
       "status": "NOT RUN",
-      "runs": [],
-      "scope": "Public status/link/digest audit and final independent wording review pending"
+      "runs": [
+        "claims-link-audit"
+      ],
+      "scope": "Dated audit retained; current final closure and independently bound public wording review remain pending"
     },
     "AC-028": {
       "status": "PASS",
       "runs": [
-        "review-final-source-core",
+        "current-native-product",
         "rust-demo"
       ],
       "scope": "Actual fixed-scope Rust adapter/report runs with minimal OS environment, no required model/cloud keys"
@@ -198,7 +200,7 @@
     "AC-029": {
       "status": "PASS",
       "runs": [
-        "review-final-source-core",
+        "current-native-product",
         "rust-demo",
         "html-escape-control"
       ],
@@ -207,7 +209,7 @@
     "AC-030": {
       "status": "NOT RUN",
       "runs": [
-        "review-followup-license"
+        "resolved-notice-components"
       ],
       "scope": "Actual lock/license/notice and online policy scans recorded; final release wording review pending"
     }
@@ -336,6 +338,30 @@
     "review-final-source-core": {
       "path": "verification/product/runs/review-final-source-core.json",
       "sha256": "cf43400a01b48fbe84674b3ef9f9b63773c9a903177c93f5e654f96f22e9dc0e"
+    },
+    "lifecycle-tooling-validation": {
+      "path": "verification/product/runs/lifecycle-tooling-validation.json",
+      "sha256": "83b6cfaa67a9606f488e3fff93eadd8411071a3d7654f593b2024904c492dea4"
+    },
+    "resolved-notice-components": {
+      "path": "verification/product/runs/resolved-notice-components.json",
+      "sha256": "474ea50f1df504d326880a4d94e4918a192467b11c2d9272ac722bf96bfd12a8"
+    },
+    "current-source-pilot-validation": {
+      "path": "verification/product/runs/current-source-pilot-validation.json",
+      "sha256": "b360b706a11c2fcfa3a10695deab9587dbe5f3759c678eb3f9a2f3e3b2f0bc7f"
+    },
+    "reviewed-release-pilot": {
+      "path": "verification/product/runs/reviewed-release-pilot.json",
+      "sha256": "2479a29d55ba8eb9ad0d227a4ce856cf7c6ae6226e1b9e018aefab3875aec5b1"
+    },
+    "ten-rust-controls-html-baseline-failed": {
+      "path": "verification/product/runs/ten-rust-controls-html-baseline-failed.json",
+      "sha256": "2b7098c4f0cc4e4e41444e121efbb261e0cdac6e95a4d29ec18ab087ba6b38a2"
+    },
+    "current-native-product": {
+      "path": "verification/product/runs/current-native-product.json",
+      "sha256": "e209f685eb87ee1306b0a300156f605e0793b403b5e62e84f39270838641fb4f"
     }
   },
   "release_status": "INCOMPLETE",

@@ -17,10 +17,14 @@ def audit():
     if result.returncode:
         raise RuntimeError('locked dependency metadata failed')
     metadata = json.loads(result.stdout)
+    resolved = {(p['name'],p['version']):p for p in metadata['packages'] if p['source'] is not None}
     actual = {(p['name'], p['version'], p['license'], p['source']) for p in metadata['packages'] if p['source'] is not None}
     listed = {(p['name'], p['version'], p['declared_license'], p['source']) for p in inventory['packages']}
     if actual != listed: errors.append('resolved graph differs from notice inventory')
     for package in inventory['packages']:
+        required_components = {'MIT','Unicode-3.0'} if package['selected_license'] == 'MIT AND Unicode-3.0' else {'MIT'}
+        components = {notice.get('spdx_license') for notice in package['notices']}
+        if components != required_components: errors.append('selected license notice component missing or unreviewed: ' + package['name'])
         if package['selected_license'] not in ('MIT', 'MIT AND Unicode-3.0'):
             errors.append('unreviewed selected license')
         if 'MIT' not in package['declared_license']: errors.append('selected license is not declared')
@@ -33,6 +37,16 @@ def audit():
                 errors.append('invalid notice path'); continue
             if not path.is_file() or hashlib.sha256(path.read_bytes()).hexdigest() != notice['sha256']:
                 errors.append('notice missing or changed: ' + notice['path'])
+                continue
+            content = path.read_bytes().upper()
+            component = notice.get('spdx_license')
+            if ((component == 'MIT' and b'PERMISSION IS HEREBY GRANTED' not in content)
+                    or (component == 'Unicode-3.0' and b'UNICODE LICENSE V3' not in content)):
+                errors.append('notice content does not identify selected component: ' + notice['path'])
+            actual_package = resolved.get((package['name'],package['version']))
+            upstream = None if actual_package is None else Path(actual_package['manifest_path']).parent / path.name
+            if upstream is None or not upstream.is_file() or hashlib.sha256(upstream.read_bytes()).hexdigest() != notice['sha256']:
+                errors.append('notice differs from resolved package source: ' + notice['path'])
     own = [p for p in metadata['packages'] if p['source'] is None]
     if len(own) != 1 or own[0]['license'] != 'MIT' or b'MIT' not in (ROOT / 'LICENSE').read_bytes():
         errors.append('first-party MIT declaration missing')

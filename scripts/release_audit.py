@@ -6,7 +6,7 @@ import hashlib
 import json
 from pathlib import Path
 import re
-from evidence_coverage import coverage, required_sources
+from evidence_coverage import coverage, required_sources, wording_hashes
 
 ROOT = Path(__file__).resolve().parents[1]
 STATUSES = {'PASS', 'FAIL', 'BLOCKED', 'NOT RUN', 'NOT YET MEASURED'}
@@ -15,7 +15,7 @@ STATUSES = {'PASS', 'FAIL', 'BLOCKED', 'NOT RUN', 'NOT YET MEASURED'}
 def digest(path): return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def public_file(name):
+def public_file(name, allow_missing=False):
     relative = Path(name)
     if relative.is_absolute() or '..' in relative.parts: raise ValueError('non-public evidence path')
     path = ROOT / relative
@@ -23,13 +23,13 @@ def public_file(name):
         if component == ROOT: break
         if component.is_symlink() or (hasattr(component, 'is_junction') and component.is_junction()):
             raise ValueError('evidence cannot traverse a symbolic link/reparse point')
-    if not path.resolve().is_relative_to(ROOT) or not path.is_file():
+    if not path.resolve().is_relative_to(ROOT) or (not path.is_file() and not (allow_missing and not path.exists())):
         raise ValueError('missing/non-regular public evidence file')
     return path
 
 
 def audit(index, require_all=False):
-    errors, unproved, historical = [], [], []
+    errors, unproved, historical, stale_requirements = [], [], [], []
     locked = {row['id'] for row in json.loads((ROOT / 'spec/acceptance.json').read_bytes())['criteria']}
     if set(index['criteria']) != locked: errors.append('evidence index must cover exactly the thirty locked criteria')
     artifacts = {}
@@ -39,15 +39,15 @@ def audit(index, require_all=False):
         if digest(path) != artifact['sha256']: errors.append('public evidence digest mismatch: ' + name)
         data = json.loads(path.read_bytes())
         artifacts[name] = data
-        observed.update(coverage(data))
+        observed.update(coverage(data,ROOT))
         if not data.get('source_files') or any(not re.fullmatch('[0-9a-f]{64}', data.get(key, '')) for key in ('source_before_sha256', 'source_after_sha256', 'raw_stdout_sha256', 'raw_stderr_sha256')):
             errors.append('required source/output provenance missing: ' + name)
         if data.get('status') == 'PASS' and (data.get('exit_code') != 0 or data.get('source_before_sha256') != data.get('source_after_sha256')):
             errors.append('passing run lacks exit-zero/stable-source provenance: ' + name)
         # Old evidence stays visible as dated evidence. It cannot establish a new all-green release.
         for source, expected in data.get('source_files', []):
-            if source.startswith(('src/', 'tests/', 'tools/', 'benchmarks/', 'scripts/')) or source in ('Cargo.toml', 'Cargo.lock', 'Makefile'):
-                file = ROOT / source
+            if source.startswith(('src/', 'tests/', 'tools/', 'benchmarks/', 'scripts/','licenses/')) or source.endswith('.md') or source in ('Cargo.toml', 'Cargo.lock', 'Makefile','LICENSE'):
+                file = public_file(source,allow_missing=True)
                 if not file.is_file() or digest(file) != expected:
                     historical.append(name); break
     table = (ROOT / 'CLAIMS_EVIDENCE.md').read_text(encoding='utf-8')
@@ -66,6 +66,9 @@ def audit(index, require_all=False):
             for link in links:
                 try: public_file(link)
                 except ValueError: errors.append('claim Markdown evidence link is missing/invalid: ' + identifier)
+            expected_cell = ', '.join('[' + name + '](' + index['artifacts'][name]['path'] + ')' for name in row['runs'] if name in index['artifacts']) or row['scope']
+            if len(cells) != 7 or cells[4].strip() != expected_cell:
+                errors.append('claim evidence field is not the canonical live-validated index value: ' + identifier)
         if row['status'] != 'PASS': unproved.append(identifier + ': ' + row['status'])
         if row['status'] == 'PASS' and not row['runs']: errors.append('PASS claim lacks evidence: ' + identifier)
         for name in row['runs']:
@@ -74,26 +77,45 @@ def audit(index, require_all=False):
                 errors.append('PASS claim references a nonpassing run: ' + identifier)
         if row['status'] == 'PASS':
             selected = [artifacts[name] for name in row['runs'] if name in artifacts]
-            subjects = set().union(*(coverage(data) for data in selected))
+            subjects = set().union(*(coverage(data,ROOT) for data in selected))
             if identifier == 'AC-025':
                 static = any({'fmt', 'lint', 'check', 'test'} <= set(data.get('executed_targets', [])) for data in selected)
                 if 'MALFORMED-CORPUS' not in subjects or not static: errors.append('static/malformed criterion evidence missing: ' + identifier)
             elif identifier == 'AC-030':
                 if not {'LICENSE-NOTICES', 'PUBLIC-WORDING'} <= subjects: errors.append('license/notices and independent wording evidence missing: ' + identifier)
+            elif identifier == 'AC-021':
+                if not {'FULL-GRID-CAPTURE','FULL-GRID-VALIDATION'} <= subjects:
+                    errors.append('criterion-specific executed observation missing: ' + identifier)
+                    errors.append('full captured grid and current-product artifact validation missing: ' + identifier)
             elif identifier not in subjects: errors.append('criterion-specific executed observation missing: ' + identifier)
             supplied = set().union(*({source for source, _ in data.get('source_files', [])} for data in selected))
-            missing = required_sources(identifier, ROOT) - supplied
+            needed = required_sources(identifier, ROOT)
+            missing = needed - supplied
             if missing: errors.append('criterion source coverage missing: ' + identifier + ': ' + ', '.join(sorted(missing)))
+            reviewed_words = set(wording_hashes(ROOT)) if 'PUBLIC-WORDING' in subjects else set()
+            for source in needed - missing:
+                # This invocation reads and validates the live claim table above.
+                # Its proof-link/status fields cannot hash their own future receipt.
+                if identifier == 'AC-027' and source == 'CLAIMS_EVIDENCE.md': continue
+                if identifier == 'AC-030' and source in reviewed_words: continue
+                source_candidates = selected
+                if identifier == 'AC-030': source_candidates = [data for data in selected if 'LICENSE-NOTICES' in coverage(data,ROOT)]
+                elif identifier == 'AC-027': source_candidates = [data for data in selected if 'AC-027' in coverage(data,ROOT)]
+                file = public_file(source,allow_missing=True)
+                current = digest(file) if file.is_file() else None
+                if current is None or not any([source,current] in data['source_files'] for data in source_candidates):
+                    stale_requirements.append(identifier + ': ' + source)
     referenced = {name for row in index['criteria'].values() if row['status'] == 'PASS' for name in row['runs']}
-    current_history = sorted(set(historical) & referenced)
     if require_all:
         errors += ['unproved required criterion: ' + value for value in unproved]
-        errors += ['historical source evidence cannot establish current release: ' + value for value in current_history]
-    return {'audit_status': 'FAIL' if errors else 'PASS', 'all_declared_criteria_have_current_passing_evidence_links': not unproved and not current_history and not errors,
+        errors += ['current criterion source evidence missing: ' + value for value in stale_requirements]
+    return {'audit_status': 'FAIL' if errors else 'PASS', 'all_declared_criteria_have_current_passing_evidence_links': not unproved and not stale_requirements and not errors,
             'criterion_status_counts': dict(Counter(row['status'] for row in index['criteria'].values())),
             'unproved': unproved, 'historical_source_evidence': sorted(set(historical)), 'errors': errors,
+            'stale_required_sources': sorted(set(stale_requirements)),
             'scope': 'public claim status/link/digest/provenance audit; no new runtime execution or independent prose review',
-            'claims_sha256': digest(ROOT / 'CLAIMS_EVIDENCE.md')}
+            'claims_sha256': digest(ROOT / 'CLAIMS_EVIDENCE.md'),
+            'wording_binding': 'all public Markdown assertions; canonical evidence-link/status fields are validated live against the index'}
 
 
 def main():

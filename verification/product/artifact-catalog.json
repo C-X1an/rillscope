@@ -122,5 +122,29 @@
   "review-final-source-core": {
     "path": "verification/product/runs/review-final-source-core.json",
     "sha256": "cf43400a01b48fbe84674b3ef9f9b63773c9a903177c93f5e654f96f22e9dc0e"
+  },
+  "lifecycle-tooling-validation": {
+    "path": "verification/product/runs/lifecycle-tooling-validation.json",
+    "sha256": "83b6cfaa67a9606f488e3fff93eadd8411071a3d7654f593b2024904c492dea4"
+  },
+  "resolved-notice-components": {
+    "path": "verification/product/runs/resolved-notice-components.json",
+    "sha256": "474ea50f1df504d326880a4d94e4918a192467b11c2d9272ac722bf96bfd12a8"
+  },
+  "current-source-pilot-validation": {
+    "path": "verification/product/runs/current-source-pilot-validation.json",
+    "sha256": "b360b706a11c2fcfa3a10695deab9587dbe5f3759c678eb3f9a2f3e3b2f0bc7f"
+  },
+  "reviewed-release-pilot": {
+    "path": "verification/product/runs/reviewed-release-pilot.json",
+    "sha256": "2479a29d55ba8eb9ad0d227a4ce856cf7c6ae6226e1b9e018aefab3875aec5b1"
+  },
+  "ten-rust-controls-html-baseline-failed": {
+    "path": "verification/product/runs/ten-rust-controls-html-baseline-failed.json",
+    "sha256": "2b7098c4f0cc4e4e41444e121efbb261e0cdac6e95a4d29ec18ab087ba6b38a2"
+  },
+  "current-native-product": {
+    "path": "verification/product/runs/current-native-product.json",
+    "sha256": "e209f685eb87ee1306b0a300156f605e0793b403b5e62e84f39270838641fb4f"
   }
 }

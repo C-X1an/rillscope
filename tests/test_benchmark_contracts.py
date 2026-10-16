@@ -35,6 +35,7 @@ class BenchmarkContracts(unittest.TestCase):
         triplet = [({'mode': mode, 'phase':'measured', 'repetition':0}, oracle if mode == 'sqlite' else failed) for mode in run.MODES]
         verdict = run.pair_verdict(triplet, {'description':description, 'ordered':False})
         self.assertIn('predetermined independent baseline outcome mismatch', verdict['modes']['sqlite']['problems'])
+        self.assertEqual(sum(row.get('expected_product_status') == 'OK' for row in descriptors()),58)
 
     def test_terminal_digest_metrics_schema_and_parameters_are_rechecked(self):
         # Explicit unit bytes/metadata; no executable or timing observation is generated.
@@ -42,9 +43,10 @@ class BenchmarkContracts(unittest.TestCase):
         stdout = json.dumps(value).encode()
         hashes = {name + '.json':'a' * 64 for name in ('catalog','context','query','case')}
         measurement = {'implementation':'rust-benchmark', 'synthetic_only':True, 'optimize':True, 'batch_rows':128,
-                       'execution_only_ns':10, 'error':None, 'result_sha256':__import__('hashlib').sha256(stdout).hexdigest(),
+                       'execution_only_ns':10, 'serialization_ns':1, 'error':None, 'result_sha256':__import__('hashlib').sha256(stdout).hexdigest(),
                        **{name:1 for name in ('load_ns','compile_ns','execution_call_wall_ns','consumed_work','visible_work','peak_reserved_bytes')},
                        **{name + '_sha256':'a' * 64 for name in ('catalog','context','query')}}
+        measurement['execution_call_wall_ns'] = 20
         row = {'mode':'rust-on', 'inputs':hashes, 'status':'OK', 'result_digest':run.semantic_digest(value, False), 'execution_only_ns':10}
         row.update({key:value for key,value in measurement.items() if key in run.METRICS})
         description, spec = {'batch_rows':128}, {'ordered':False, 'schema':value['schema']}
@@ -59,6 +61,36 @@ class BenchmarkContracts(unittest.TestCase):
                                        ('result_sha256','b' * 64,'measurement result hash mismatch')]:
             broken = dict(measurement, **{key:altered})
             self.assertIn(expected, sample_problems(row, value, broken, description, spec, hashes, stdout))
+
+    def test_successful_measurement_requires_complete_enclosed_execution_timing(self):
+        # Synthetic validator fixture, not measured execution.
+        value = {'status':'ok','schema':[],'rows':[]}
+        stdout = json.dumps(value).encode()
+        hashes = {name + '.json':'a' * 64 for name in ('catalog','context','query','case')}
+        measurement = {'implementation':'rust-benchmark','synthetic_only':True,'optimize':True,'batch_rows':128,
+                       'error':None,'result_sha256':__import__('hashlib').sha256(stdout).hexdigest(),
+                       **{name + '_sha256':'a' * 64 for name in ('catalog','context','query')},
+                       **{key:1 for key in ('load_ns','compile_ns','execution_call_wall_ns','consumed_work','visible_work','peak_reserved_bytes')},
+                       'execution_only_ns':None,'serialization_ns':None}
+        row = {'mode':'rust-on','inputs':hashes,'status':'OK','result_digest':run.semantic_digest(value, False),
+               **{key:number for key,number in measurement.items() if key in run.METRICS}}
+        problems = sample_problems(row,value,measurement,{'batch_rows':128},{'ordered':False,'schema':[]},hashes,stdout)
+        self.assertIn('successful Rust execution/serialization timing missing', problems)
+        measurement.update(execution_only_ns=10,serialization_ns=1)
+        row.update(execution_only_ns=10,serialization_ns=1)
+        self.assertIn('execution timer exceeds enclosing call', sample_problems(row,value,measurement,{'batch_rows':128},{'ordered':False,'schema':[]},hashes,stdout))
+
+    def test_reference_filter_requires_a_successful_product_result(self):
+        description = next(row for row in descriptors() if row['id'] == 'B01-n100000-s10-null10-b1024')
+        self.assertEqual(description.get('expected_product_status'), 'OK')
+
+    def test_advertised_filter_row_count_is_checked_before_measurement(self):
+        import workloads
+        description = next(row for row in descriptors() if row['id'] == 'B01-n100000-s10-null10-b1024')
+        too_small = make_catalog(dict(description, rows=10), 20261014)
+        with tempfile.TemporaryDirectory() as folder, patch.object(workloads,'make_catalog',return_value=too_small):
+            with self.assertRaisesRegex(ValueError, 'advertised row count'):
+                workloads.write_case(Path(folder),description,20261014)
 
     def test_failed_build_attempt_records_compiler_discovery_and_cargo_failure(self):
         # Mocked launch failures test receipt retention only; no compiler is executed.

@@ -10,8 +10,9 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'benchmarks'))
 from run import METRICS, MODES, REPETITIONS, WARMUPS, semantic_digest, sha, summarize_case, pair_verdict
-from workloads import SEEDS, descriptors, query
+from workloads import SEEDS, descriptors, query, context, make_catalog, validate_workload_catalog
 from envelopes import terminal
+from evidence import source_identity
 
 
 def sample_problems(row, value, measurement, description, spec, hashes, stdout):
@@ -24,6 +25,8 @@ def sample_problems(row, value, measurement, description, spec, hashes, stdout):
     if value['status'] == 'ok' and value['schema'] != spec['schema']: errors.append('independent expected schema mismatch')
     if row['mode'] != 'sqlite' and description.get('expected_product_status') and actual != description['expected_product_status']:
         errors.append('predetermined control outcome mismatch')
+    if row['mode'] != 'sqlite' and description.get('allowed_product_statuses') and actual not in description['allowed_product_statuses']:
+        errors.append('predetermined capacity outcome mismatch')
     if not isinstance(measurement, dict): return errors + ['measurement artifact missing']
     for key in METRICS:
         if key not in ('wall_ns', 'cpu_user_ns', 'cpu_system_ns', 'peak_rss_bytes') and row.get(key) != measurement.get(key):
@@ -34,6 +37,11 @@ def sample_problems(row, value, measurement, description, spec, hashes, stdout):
     expected_payload = None if row['mode'] != 'sqlite' and value['status'] == 'error' else payload_hash
     if measurement.get('result_sha256') != expected_payload: errors.append('measurement result hash mismatch')
     if row['mode'] != 'sqlite':
+        if value['status'] == 'ok':
+            if any(type(measurement.get(key)) is not int or measurement[key] < 0 for key in ('execution_only_ns','serialization_ns')):
+                errors.append('successful Rust execution/serialization timing missing')
+            elif measurement['execution_only_ns'] > measurement['execution_call_wall_ns']:
+                errors.append('execution timer exceeds enclosing call')
         for field in ('load_ns', 'compile_ns', 'execution_call_wall_ns', 'consumed_work', 'visible_work', 'peak_reserved_bytes'):
             if type(measurement.get(field)) is not int or measurement[field] < 0: errors.append('required Rust measurement missing: ' + field)
         for field in ('catalog', 'context', 'query'):
@@ -52,12 +60,17 @@ def sample_problems(row, value, measurement, description, spec, hashes, stdout):
     return errors
 
 
-def verify(directory):
+def verify(directory, require_current_product=False):
     errors = []
     manifest = json.loads((directory / 'manifest.json').read_bytes())
     results = json.loads((directory / 'results.json').read_bytes())
     rows = [json.loads(line) for line in (directory / 'samples.jsonl').read_text(encoding='utf-8').splitlines()]
     version = manifest.get('schema_version', 1)
+    product_file = lambda name: name.startswith('src/') or name in ('Cargo.toml','Cargo.lock','rust-toolchain.toml')
+    captured_product = {name:digest for name,digest in manifest['source']['files'] if product_file(name)}
+    current_product = {name:digest for name,digest in source_identity(ROOT)['files'] if product_file(name)}
+    current_product_matches = captured_product == current_product
+    if require_current_product and not current_product_matches: errors.append('current Rust product source differs from captured build')
     pair_rows = []
     if version >= 2:
         pair_rows = [json.loads(line) for line in (directory / 'pair-verdicts.jsonl').read_text(encoding='utf-8').splitlines()]
@@ -86,7 +99,9 @@ def verify(directory):
     if results['samples_sha256'] != sha(directory / 'samples.jsonl'): errors.append('sample stream digest changed')
     if manifest['warmups'] != WARMUPS or manifest['repetitions'] != REPETITIONS: errors.append('warmup/repetition contract changed')
     if manifest['profile'] == 'full':
-        if manifest['chosen_workloads'] != descriptors() or manifest['seeds'] != list(SEEDS): errors.append('full predetermined grid changed')
+        dimensions = lambda row: {key:value for key,value in row.items() if key not in ('expected_product_status','allowed_product_statuses','expected_oracle_status')}
+        if [dimensions(row) for row in manifest['chosen_workloads']] != [dimensions(row) for row in descriptors()] or manifest['seeds'] != list(SEEDS):
+            errors.append('full predetermined grid changed')
         if not results['complete_grid']: errors.append('full grid incomplete')
     if len(rows) != manifest['expected_observations']: errors.append('missing or extra observations')
     if not results['source_binary_inputs_stable']: errors.append('source/binary/input identity was not stable during execution')
@@ -100,7 +115,9 @@ def verify(directory):
     expected_pairs = set()
     total_invalid = 0
     total_comparisons = 0
+    required_success_cases = 0
     for description in manifest['chosen_workloads']:
+        validation_description = next((row for row in descriptors() if row['id'] == description['id']), description) if manifest['profile'] == 'full' else description
         for seed in manifest['seeds']:
             case_rows = by_case[(description['id'], seed)]
             case = directory / (description['id'] + '-seed' + str(seed))
@@ -110,6 +127,15 @@ def verify(directory):
                 errors.append('missing/duplicate paired record: ' + description['id'])
                 continue
             spec = json.loads((case / 'inputs/case.json').read_bytes())
+            catalog_path = case / 'inputs/catalog.json'
+            if catalog_path.stat().st_size > 256 * 1024 * 1024: raise ValueError('catalog evidence exceeds locked input bound')
+            actual_shape = validate_workload_catalog(description,json.loads(catalog_path.read_bytes()))
+            expected_catalog = json.dumps(make_catalog(description,seed),ensure_ascii=False,separators=(',',':')).encode()
+            if hashlib.sha256(expected_catalog).hexdigest() != sha(catalog_path):
+                errors.append('catalog differs from declared deterministic workload/seed recipe')
+            del expected_catalog
+            if spec['realized_shape'] != actual_shape or json.loads((case / 'inputs/context.json').read_bytes()) != context():
+                errors.append('retained catalog dimensions/authority differ from declared case')
             expected_query, sql, schema, ordered = query(description)
             if (spec['description'] != description or spec['seed'] != seed or spec['sql'] != sql
                     or spec['schema'] != schema or spec['ordered'] != ordered
@@ -134,7 +160,7 @@ def verify(directory):
                 if row['cpu_rss_status'] != 'MEASURED' or any(row.get(key) is None or row[key] < 0 for key in ('wall_ns', 'cpu_user_ns', 'cpu_system_ns', 'peak_rss_bytes')):
                     errors.append('missing/invalid owned process measurement: ' + tag)
                 value = terminal(stdout, stderr, row['exit_code'], row['mode'])
-                errors.extend(problem + ': ' + tag for problem in sample_problems(row, value, measurement, description, spec, hashes, stdout))
+                errors.extend(problem + ': ' + tag for problem in sample_problems(row, value, measurement, validation_description, spec, hashes, stdout))
                 if version >= 3:
                     usage_path = case / 'raw' / (tag + '.process.json')
                     usage = json.loads(usage_path.read_bytes())
@@ -144,7 +170,7 @@ def verify(directory):
             case_invalid = 0
             comparisons = 0
             for key, triplet in groups.items():
-                verdict = pair_verdict(triplet, spec)
+                verdict = pair_verdict(triplet, dict(spec,description=validation_description))
                 verdict.update(workload=description['id'], seed=seed)
                 pair_key = (description['id'], seed, *key)
                 expected_pairs.add(pair_key)
@@ -157,6 +183,10 @@ def verify(directory):
             if saved['invalid_observations'] != case_invalid: errors.append('case invalid count mismatch')
             total_invalid += case_invalid
             if version >= 3 and saved.get('independent_semantic_comparisons') != comparisons: errors.append('case independent comparison count mismatch')
+            if validation_description.get('expected_product_status') == 'OK' and comparisons != REPETITIONS * 2:
+                errors.append('required successful Rust/SQLite comparisons missing: ' + description['id'])
+            if validation_description.get('expected_product_status') == 'OK' and comparisons == REPETITIONS * 2:
+                required_success_cases += 1
             total_comparisons += comparisons
             saved_summaries.append(saved)
     if version >= 2 and set(by_pair) != expected_pairs: errors.append('missing/extra pair verdicts')
@@ -175,13 +205,16 @@ def verify(directory):
     if results['completed_cases'] != len(expected_cases) or results['expected_cases'] != len(expected_cases): errors.append('top-level case count differs from actual cases')
     return {'profile': manifest['profile'], 'observations_checked': len(rows), 'cases_checked': len(by_case),
             'status': 'FAIL' if errors else 'PASS', 'errors': errors,
+            'current_product_source_matches_capture':current_product_matches,
+            'independent_semantic_comparisons':total_comparisons,'required_success_cases_checked':required_success_cases,
             'build_provenance_status': 'RECORDED' if version >= 2 else 'NOT RECORDED: historical schema 1 instrument evidence only',
             'scope': 'recorded observations and artifacts verified; this command executed no queries and establishes no reference-host target'}
 
 
 def main():
-    parser = argparse.ArgumentParser(); parser.add_argument('directory', type=Path); args = parser.parse_args()
-    try: result = verify(args.directory)
+    parser = argparse.ArgumentParser(); parser.add_argument('directory', type=Path)
+    parser.add_argument('--require-current-product',action='store_true'); args = parser.parse_args()
+    try: result = verify(args.directory,args.require_current_product)
     except (OSError, ValueError, KeyError, TypeError) as error:
         result = {'status': 'FAIL', 'errors': ['missing/invalid evidence: ' + type(error).__name__]}
     print(json.dumps(result, indent=2))

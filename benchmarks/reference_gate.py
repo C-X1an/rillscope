@@ -64,7 +64,7 @@ def main():
     code = subprocess.call([sys.executable, str(ROOT / 'benchmarks/cancellation.py'), '--binary', str(ROOT / build['bins']['rillscope']['path']),
                             '--build-receipt', str(proof), '--out', str(args.out / 'cancel')], cwd=ROOT)
     if code: return code
-    code = subprocess.call([sys.executable, str(ROOT / 'benchmarks/verify.py'), str(args.out / 'grid')], cwd=ROOT)
+    code = subprocess.call([sys.executable, str(ROOT / 'benchmarks/verify.py'), str(args.out / 'grid'),'--require-current-product'], cwd=ROOT)
     if code: return code
     grid = json.loads((args.out / 'grid/results.json').read_bytes())
     targets = []
@@ -72,9 +72,12 @@ def main():
         if row['workload']['id'] != 'B01-n100000-s10-null10-b1024': continue
         measured = row['metrics']['rust-on']
         latency = measured['success_only_execution_ns']
+        if latency.get('n') != 30 or row.get('independent_semantic_comparisons') != 60:
+            raise ValueError('reference target has no complete valid execution distribution; no speed target verdict exists')
         targets.append({'seed': row['seed'], 'execution_ns': latency,
+                        'independent_semantic_comparisons':row['independent_semantic_comparisons'],
                         'end_to_end_ns': measured['all_outcome_metrics']['wall_ns'],
-                        'target_status': 'MET' if latency['n'] == 30 and latency['p95'] < 1000000000 else 'MISSED'})
+                        'target_status': 'MET' if latency['p95'] < 1000000000 else 'MISSED'})
     cancellation = json.loads((args.out / 'cancel/results.json').read_bytes())
     from cancellation import verify_cancellation
     cancellation_check = verify_cancellation(args.out / 'cancel')

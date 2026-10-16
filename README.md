@@ -106,7 +106,7 @@ These commands must actually succeed before making a Rust verification claim. `m
 
 The reference suite includes a **1,000-seed SQLite comparison test** across filter/project, grouped aggregates, joins, scalar aggregates and ordering. Three targeted mutations exercise selected tenant, NULL and duplicate-handling defects. These counts describe **test design and recorded reference execution**, not coverage of all SQL, Rust validation, security certification or production users.
 
-[Verification report](VERIFICATION_REPORT.md) separates what ran from what did not. [Claims-to-evidence](CLAIMS_EVIDENCE.md) keeps the full Rust acceptance claims pending. [Benchmark methodology](BENCHMARKS.md) distinguishes a tiny reference harness measurement from the unmeasured Rust performance targets.
+[Verification report](VERIFICATION_REPORT.md) separates executed checks from outstanding requirements. [Claims-to-evidence](CLAIMS_EVIDENCE.md) records scoped Rust successes alongside failed, blocked and unmeasured criteria. [Benchmark methodology](BENCHMARKS.md) distinguishes reference smoke measurements, Rust instrumentation pilots and the pending complete/reference-host results.
 
 `make verify` executes the full product validation sequence, including the reference-host benchmark and a fresh committed checkout. It currently fails while required runtime gates remain unavailable. Once its receipts have been collected into the public evidence index, `make release-verify` additionally requires current passing evidence for every locked criterion. This ordering lets a fresh run produce AC-024 evidence before the final claims audit consumes it. A green reference check or source-only CI run does not establish full-product approval.
 

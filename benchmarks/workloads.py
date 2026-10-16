@@ -32,6 +32,12 @@ def descriptors():
         oversized = (row['family'] == 'filter' and row['rows'] * row['selectivity'] // 100 > 10000)
         oversized |= row['family'] == 'aggregate' and row.get('groups', 0) > 10000
         row['expected_oracle_status'] = 'E_OUTPUT_LIMIT' if oversized else 'OK'
+        if row['family'] == 'join' and row['skew'] == 'heavy' and row['keys'] == 10000:
+            row['allowed_product_statuses'] = ['OK','E_BUDGET']
+        elif row['family'] == 'aggregate' and row.get('groups',0) > 10000:
+            row['allowed_product_statuses'] = ['E_OUTPUT_LIMIT','E_BUDGET']
+        else:
+            row.setdefault('expected_product_status', 'E_OUTPUT_LIMIT' if oversized else 'OK')
     return out
 
 def make_catalog(description, seed):
@@ -120,9 +126,29 @@ def query(description):
 def write_case(directory: Path, description, seed):
     directory.mkdir(parents=True, exist_ok=True)
     catalog = make_catalog(description, seed)
+    realized = validate_workload_catalog(description, catalog)
     request, sql, schema, ordered = query(description)
     for name, value in [('catalog.json', catalog), ('context.json', context()), ('query.json', request)]:
         (directory / name).write_bytes(json.dumps(value, ensure_ascii=False, separators=(',', ':')).encode())
+    spec = {'description': description, 'seed': seed, 'sql': sql, 'schema': schema, 'ordered': ordered,
+            'realized_shape': realized, 'group_cardinality_definition': 'authorized distinct group values including NULL',
+            'null_percent_definition': 'nominal seeded selection; mandatory authorized key/group coverage may override key NULLs'}
+    (directory / 'case.json').write_bytes(json.dumps(spec, ensure_ascii=False).encode())
+    return spec
+
+
+def validate_workload_catalog(description, catalog):
+    sales, lookup = (catalog['tables'][name]['rows'] for name in ('sales','lookup'))
+    expected_lookup = description['rows'] if description['family'] in ('join','budget') else 0
+    if len(sales) != description['rows'] or len(lookup) != expected_lookup:
+        raise ValueError('advertised row count not realized')
+    authorized = description['rows'] if description['family'] == 'filter' else description['rows'] - description['rows'] // 4
+    if sum(row[0] == 'alpha' for row in sales) != authorized:
+        raise ValueError('advertised authorized row count not realized')
+    if description['family'] in ('join','budget'):
+        visible_lookup = [row for row in lookup if row[0] == 'alpha']
+        if len(visible_lookup) != authorized or len({row[1] for row in visible_lookup if row[1] is not None}) != description['keys']:
+            raise ValueError('advertised authorized lookup dimensions not realized')
     realized = realized_shape(catalog)
     if description['family'] == 'aggregate' and description.get('groups', 0):
         if realized['authorized_distinct_group_values_including_null'] != description['groups']:
@@ -134,11 +160,7 @@ def write_case(directory: Path, description, seed):
             raise ValueError('composite components are not independently distinguishing')
     if description['family'] == 'sort' and description['order'] == 'equal' and realized['authorized_distinct_complete_sort_keys'] != 1:
         raise ValueError('equal sort workload does not have equal complete keys')
-    spec = {'description': description, 'seed': seed, 'sql': sql, 'schema': schema, 'ordered': ordered,
-            'realized_shape': realized, 'group_cardinality_definition': 'authorized distinct group values including NULL',
-            'null_percent_definition': 'nominal seeded selection; mandatory authorized key/group coverage may override key NULLs'}
-    (directory / 'case.json').write_bytes(json.dumps(spec, ensure_ascii=False).encode())
-    return spec
+    return realized
 
 
 def realized_shape(catalog):
