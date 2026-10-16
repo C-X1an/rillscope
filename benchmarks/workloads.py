@@ -27,7 +27,11 @@ def descriptors():
             out.append({'id': f'B04-n{size}-{order}', 'family': 'sort', 'rows': size, 'order': order,
                         'null_percent': 0 if order == 'equal' else 10, 'batch_rows': 1024})
     out.append({'id': 'B06-tiny-work', 'family': 'budget', 'rows': 100, 'keys': 1, 'skew': 'heavy',
-                'null_percent': 0, 'batch_rows': 1024, 'max_work': 1000})
+                'null_percent': 0, 'batch_rows': 1024, 'max_work': 1000, 'expected_product_status': 'E_BUDGET'})
+    for row in out:
+        oversized = (row['family'] == 'filter' and row['rows'] * row['selectivity'] // 100 > 10000)
+        oversized |= row['family'] == 'aggregate' and row.get('groups', 0) > 10000
+        row['expected_oracle_status'] = 'E_OUTPUT_LIMIT' if oversized else 'OK'
     return out
 
 def make_catalog(description, seed):

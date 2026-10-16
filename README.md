@@ -108,7 +108,7 @@ The reference suite includes a **1,000-seed SQLite comparison test** across filt
 
 [Verification report](VERIFICATION_REPORT.md) separates what ran from what did not. [Claims-to-evidence](CLAIMS_EVIDENCE.md) keeps the full Rust acceptance claims pending. [Benchmark methodology](BENCHMARKS.md) distinguishes a tiny reference harness measurement from the unmeasured Rust performance targets.
 
-`make verify` is the full product gate and currently fails while unfinished required gates remain. A green reference check or future source-only CI run must not be represented as full-product approval.
+`make verify` executes the full product validation sequence, including the reference-host benchmark and a fresh committed checkout. It currently fails while required runtime gates remain unavailable. Once its receipts have been collected into the public evidence index, `make release-verify` additionally requires current passing evidence for every locked criterion. This ordering lets a fresh run produce AC-024 evidence before the final claims audit consumes it. A green reference check or source-only CI run does not establish full-product approval.
 
 ## Boundaries worth reading
 

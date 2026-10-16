@@ -22,13 +22,24 @@ def coverage(data):
         result.add('AC-016')
     evidence_controls = {'test_real_success_receipt', 'test_real_failure_receipt', 'test_real_timeout_receipt',
                          'test_missing_executable_receipt', 'test_output_tampering',
+                         'test_nonexecutable_launch_retains_failed_receipt', 'test_timeout_stops_owned_descendant_before_next_gate',
                          'test_external_input_mutation_prevents_verification_pass',
                          'test_external_stdin_and_file_inputs_have_actual_hashes'}
     if evidence_controls <= names and {'scripts/evidence.py', 'tests/test_evidence.py'} <= sources: result.add('AC-026')
-    if not any(name.endswith('batch_conversion_observes_mid_column_cancellation') for name in rust):
+    if not all(any(name.endswith(check) for name in rust) for check in (
+            'batch_conversion_observes_mid_column_cancellation', 'repeated_text_join_probe_keys_reserve_every_copy')):
         # Existing narrow budget cases alone do not establish the now-known conversion guarantee.
         result.discard('AC-015')
     for observation in data.get('observations', []):
+        if (observation.get('license_audit_status') == 'PASS' and observation.get('errors') == []
+                and observation.get('first_party_license') == 'MIT' and observation.get('registry_packages', 0) > 0
+                and observation.get('preserved_notice_files', 0) >= observation['registry_packages']
+                and re.fullmatch('[0-9a-f]{64}', observation.get('lockfile_sha256', ''))
+                and {'Cargo.lock', 'scripts/license_audit.py', 'licenses/dependency-inventory.json', 'THIRD_PARTY_NOTICES.md'} <= sources):
+            result.add('LICENSE-NOTICES')
+        if (observation.get('review_kind') == 'independent-public-wording' and observation.get('review_status') == 'PASS'
+                and observation.get('unsupported_maturity_claims') == [] and observation.get('inspection_only') is True):
+            result.add('PUBLIC-WORDING')
         if observation.get('status') == 'PASS' and observation.get('failures') == 0 and observation.get('binary_sha256'):
             if observation.get('cases', 0) >= 1000 and 'tests/property/differential.py' in sources and 'cases_by_format' not in observation:
                 result.add('AC-006')

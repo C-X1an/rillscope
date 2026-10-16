@@ -417,4 +417,52 @@ mod tests {
         assert_eq!(budget.reserved_bytes(), 0);
         Ok(())
     }
+
+    #[test]
+    fn repeated_text_join_probe_keys_reserve_every_copy() -> Result<()> {
+        let columns = serde_json::json!([
+            {"name":"tenant","type":"text","nullable":false},
+            {"name":"key","type":"text","nullable":false}
+        ]);
+        let catalog = Catalog::from_bytes(
+            &serde_json::to_vec(&serde_json::json!({
+                "version":1,"snapshot":"repeated-probe-keys","tables":{
+                    "l":{"columns":columns,"rows":[["alpha","x".repeat(4096)]]},
+                    "r":{"columns":columns,"rows":[]}
+                }
+            }))
+            .map_err(|_| E::Internal)?,
+        )?;
+        let context = Context::from_bytes(catalog.clone(), br#"{"version":1,"tenant":"alpha","policy_revision":"r1","tables":{"l":{"tenant_column":"tenant","columns":["key"]},"r":{"tenant_column":"tenant","columns":["key"]}}}"#)?;
+        let pairs: Vec<_> = (0..64)
+            .map(|_| {
+                serde_json::json!({
+                    "left":{"col":"a.key"},"right":{"col":"b.key"}
+                })
+            })
+            .collect();
+        let query = Query::from_json(
+            &serde_json::to_vec(&serde_json::json!({
+                "version":1,"plan":{"op":"join",
+                    "left":{"op":"scan","table":"l","alias":"a"},
+                    "right":{"op":"scan","table":"r","alias":"b"},"on":pairs}
+            }))
+            .map_err(|_| E::Internal)?,
+        )?;
+        let plan = crate::compile(&query, catalog, context)?;
+        let mut budget = Budget::new(
+            Limits {
+                max_reserved_bytes: 32768,
+                ..Limits::default()
+            },
+            Arc::new(AtomicBool::new(false)),
+            None,
+        )?;
+        assert_eq!(
+            execute(&plan, &mut budget).err().map(|e| e.code),
+            Some(E::Budget)
+        );
+        assert_eq!(budget.reserved_bytes(), 0);
+        Ok(())
+    }
 }

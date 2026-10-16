@@ -4,21 +4,21 @@
     "AC-001": {
       "status": "PASS",
       "runs": [
-        "performance-fixed-core"
+        "review-final-source-core"
       ],
       "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
     },
     "AC-002": {
       "status": "PASS",
       "runs": [
-        "performance-fixed-core"
+        "review-final-source-core"
       ],
       "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
     },
     "AC-003": {
       "status": "PASS",
       "runs": [
-        "performance-fixed-core",
+        "review-final-source-core",
         "ambiguous-zero-scan"
       ],
       "scope": "Unknown, type-mismatched and ambiguous columns denied before actual scan counters advance"
@@ -26,28 +26,28 @@
     "AC-004": {
       "status": "PASS",
       "runs": [
-        "performance-fixed-core"
+        "review-final-source-core"
       ],
       "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
     },
     "AC-005": {
       "status": "PASS",
       "runs": [
-        "performance-fixed-core"
+        "review-final-source-core"
       ],
       "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
     },
     "AC-006": {
       "status": "PASS",
       "runs": [
-        "performance-fixed-differential"
+        "review-followup-differential"
       ],
       "scope": "1000 deterministic small-catalog cases, JSON/SQL on/off against physically scoped SQLite; all verdicts retained"
     },
     "AC-007": {
       "status": "PASS",
       "runs": [
-        "performance-fixed-core"
+        "review-final-source-core"
       ],
       "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
     },
@@ -61,28 +61,28 @@
     "AC-009": {
       "status": "PASS",
       "runs": [
-        "performance-fixed-core"
+        "review-final-source-core"
       ],
       "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
     },
     "AC-010": {
       "status": "PASS",
       "runs": [
-        "performance-fixed-core"
+        "review-final-source-core"
       ],
       "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
     },
     "AC-011": {
       "status": "PASS",
       "runs": [
-        "performance-fixed-core"
+        "review-final-source-core"
       ],
       "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
     },
     "AC-012": {
       "status": "PASS",
       "runs": [
-        "performance-fixed-core",
+        "review-final-source-core",
         "eight-rust-controls"
       ],
       "scope": "Known-bad physical plans and selected real PASS-FAIL-PASS controls; source revisions are recorded"
@@ -90,21 +90,21 @@
     "AC-013": {
       "status": "PASS",
       "runs": [
-        "performance-fixed-core"
+        "review-final-source-core"
       ],
       "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
     },
     "AC-014": {
       "status": "PASS",
       "runs": [
-        "performance-fixed-core"
+        "review-final-source-core"
       ],
       "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
     },
     "AC-015": {
       "status": "PASS",
       "runs": [
-        "performance-fixed-core",
+        "review-final-source-core",
         "eight-rust-controls",
         "source-bound-pilot-v2"
       ],
@@ -118,28 +118,28 @@
     "AC-017": {
       "status": "PASS",
       "runs": [
-        "performance-fixed-core"
+        "review-final-source-core"
       ],
       "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
     },
     "AC-018": {
       "status": "PASS",
       "runs": [
-        "performance-fixed-core"
+        "review-final-source-core"
       ],
       "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
     },
     "AC-019": {
       "status": "PASS",
       "runs": [
-        "performance-fixed-core"
+        "review-final-source-core"
       ],
       "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
     },
     "AC-020": {
       "status": "PASS",
       "runs": [
-        "performance-fixed-core"
+        "review-final-source-core"
       ],
       "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
     },
@@ -170,17 +170,17 @@
     "AC-025": {
       "status": "PASS",
       "runs": [
-        "performance-fixed-core",
-        "performance-fixed-malformed"
+        "review-final-source-core",
+        "review-followup-malformed"
       ],
       "scope": "Static forbid-unsafe/lint and 2000 finite malformed JSON/SQL cases; no libFuzzer-duration claim"
     },
     "AC-026": {
       "status": "PASS",
       "runs": [
-        "performance-validator-controls"
+        "review-final-source-core"
       ],
-      "scope": "Executed evidence-runner success/failure/timeout/missing executable and input/output corruption controls in the 49-test build-independent suite"
+      "scope": "Executed source-bound suites include launch failure retention, input/output provenance and actual timeout descendant cleanup controls; Linux branch execution remains separate"
     },
     "AC-027": {
       "status": "NOT RUN",
@@ -190,7 +190,7 @@
     "AC-028": {
       "status": "PASS",
       "runs": [
-        "performance-fixed-core",
+        "review-final-source-core",
         "rust-demo"
       ],
       "scope": "Actual fixed-scope Rust adapter/report runs with minimal OS environment, no required model/cloud keys"
@@ -198,7 +198,7 @@
     "AC-029": {
       "status": "PASS",
       "runs": [
-        "performance-fixed-core",
+        "review-final-source-core",
         "rust-demo",
         "html-escape-control"
       ],
@@ -207,7 +207,7 @@
     "AC-030": {
       "status": "NOT RUN",
       "runs": [
-        "dependency-policy"
+        "review-followup-license"
       ],
       "scope": "Actual lock/license/notice and online policy scans recorded; final release wording review pending"
     }
@@ -304,6 +304,38 @@
     "source-bound-pilot-controls": {
       "path": "verification/product/runs/source-bound-pilot-controls.json",
       "sha256": "da94eec57fbf72ecde82851a593d6c338412e20fcd5e75987b97a35f14e7ef4e"
+    },
+    "review-followup-core": {
+      "path": "verification/product/runs/review-followup-core.json",
+      "sha256": "069b8e3ef7de56125ce2ab942983a9edf4844dab373242524a0ff98ba3a96a2c"
+    },
+    "review-followup-differential": {
+      "path": "verification/product/runs/review-followup-differential.json",
+      "sha256": "f15499417f118d69f04d229f1e33a9f872c9994f5263296810e2aa950bcde014"
+    },
+    "review-followup-malformed": {
+      "path": "verification/product/runs/review-followup-malformed.json",
+      "sha256": "270f83668c5def06be37acba06048d2844a0994c6de4efb360e68d3f372366fb"
+    },
+    "review-followup-license": {
+      "path": "verification/product/runs/review-followup-license.json",
+      "sha256": "12f2d3bd3b22f9a3aa29be44a176bdc4cc4e0ec7dc8afd4ae648564ed0b6471a"
+    },
+    "semantic-artifact-controls": {
+      "path": "verification/product/runs/semantic-artifact-controls.json",
+      "sha256": "8a47374bc3d60228168ad6616c24cf27f9232b3baf4ccee1099d54af39f7f393"
+    },
+    "functional-build-control": {
+      "path": "verification/product/runs/functional-build-control.json",
+      "sha256": "f0bc187399362d2a6a18eff7a46bc222d300a95cd6bcee84291284a4940a3f44"
+    },
+    "timeout-process-controls": {
+      "path": "verification/product/runs/timeout-process-controls.json",
+      "sha256": "979702b96d334000972cf23ccabffca5000b0a2814a8a5e77437b09cfcc96dae"
+    },
+    "review-final-source-core": {
+      "path": "verification/product/runs/review-final-source-core.json",
+      "sha256": "cf43400a01b48fbe84674b3ef9f9b63773c9a903177c93f5e654f96f22e9dc0e"
     }
   },
   "release_status": "INCOMPLETE",

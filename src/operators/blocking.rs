@@ -95,16 +95,16 @@ impl<'a> HashJoin<'a> {
                 }
             }
             let frame = self.frame.as_ref().ok_or(E::Plan)?;
-            let _temporary = budget.reserve(
-                frame
-                    .batch
-                    .row_bytes(self.left_row)?
-                    .checked_mul(2)
-                    .ok_or(E::Budget)?
-                    + 64,
-            )?;
+            let _temporary = budget.reserve(frame.batch.row_bytes(self.left_row)?)?;
             let left = frame.batch.row(self.left_row)?;
             budget.charge(self.on.len() as u64 + 1)?;
+            // A bound key may repeat a column. Account for each owned copy,
+            // independently of the complete row's width, before cloning it.
+            let key_bytes = self.on.iter().try_fold(64usize, |sum, (col, _)| {
+                sum.checked_add(left.get(*col).ok_or(E::Plan)?.logical_bytes())
+                    .ok_or(E::Budget)
+            })?;
+            let _key_temporary = budget.reserve(key_bytes)?;
             let key: Vec<_> = self
                 .on
                 .iter()

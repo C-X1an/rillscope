@@ -9,9 +9,47 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'benchmarks'))
-from run import MODES, REPETITIONS, WARMUPS, canonical, sha, summarize_case, pair_verdict
-from workloads import SEEDS, descriptors
+from run import METRICS, MODES, REPETITIONS, WARMUPS, semantic_digest, sha, summarize_case, pair_verdict
+from workloads import SEEDS, descriptors, query
 from envelopes import terminal
+
+
+def sample_problems(row, value, measurement, description, spec, hashes, stdout):
+    errors = []
+    if row.get('inputs') != hashes: errors.append('input identities differ')
+    if row.get('status') != value['status'].upper(): errors.append('recorded terminal status differs')
+    actual = value['error']['code'] if value['status'] == 'error' else 'OK'
+    if row.get('error_code') != (actual if value['status'] == 'error' else None): errors.append('recorded error code differs')
+    if row.get('result_digest') != semantic_digest(value, spec['ordered']): errors.append('semantic digest differs from terminal result')
+    if value['status'] == 'ok' and value['schema'] != spec['schema']: errors.append('independent expected schema mismatch')
+    if row['mode'] != 'sqlite' and description.get('expected_product_status') and actual != description['expected_product_status']:
+        errors.append('predetermined control outcome mismatch')
+    if not isinstance(measurement, dict): return errors + ['measurement artifact missing']
+    for key in METRICS:
+        if key not in ('wall_ns', 'cpu_user_ns', 'cpu_system_ns', 'peak_rss_bytes') and row.get(key) != measurement.get(key):
+            errors.append('flattened metric differs: ' + key)
+        number = measurement.get(key)
+        if number is not None and (type(number) is not int or number < 0): errors.append('invalid instrumentation metric: ' + key)
+    payload_hash = hashlib.sha256(stdout.rstrip(b'\r\n')).hexdigest()
+    expected_payload = None if row['mode'] != 'sqlite' and value['status'] == 'error' else payload_hash
+    if measurement.get('result_sha256') != expected_payload: errors.append('measurement result hash mismatch')
+    if row['mode'] != 'sqlite':
+        for field in ('load_ns', 'compile_ns', 'execution_call_wall_ns', 'consumed_work', 'visible_work', 'peak_reserved_bytes'):
+            if type(measurement.get(field)) is not int or measurement[field] < 0: errors.append('required Rust measurement missing: ' + field)
+        for field in ('catalog', 'context', 'query'):
+            if measurement.get(field + '_sha256') != hashes[field + '.json']: errors.append('measurement input hash mismatch: ' + field)
+        if measurement.get('implementation') != 'rust-benchmark' or measurement.get('synthetic_only') is not True:
+            errors.append('measurement implementation mismatch')
+        if measurement.get('optimize') is not (row['mode'] == 'rust-on') or measurement.get('batch_rows') != description['batch_rows']:
+            errors.append('measured optimization/batch parameters differ')
+        if measurement.get('consumed_work', -1) > description.get('max_work', 10000000): errors.append('work counter exceeds configured limit')
+        if measurement.get('peak_reserved_bytes', -1) > 64 * 1024 * 1024: errors.append('logical reservation exceeds configured limit')
+        if measurement.get('error') != (value['error'] if value['status'] == 'error' else None): errors.append('measurement error differs')
+    else:
+        if measurement.get('implementation') != 'sqlite-baseline': errors.append('measurement implementation mismatch')
+        for field in ('materialization_ns', 'execution_only_ns', 'serialization_ns'):
+            if type(measurement.get(field)) is not int or measurement[field] < 0: errors.append('required SQLite measurement missing: ' + field)
+    return errors
 
 
 def verify(directory):
@@ -37,6 +75,14 @@ def verify(directory):
         for name in ('stdout', 'stderr'):
             if sha(directory / 'build' / ('cargo.' + name)) != build['raw_' + name + '_sha256']:
                 errors.append('raw Cargo build digest changed')
+        if version >= 3:
+            if build.get('schema_version') != 2 or build.get('compiler_selection') != 'explicit pinned sysroot executable passed as RUSTC':
+                errors.append('explicit actual compiler build binding missing')
+            for name in ('stdout','stderr'):
+                if sha(directory / 'build' / ('compiler.' + name)) != build.get('raw_compiler_' + name + '_sha256'):
+                    errors.append('raw compiler probe digest changed')
+            if (directory / 'build/compiler.stdout').read_text(encoding='utf-8') != build['compiler']:
+                errors.append('compiler probe/receipt version differs')
     if results['samples_sha256'] != sha(directory / 'samples.jsonl'): errors.append('sample stream digest changed')
     if manifest['warmups'] != WARMUPS or manifest['repetitions'] != REPETITIONS: errors.append('warmup/repetition contract changed')
     if manifest['profile'] == 'full':
@@ -53,6 +99,7 @@ def verify(directory):
     for item in pair_rows: by_pair[(item['workload'], item['seed'], item['phase'], item['repetition'])].append(item)
     expected_pairs = set()
     total_invalid = 0
+    total_comparisons = 0
     for description in manifest['chosen_workloads']:
         for seed in manifest['seeds']:
             case_rows = by_case[(description['id'], seed)]
@@ -63,6 +110,11 @@ def verify(directory):
                 errors.append('missing/duplicate paired record: ' + description['id'])
                 continue
             spec = json.loads((case / 'inputs/case.json').read_bytes())
+            expected_query, sql, schema, ordered = query(description)
+            if (spec['description'] != description or spec['seed'] != seed or spec['sql'] != sql
+                    or spec['schema'] != schema or spec['ordered'] != ordered
+                    or json.loads((case / 'inputs/query.json').read_bytes()) != expected_query):
+                errors.append('case specification differs from predetermined workload')
             groups = defaultdict(list)
             hashes = {name: sha(case / 'inputs' / name) for name in ('catalog.json', 'context.json', 'query.json', 'case.json')}
             for row in case_rows:
@@ -76,12 +128,21 @@ def verify(directory):
                     if hashes[name] != digest: errors.append('input digest changed: ' + name)
                 measurement = json.loads((case / 'raw' / (tag + '.measurement.json')).read_bytes())
                 if measurement != row['measurement']: errors.append('instrumentation differs from captured record: ' + tag)
+                if sha(case / 'raw' / (tag + '.measurement.json')) != row.get('measurement_sha256'):
+                    errors.append('measurement artifact digest changed: ' + tag)
                 if row['problems']: errors.append('invalid observation retained: ' + tag)
                 if row['cpu_rss_status'] != 'MEASURED' or any(row.get(key) is None or row[key] < 0 for key in ('wall_ns', 'cpu_user_ns', 'cpu_system_ns', 'peak_rss_bytes')):
                     errors.append('missing/invalid owned process measurement: ' + tag)
                 value = terminal(stdout, stderr, row['exit_code'], row['mode'])
+                errors.extend(problem + ': ' + tag for problem in sample_problems(row, value, measurement, description, spec, hashes, stdout))
+                if version >= 3:
+                    usage_path = case / 'raw' / (tag + '.process.json')
+                    usage = json.loads(usage_path.read_bytes())
+                    if sha(usage_path) != row.get('process_measurement_sha256') or any(row.get(key) != number for key, number in usage.items()):
+                        errors.append('process measurement differs from recorded sample: ' + tag)
                 groups[(row['phase'], row['repetition'])].append((row, value))
             case_invalid = 0
+            comparisons = 0
             for key, triplet in groups.items():
                 verdict = pair_verdict(triplet, spec)
                 verdict.update(workload=description['id'], seed=seed)
@@ -90,10 +151,13 @@ def verify(directory):
                 if version >= 2 and by_pair[pair_key] != [verdict]: errors.append('pair verdict mismatch or duplicate')
                 case_invalid += sum(bool(row['problems'] or verdict['modes'][row['mode']]['problems']) for row, _ in triplet)
                 if any(value['problems'] for value in verdict['modes'].values()): errors.append('independent oracle mismatch/unavailable')
+                if key[0] == 'measured': comparisons += sum(value['oracle_comparison'] == 'EXACT' for mode, value in verdict['modes'].items() if mode != 'sqlite')
             saved = json.loads((case / 'summary.json').read_bytes())
             if saved['metrics'] != summarize_case(case_rows): errors.append('summary omits/changes observations: ' + description['id'])
             if saved['invalid_observations'] != case_invalid: errors.append('case invalid count mismatch')
             total_invalid += case_invalid
+            if version >= 3 and saved.get('independent_semantic_comparisons') != comparisons: errors.append('case independent comparison count mismatch')
+            total_comparisons += comparisons
             saved_summaries.append(saved)
     if version >= 2 and set(by_pair) != expected_pairs: errors.append('missing/extra pair verdicts')
     if results['summaries'] != saved_summaries: errors.append('top-level summaries differ from verified case summaries')
@@ -106,6 +170,8 @@ def verify(directory):
         if results['batch_limit_control']['status'] != 'PASS': errors.append('batch bound control failed')
         total_invalid += int(results['batch_limit_control']['status'] != 'PASS')
     if results['invalid_observations'] != total_invalid: errors.append('top-level invalid count differs from observations')
+    if version >= 3 and (results.get('independent_semantic_comparisons') != total_comparisons or total_comparisons == 0):
+        errors.append('independent semantic comparisons missing or misreported')
     if results['completed_cases'] != len(expected_cases) or results['expected_cases'] != len(expected_cases): errors.append('top-level case count differs from actual cases')
     return {'profile': manifest['profile'], 'observations_checked': len(rows), 'cases_checked': len(by_case),
             'status': 'FAIL' if errors else 'PASS', 'errors': errors,

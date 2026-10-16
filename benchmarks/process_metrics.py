@@ -88,6 +88,8 @@ def measured_child(command, *, cwd, prefix: Path, timeout=120):
         prefix.with_suffix('.stderr').write_bytes(stderr)
     except OSError as error:
         problem = 'artifact write: ' + type(error).__name__; outcome = 'ARTIFACT WRITE FAILED'
-    return {'exit_code': None if process is None else process.returncode,
+    captured = {'exit_code': None if process is None else process.returncode,
             'pid': None if process is None else process.pid, 'wall_ns': elapsed, 'timed_out': timed_out,
-            'process_outcome': outcome, 'instrument_problem': problem, **usage}, stdout, stderr
+            'process_outcome': outcome, 'instrument_problem': problem, **usage}
+    prefix.with_suffix('.process.json').write_text(json.dumps(captured, separators=(',', ':')), encoding='utf-8')
+    return captured, stdout, stderr

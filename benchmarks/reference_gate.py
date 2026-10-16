@@ -18,6 +18,14 @@ def host_reasons(actual, receipt):
     reasons = []
     if actual['system'] != 'Linux': reasons.append('actual Linux runtime unavailable on this host')
     if actual['machine'].lower() not in ('x86_64', 'amd64'): reasons.append('actual reference architecture is not x86_64')
+    if actual['system'] == 'Linux':
+        if actual.get('resource_inspection_status') != 'MEASURED': reasons.append('effective Linux CPU/memory restrictions have not been measured')
+        elif actual.get('effective_cpu_capacity') != 4 or actual.get('process_affinity_cpu_count') != 4:
+            reasons.append('effective Linux CPU capacity/affinity is not four')
+        limit = actual.get('cgroup_memory_limit_bytes')
+        if limit is not None and limit < 7.5 * 1024**3: reasons.append('effective cgroup memory is below the reference configuration')
+        high = actual.get('cgroup_memory_high_bytes')
+        if high is not None and high < 7.5 * 1024**3: reasons.append('effective cgroup memory throttle is below the reference configuration')
     if receipt is None: return reasons + ['dedicated 4-core/8-GiB reference host allocation has not been evidenced']
     if receipt.get('source') != 'actual host allocation and inspection' or receipt.get('dedicated') is not True:
         reasons.append('reference receipt does not establish dedicated allocation')

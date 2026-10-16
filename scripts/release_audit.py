@@ -58,6 +58,14 @@ def audit(index, require_all=False):
         matching = [line for line in table.splitlines() if line.startswith('| C-' + identifier[3:] + ':')]
         if len(matching) != 1 or not matching[0].endswith('| ' + row['status'] + ' |'):
             errors.append('claim table/index status differs: ' + identifier)
+        if len(matching) == 1:
+            cells = matching[0].split('|')
+            links = re.findall(r'\[[^\]]+\]\(([^)]+)\)', cells[4]) if len(cells) == 7 else []
+            expected_links = [index['artifacts'][name]['path'] for name in row['runs'] if name in index['artifacts']]
+            if sorted(links) != sorted(expected_links): errors.append('claim Markdown links/index artifacts differ: ' + identifier)
+            for link in links:
+                try: public_file(link)
+                except ValueError: errors.append('claim Markdown evidence link is missing/invalid: ' + identifier)
         if row['status'] != 'PASS': unproved.append(identifier + ': ' + row['status'])
         if row['status'] == 'PASS' and not row['runs']: errors.append('PASS claim lacks evidence: ' + identifier)
         for name in row['runs']:
@@ -70,6 +78,8 @@ def audit(index, require_all=False):
             if identifier == 'AC-025':
                 static = any({'fmt', 'lint', 'check', 'test'} <= set(data.get('executed_targets', [])) for data in selected)
                 if 'MALFORMED-CORPUS' not in subjects or not static: errors.append('static/malformed criterion evidence missing: ' + identifier)
+            elif identifier == 'AC-030':
+                if not {'LICENSE-NOTICES', 'PUBLIC-WORDING'} <= subjects: errors.append('license/notices and independent wording evidence missing: ' + identifier)
             elif identifier not in subjects: errors.append('criterion-specific executed observation missing: ' + identifier)
             supplied = set().union(*({source for source, _ in data.get('source_files', [])} for data in selected))
             missing = required_sources(identifier, ROOT) - supplied

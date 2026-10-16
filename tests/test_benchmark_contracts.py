@@ -2,10 +2,12 @@
 import copy
 import io
 import json
+import os
 from pathlib import Path
 import sys
 import tempfile
 import unittest
+import subprocess
 from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -18,10 +20,69 @@ from workloads import descriptors, make_catalog, realized_shape
 from build import verify_build, sha
 from evidence import source_identity
 import run
+import build
+from verify import sample_problems
 import release_audit
 
 
 class BenchmarkContracts(unittest.TestCase):
+    def test_full_grid_budget_control_and_successful_baseline_are_required(self):
+        description = next(row for row in descriptors() if row['id'] == 'B06-tiny-work')
+        self.assertEqual(description['expected_product_status'], 'E_BUDGET')
+        self.assertEqual(description['expected_oracle_status'], 'OK')
+        failed = {'status':'error', 'error':{'code':'E_BUDGET'}}
+        oracle = {'status':'error', 'error':{'code':'E_OUTPUT_LIMIT'}}
+        triplet = [({'mode': mode, 'phase':'measured', 'repetition':0}, oracle if mode == 'sqlite' else failed) for mode in run.MODES]
+        verdict = run.pair_verdict(triplet, {'description':description, 'ordered':False})
+        self.assertIn('predetermined independent baseline outcome mismatch', verdict['modes']['sqlite']['problems'])
+
+    def test_terminal_digest_metrics_schema_and_parameters_are_rechecked(self):
+        # Explicit unit bytes/metadata; no executable or timing observation is generated.
+        value = {'status':'ok', 'schema':[{'name':'x','type':'i64','nullable':False}], 'rows':[[7]]}
+        stdout = json.dumps(value).encode()
+        hashes = {name + '.json':'a' * 64 for name in ('catalog','context','query','case')}
+        measurement = {'implementation':'rust-benchmark', 'synthetic_only':True, 'optimize':True, 'batch_rows':128,
+                       'execution_only_ns':10, 'error':None, 'result_sha256':__import__('hashlib').sha256(stdout).hexdigest(),
+                       **{name:1 for name in ('load_ns','compile_ns','execution_call_wall_ns','consumed_work','visible_work','peak_reserved_bytes')},
+                       **{name + '_sha256':'a' * 64 for name in ('catalog','context','query')}}
+        row = {'mode':'rust-on', 'inputs':hashes, 'status':'OK', 'result_digest':run.semantic_digest(value, False), 'execution_only_ns':10}
+        row.update({key:value for key,value in measurement.items() if key in run.METRICS})
+        description, spec = {'batch_rows':128}, {'ordered':False, 'schema':value['schema']}
+        self.assertEqual(sample_problems(row, value, measurement, description, spec, hashes, stdout), [])
+        for key, altered, expected in [('result_digest','0' * 64,'semantic digest differs from terminal result'),
+                                       ('execution_only_ns',999,'flattened metric differs: execution_only_ns')]:
+            broken = dict(row, **{key:altered})
+            self.assertIn(expected, sample_problems(broken, value, measurement, description, spec, hashes, stdout))
+        for key, altered, expected in [('optimize',False,'measured optimization/batch parameters differ'),
+                                       ('batch_rows',1024,'measured optimization/batch parameters differ'),
+                                       ('query_sha256','b' * 64,'measurement input hash mismatch: query'),
+                                       ('result_sha256','b' * 64,'measurement result hash mismatch')]:
+            broken = dict(measurement, **{key:altered})
+            self.assertIn(expected, sample_problems(row, value, broken, description, spec, hashes, stdout))
+
+    def test_failed_build_attempt_records_compiler_discovery_and_cargo_failure(self):
+        # Mocked launch failures test receipt retention only; no compiler is executed.
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder).resolve(); (root / 'Cargo.lock').write_text('unit fixture')
+            compiler = root / 'unit-toolchain/bin' / ('rustc.exe' if os.name == 'nt' else 'rustc')
+            compiler.parent.mkdir(parents=True); compiler.write_bytes(b'unit fixture, not an executable')
+            paths = [root / '.local-runs/probe', root / '.local-runs/cargo']
+            with patch.object(build, 'ROOT', root), patch.object(build.subprocess, 'run', side_effect=OSError('unit discovery failure')):
+                with self.assertRaises(ValueError): build.build_release(paths[0])
+            receipt = json.loads((paths[0] / 'build.json').read_bytes())
+            self.assertEqual((receipt['status'], receipt['stage'], receipt['command']), ('FAIL','compiler discovery',['rustc','--print','sysroot']))
+            responses = [subprocess.CompletedProcess([],0,str(compiler.parent.parent).encode() + b'\n',b''),
+                         subprocess.CompletedProcess([],0,b'rustc 1.99.0 (unit fixture)\n',b''), OSError('unit Cargo launch failure')]
+            with patch.object(build, 'ROOT', root), patch.dict(os.environ, {'RUSTC':'unrelated-compiler', 'CARGO_BUILD_RUSTFLAGS':'unit-invalid-flags'}), patch.object(build.subprocess, 'run', side_effect=responses) as launched:
+                with self.assertRaises(ValueError): build.build_release(paths[1])
+                env = launched.call_args.kwargs['env']
+                self.assertEqual(env['RUSTC'], str(compiler))
+                self.assertEqual(env['CARGO_ENCODED_RUSTFLAGS'], '')
+                self.assertNotIn('CARGO_BUILD_RUSTFLAGS', env)
+            receipt = json.loads((paths[1] / 'build.json').read_bytes())
+            self.assertEqual((receipt['status'], receipt['stage']), ('FAIL','cargo build'))
+            self.assertEqual(receipt['compiler_selection'], 'explicit pinned sysroot executable passed as RUSTC')
+
     def test_failure_cannot_publish_rows_and_exit_mapping_is_exact(self):
         value = {'version': 1, 'implementation': 'rust-benchmark', 'status': 'error',
                  'error': {'code': 'E_BUDGET', 'stage': 'execute', 'message': 'synthetic unit error'}}
@@ -30,6 +91,13 @@ class BenchmarkContracts(unittest.TestCase):
         value['rows'] = [[1]]
         with self.assertRaises(ValueError): terminal(json.dumps(value).encode(), b'', 3, 'rust-on')
         with self.assertRaises(ValueError): terminal(b'[]', b'', 3, 'rust-on')
+
+    def test_terminal_schema_retains_bool_integer_and_null_types(self):
+        fixture = {'version':1,'implementation':'rust-benchmark','status':'ok',
+                   'schema':[{'name':'x','type':'i64','nullable':False}],'rows':[[7]]}
+        self.assertEqual(terminal(json.dumps(fixture).encode(), b'', 0, 'rust-on')['rows'], [[7]])
+        for rows in ([[True]], [[None]], [[2**63]], [[]]):
+            with self.assertRaises(ValueError): terminal(json.dumps(dict(fixture, rows=rows)).encode(), b'', 0, 'rust-on')
 
     def test_real_missing_executable_attempt_has_retained_artifacts(self):
         with tempfile.TemporaryDirectory() as folder:
@@ -78,6 +146,61 @@ class BenchmarkContracts(unittest.TestCase):
                    'machine': 'aarch64', 'logical_processors': 4, 'cpu_model': 'synthetic fixture'}
         self.assertIn('actual reference architecture is not x86_64', host_reasons(actual, receipt))
 
+    def test_cgroup_limits_cannot_masquerade_as_reference_capacity(self):
+        actual = {'system':'Linux','machine':'x86_64','logical_processors':4,
+                  'physical_memory_bytes':8 * 1024**3,'cpu_model':'unit fixture',
+                  'resource_inspection_status':'MEASURED','process_affinity_cpu_count':4,
+                  'effective_cpu_capacity':2,'cgroup_memory_limit_bytes':2 * 1024**3}
+        receipt = {'source':'actual host allocation and inspection','dedicated':True,
+                   'machine':'x86_64','logical_processors':4,'cpu_model':'unit fixture'}
+        reasons = host_reasons(actual, receipt)
+        self.assertIn('effective Linux CPU capacity/affinity is not four', reasons)
+        self.assertIn('effective cgroup memory is below the reference configuration', reasons)
+
+    def test_actual_cgroup_parser_includes_ancestors_and_handles_root_interfaces(self):
+        # Filesystem fixture, not an actual Linux host/allocation claim.
+        with tempfile.TemporaryDirectory() as folder:
+            base = Path(folder).resolve(); child = base / 'worker'; child.mkdir()
+            (base / 'cgroup.controllers').write_text('cpu memory')
+            membership = base / 'membership'; membership.write_text('0::/worker\n')
+            for name, value in [('cpu.max','200000 100000'),('memory.max',str(2 * 1024**3)),('memory.high','max')]:
+                (child / name).write_text(value)
+            with patch.object(os, 'sched_getaffinity', return_value={0,1,2,3}, create=True):
+                observed = run.effective_linux_resources(base, membership)
+            self.assertEqual(observed['resource_inspection_status'], 'MEASURED')
+            self.assertEqual(observed['cgroup_v2_ancestor_levels'], 2)
+            self.assertEqual(observed['effective_cpu_capacity'], 2)
+            self.assertEqual(observed['cgroup_memory_limit_bytes'], 2 * 1024**3)
+
+    def test_stale_functional_executable_source_binding_is_rejected(self):
+        # Source/binary bytes are validator unit fixtures, never compiled/executed product evidence.
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder).resolve(); (root / 'Cargo.lock').write_text('unit lock')
+            source = root / 'lib.rs'; source.write_text('unit source before')
+            out = root / '.local-runs/build'; out.mkdir(parents=True)
+            executable = root / 'target/debug/unit-artifact'; executable.parent.mkdir(parents=True)
+            executable.write_bytes(b'unit binary, not an executable')
+            for stream in ('stdout','stderr'): (out / ('cargo.' + stream)).write_bytes(b'unit log')
+            (out / 'compiler.stdout').write_bytes(b'rustc 1.99.0 (unit fixture)')
+            (out / 'compiler.stderr').write_bytes(b'')
+            identity = source_identity(root)
+            receipt = {'schema_version':2,'fresh_target_directory':False,'target_directory':'target',
+                       'status':'PASS','exit_code':0,'profile':'dev','source':identity,'source_after_sha256':identity['sha256'],
+                       'cargo_lock_sha256':sha(root / 'Cargo.lock'),'compiler':'rustc 1.99.0 (unit fixture)',
+                       'compiler_selection':'explicit pinned sysroot executable passed as RUSTC',
+                       'compiler_configuration':{'RUSTUP_TOOLCHAIN':'1.99.0','RUSTC_WRAPPER':'','RUSTC_WORKSPACE_WRAPPER':'','CARGO_ENCODED_RUSTFLAGS':''},
+                       'bins':{'rillscope':{'path':executable.relative_to(root).as_posix(),'sha256':sha(executable),
+                                           'actual_profile':{'opt_level':'0','debug_assertions':True,'test':False}}},
+                       **{'raw_' + stream + '_sha256':sha(out / ('cargo.' + stream)) for stream in ('stdout','stderr')}}
+            receipt.update({'raw_compiler_' + stream + '_sha256':sha(out / ('compiler.' + stream)) for stream in ('stdout','stderr')})
+            path = out / 'build.json'; path.write_text(json.dumps(receipt))
+            verify_build(path, executable, name='rillscope', profile='dev', root=root)
+            source.write_text('unit source with a deliberate regression')
+            with self.assertRaisesRegex(ValueError, 'source differs'):
+                verify_build(path, executable, name='rillscope', profile='dev', root=root)
+            source.write_text('unit source before')
+            verify_build(path, executable, name='rillscope', profile='dev', root=root)
+
     def test_debug_artifact_cannot_be_attributed_to_release(self):
         # Synthetic metadata/bytes exercise the validator; no compiler or binary is executed.
         with tempfile.TemporaryDirectory() as folder:
@@ -86,7 +209,7 @@ class BenchmarkContracts(unittest.TestCase):
             executable = out / 'synthetic-artifact'; executable.write_bytes(b'not an executable')
             (out / 'cargo.stdout').write_bytes(b'synthetic unit log'); (out / 'cargo.stderr').write_bytes(b'')
             identity = source_identity(root)
-            receipt = {'schema_version': 1, 'fresh_target_directory': True, 'target_directory': out.relative_to(root).as_posix(), 'status': 'PASS', 'exit_code': 0, 'profile': 'release', 'source': identity,
+            receipt = {'schema_version': 2, 'fresh_target_directory': True, 'target_directory': out.relative_to(root).as_posix(), 'status': 'PASS', 'exit_code': 0, 'profile': 'release', 'source': identity,
                        'source_after_sha256': identity['sha256'], 'cargo_lock_sha256': sha(root / 'Cargo.lock'),
                        'bins': {'rillscope-measure': {'path': executable.relative_to(root).as_posix(), 'sha256': sha(executable),
                                 'actual_profile': {'opt_level': '0', 'debug_assertions': True, 'test': False}}},

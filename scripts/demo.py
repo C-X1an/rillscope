@@ -11,7 +11,9 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(ROOT / 'scripts'))
 from tools.fixed_scope import FixedScopeAdapter, ENVIRONMENT_KEYS
+from product_build import bound_binary
 
 LABEL = 'Escaped label <img src=x onerror="alert(1)">'
 def digest(data): return hashlib.sha256(data).hexdigest()
@@ -42,7 +44,7 @@ def render(cases, explain, label=LABEL):
     for case in cases:
         result = case['result']
         extra = ('<p class="match">Independent SQLite rows match exactly.</p><pre aria-label="SQLite result">' + html.escape(json.dumps(case['oracle_rows'])) + '</pre>') if 'oracle_rows' in case else '<p>No result rows were published.</p>'
-        sections.append('<section id="' + case['id'] + '"><p class="eyebrow">' + html.escape(case['scope']) + '</p><h2>' + html.escape(case['title']) + '</h2>' + table(result) + extra + '</section>')
+        sections.append('<section id="' + html.escape(case['id'], quote=True) + '"><p class="eyebrow">' + html.escape(case['scope']) + '</p><h2>' + html.escape(case['title']) + '</h2>' + table(result) + extra + '</section>')
     return '''<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'"><title>RillScope | Scoped query inspector</title><style>
 :root{color-scheme:light}*{box-sizing:border-box}body{margin:0;background:#f4f6f2;color:#17231d;font:17px/1.6 system-ui,sans-serif}a{color:#145239;text-underline-offset:.2em}a:focus-visible,summary:focus-visible{outline:3px solid #925600;outline-offset:5px}.shell{max-width:68rem;margin:auto;padding:2.5rem 1.5rem}header{padding:2rem 0 3rem;border-bottom:2px solid #233d2d}.eyebrow{font-size:.8rem;font-weight:750;letter-spacing:.1em;text-transform:uppercase;color:#425a4a}h1{max-width:18ch;font-size:clamp(2.3rem,5vw,4.1rem);line-height:1.08;letter-spacing:-.035em;margin:1rem 0 1.5rem}h2{font-size:1.8rem;line-height:1.2;margin:.5rem 0 1.5rem}header p{max-width:60ch}nav{display:flex;gap:1.5rem;flex-wrap:wrap;margin-top:2rem}section{padding:2.5rem 0;border-bottom:1px solid #a7b4a9}.table-wrap{overflow:auto}table{border-collapse:collapse;min-width:22rem;width:100%;background:#fff}caption{text-align:left;font-size:.85rem;font-weight:650;padding-bottom:.6rem}th,td{border:1px solid #a7b4a9;padding:.85rem 1rem;text-align:left}th{background:#e3eae2}th small{display:block;font-size:.75rem;font-weight:400;color:#425a4a}td{font:1.4rem/1.5 ui-monospace,monospace}.match{font-weight:650;color:#145239}.denied{padding:1rem;border-left:4px solid #7a291e;background:#f5e4df;color:#642015;font-weight:650}code,pre{font:14px/1.6 ui-monospace,monospace}pre{max-width:100%;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;padding:1rem;background:#e7ece5;border:1px solid #a7b4a9}summary{cursor:pointer;font-weight:650;padding:.5rem 0}footer{padding:2rem 0;font-size:.9rem;color:#425a4a}@media(max-width:36rem){.shell{padding:1rem}header{padding-top:1rem}section{padding:2rem 0}th,td{padding:.7rem}nav{gap:1rem}}
 </style></head><body><div class="shell"><header><p class="eyebrow">RillScope / Rust query inspector</p><h1>One query.<br>A fixed data scope.</h1><p>This offline report shows actual executions of the original Rust compiler and bounded executor. Two host-configured tenants receive separate results; a forbidden column fails before execution.</p><nav aria-label="Report sections"><a href="#allowed">Tenant alpha</a><a href="#denied">Forbidden column</a><a href="#second">Tenant beta</a><a href="#plan">Plan &amp; limits</a></nav></header><main>''' + ''.join(sections) + '''<section id="plan"><p class="eyebrow">Inspect the boundary</p><h2>Plan &amp; limits</h2><details><summary>Show redacted verified plan</summary><pre>''' + html.escape(json.dumps(explain, indent=2)) + '''</pre></details><p>The adapter accepts only query text/format and output choice. Catalog, context, tenant and budgets are host configuration. The core uses logical reservations and cooperative work limits; these do not impose an operating-system RSS limit.</p><p>Experimental local software. This report establishes these synthetic outcomes, not production readiness or complete security coverage.</p><p>Supplied label, displayed as text: <code>''' + html.escape(label) + '''</code></p></section></main><footer><p>No scripts, external fonts or service requests. Synthetic fixtures only. Inputs, exact results, hashes and command provenance are saved alongside this report.</p></footer></div></body></html>'''
@@ -52,6 +54,7 @@ def main():
     parser.add_argument('--out', type=Path, required=True)
     args = parser.parse_args()
     if args.out.exists(): parser.error('output directory must be new')
+    bound_binary()
     binary = ROOT / 'target/debug' / ('rillscope.exe' if os.name == 'nt' else 'rillscope')
     catalog_path = ROOT / 'examples/catalog.json'
     alpha_path, beta_path = ROOT / 'examples/context.json', ROOT / 'examples/context-beta.json'

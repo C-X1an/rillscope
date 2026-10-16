@@ -8,6 +8,7 @@ import json
 import os
 from pathlib import Path
 import platform
+import signal
 import sqlite3
 import subprocess
 import sys
@@ -64,6 +65,41 @@ def verify_receipt(path: Path) -> bool:
                for key in ('stdout', 'stderr'))
 
 
+def run_owned(command, *, cwd, timeout, stdin_data):
+    """Stop this command's owned descendants before returning a timeout receipt."""
+    options = {'creationflags': subprocess.CREATE_NEW_PROCESS_GROUP} if os.name == 'nt' else {'start_new_session': True}
+    with subprocess.Popen(command, cwd=cwd, stdin=subprocess.PIPE if stdin_data is not None else subprocess.DEVNULL,
+                          stdout=subprocess.PIPE, stderr=subprocess.PIPE, **options) as process:
+        try:
+            stdout, stderr = process.communicate(stdin_data, timeout=timeout)
+            return process.returncode, stdout, stderr, 'EXECUTED', {'status': 'NOT REQUIRED'}
+        except subprocess.TimeoutExpired as expired:
+            cleanup = {'status': 'PASS', 'owned_root_pid': process.pid}
+            try:
+                if os.name == 'nt':
+                    # The still-live root PID bounds taskkill to this command's tree.
+                    killed = subprocess.run(['taskkill', '/PID', str(process.pid), '/T', '/F'],
+                                            capture_output=True, timeout=10)
+                    cleanup.update(method='taskkill /PID owned-root /T /F', exit_code=killed.returncode,
+                                   stdout_sha256=digest(killed.stdout), stderr_sha256=digest(killed.stderr))
+                    if killed.returncode: cleanup['status'] = 'FAIL'
+                else:
+                    cleanup['method'] = 'SIGKILL owned process group'
+                    os.killpg(process.pid, signal.SIGKILL)
+            except (OSError, subprocess.TimeoutExpired) as error:
+                cleanup.update(status='FAIL', error=type(error).__name__)
+            if cleanup['status'] != 'PASS': process.kill()
+            try:
+                stdout, stderr = process.communicate(timeout=5)
+            except subprocess.TimeoutExpired:
+                # Never wait indefinitely on a surviving inherited capture handle.
+                cleanup.update(status='FAIL', capture_drain='TIMEOUT')
+                stdout, stderr = expired.stdout or b'', expired.stderr or b''
+                process.stdout.close(); process.stderr.close()
+                process.kill(); process.wait(timeout=5)
+            return 124, stdout, stderr, 'TIMEOUT', cleanup
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--out', type=Path, required=True)
@@ -79,6 +115,7 @@ def main() -> int:
     before, git_before = source_identity(), git_state()
     started, clock = dt.datetime.now(dt.timezone.utc).isoformat(), time.perf_counter()
     outcome = 'EXECUTED'
+    cleanup = {'status': 'NOT LAUNCHED'}
     input_paths = list(args.input)
     stdin_required = False
     for i, item in enumerate(command[:-1]):
@@ -96,13 +133,11 @@ def main() -> int:
         inputs = [input_identity(path) for path in input_paths]
         stdin_data = args.stdin.read_bytes() if args.stdin is not None else None
         stdin_sha256 = digest(stdin_data) if stdin_data is not None else None
-        p = subprocess.run(command, cwd=ROOT, capture_output=True, timeout=args.timeout,
-                           input=stdin_data, stdin=subprocess.DEVNULL if stdin_data is None else None)
-        code, stdout, stderr = p.returncode, p.stdout, p.stderr
+        code, stdout, stderr, outcome, cleanup = run_owned(command, cwd=ROOT, timeout=args.timeout, stdin_data=stdin_data)
     except FileNotFoundError:
         code, stdout, stderr, outcome = 77, b'', b'Required executable or operator input file not found\n', 'BLOCKED'
-    except subprocess.TimeoutExpired as error:
-        code, stdout, stderr, outcome = 124, error.stdout or b'', error.stderr or b'', 'TIMEOUT'
+    except OSError as error:
+        code, stdout, stderr, outcome = 126, b'', ('Command launch failed: ' + type(error).__name__ + '\n').encode(), 'LAUNCH_FAILED'
     except ValueError:
         code, stdout, stderr, outcome = 77, b'', b'Required input provenance unavailable\n', 'BLOCKED'
     if inputs:
@@ -118,6 +153,7 @@ def main() -> int:
     receipt = {'schema_version': 1, 'command': command, 'cwd': str(ROOT), 'started_utc': started,
                'finished_utc': dt.datetime.now(dt.timezone.utc).isoformat(), 'elapsed_seconds': elapsed,
                'exit_code': code, 'execution_outcome': outcome,
+               'process_cleanup': cleanup,
                'inputs_before': inputs, 'inputs_after': inputs_after,
                'stdin': None if args.stdin is None else {'file': str(args.stdin), 'sha256': stdin_sha256},
                'verification_status': 'BLOCKED' if outcome == 'BLOCKED' else ('PASS' if code == 0 and outcome == 'EXECUTED' else 'FAIL'),

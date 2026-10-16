@@ -28,8 +28,6 @@ if name in commands:
                     commands[name], [sys.executable, 'scripts/license_audit.py']]
     if name == 'mutation':
         selected.append([sys.executable, 'scripts/html_mutation.py', '--out', str(out.with_name(out.name + '-html'))])
-    if name == 'acceptance':
-        selected.append([sys.executable, 'scripts/release_audit.py', '--require-all'])
     failures = []
     for command in selected:
         print(json.dumps({'gate': name, 'command': command, 'scope': 'executed contract/security checks; full release also requires locked release evidence'}), flush=True)

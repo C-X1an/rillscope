@@ -58,6 +58,52 @@ def semantic_digest(result, ordered):
     return hashlib.sha256(encode(value).encode()).hexdigest()
 
 
+def effective_linux_resources(cgroup_root=Path('/sys/fs/cgroup'), membership=Path('/proc/self/cgroup')):
+    """Inspect this process's affinity and every applicable cgroup-v2 ancestor."""
+    result = {'resource_inspection_status': 'NOT MEASURED'}
+    try:
+        affinity = len(os.sched_getaffinity(0))
+        lines = membership.read_text().splitlines()
+        relative = next(line[3:] for line in lines if line.startswith('0::'))
+        parts = Path(relative.lstrip('/')).parts
+        if '..' in parts or len(parts) > 64: raise ValueError('invalid cgroup path')
+        base = cgroup_root.resolve()
+        if not (base / 'cgroup.controllers').is_file(): raise ValueError('cgroup v2 unavailable')
+        current = base.joinpath(*parts).resolve()
+        if not current.is_relative_to(base): raise ValueError('cgroup path escaped hierarchy')
+        quotas, memories, highs, levels = [], [], [], 0
+        while True:
+            # Kernel cgroup-v2 CPU/memory limit files exist on non-root groups:
+            # https://docs.kernel.org/admin-guide/cgroup-v2.html
+            cpu_path, memory_path, high_path = (current / name for name in ('cpu.max','memory.max','memory.high'))
+            cpu = ['max','100000'] if current == base and not cpu_path.exists() else cpu_path.read_text().split()
+            memory = 'max' if current == base and not memory_path.exists() else memory_path.read_text().strip()
+            high = 'max' if current == base and not high_path.exists() else high_path.read_text().strip()
+            if len(cpu) != 2 or int(cpu[1]) <= 0: raise ValueError('invalid CPU quota')
+            if cpu[0] != 'max':
+                quota = int(cpu[0]) / int(cpu[1])
+                if quota <= 0: raise ValueError('invalid CPU quota')
+                quotas.append(quota)
+            if memory != 'max':
+                limit = int(memory)
+                if limit <= 0: raise ValueError('invalid memory limit')
+                memories.append(limit)
+            if high != 'max':
+                throttle = int(high)
+                if throttle <= 0: raise ValueError('invalid memory throttle')
+                highs.append(throttle)
+            levels += 1
+            if current == base: break
+            current = current.parent
+        result.update(resource_inspection_status='MEASURED', process_affinity_cpu_count=affinity,
+                      cgroup_v2_ancestor_levels=levels, effective_cpu_capacity=min([affinity, *quotas]),
+                      cgroup_memory_limit_bytes=min(memories) if memories else None,
+                      cgroup_memory_high_bytes=min(highs) if highs else None)
+    except (OSError, ValueError, StopIteration, AttributeError) as error:
+        result['resource_inspection_problem'] = type(error).__name__
+    return result
+
+
 def environment():
     result = {'system': platform.system(), 'release': platform.release(), 'version': platform.version(),
               'machine': platform.machine(), 'logical_processors': os.cpu_count(),
@@ -78,6 +124,7 @@ def environment():
         else:
             result['hardware_metadata_status'] = 'NOT MEASURED: OS inspection failed'
     elif Path('/proc/cpuinfo').is_file():
+        result.update(effective_linux_resources())
         cpu = Path('/proc/cpuinfo').read_text()
         result['cpu_model'] = next((line.split(':', 1)[1].strip() for line in cpu.splitlines() if line.startswith('model name')), None)
         memory = {line.split(':')[0]: int(line.split()[1]) * 1024 for line in Path('/proc/meminfo').read_text().splitlines() if line.startswith(('MemTotal:', 'MemAvailable:'))}
@@ -123,6 +170,7 @@ def sample(mode, binary, case, description, spec, output, phase, repetition, ord
                                    *[value.replace(str(ROOT), '<public-root>').replace(str(output.parent.parent), '<run-root>') for value in command[1:]]],
               'inputs': hashes, **usage, 'stdout_sha256': hashlib.sha256(stdout).hexdigest(),
               'stderr_sha256': hashlib.sha256(stderr).hexdigest(), 'measurement': None,
+              'process_measurement_sha256': sha(prefix.with_suffix('.process.json')),
               'status': 'INVALID', 'problems': []}
     if usage.get('process_outcome', 'EXECUTED') != 'EXECUTED': record['problems'].append('process/instrument attempt failed')
     if usage['timed_out']: record['problems'].append('process timeout')
@@ -185,6 +233,10 @@ def pair_verdict(triplet, spec):
     for record, result in triplet:
         problems = []
         if result is None: problems.append('terminal result unavailable')
+        if record['mode'] == 'sqlite' and result is not None:
+            actual = result['error']['code'] if result['status'] == 'error' else 'OK'
+            if actual != spec['description'].get('expected_oracle_status', 'OK'):
+                problems.append('predetermined independent baseline outcome mismatch')
         if result is not None and result['status'] == 'ok' and record['mode'] != 'sqlite':
             if oracle is None or oracle['status'] != 'ok': problems.append('successful Rust output has no successful independent oracle')
             elif canonical(result, spec['ordered']) != canonical(oracle, spec['ordered']): problems.append('independent SQLite result mismatch')
@@ -197,7 +249,7 @@ def execute_case(binary, description, seed, directory, stream, pairing_stream):
     case = directory / 'inputs'
     spec = write_case(case, description, seed)
     hashes = {name: sha(case / name) for name in ('catalog.json', 'context.json', 'query.json', 'case.json')}
-    records, invalid = [], 0
+    records, invalid, comparisons = [], 0, 0
     randomizer = random.Random(encode(description) + ':' + str(seed))
     for phase, repetitions in (('warmup', WARMUPS), ('measured', REPETITIONS)):
         for repetition in range(repetitions):
@@ -213,9 +265,11 @@ def execute_case(binary, description, seed, directory, stream, pairing_stream):
             verdict.update(workload=description['id'], seed=seed)
             pairing_stream.write(encode(verdict) + '\n'); pairing_stream.flush()
             invalid += sum(bool(record['problems'] or verdict['modes'][record['mode']]['problems']) for record, _ in triplet)
+            if phase == 'measured': comparisons += sum(value['oracle_comparison'] == 'EXACT' for mode, value in verdict['modes'].items() if mode != 'sqlite')
     after = {name: sha(case / name) for name in hashes}
     summary = {'workload': description, 'seed': seed, 'inputs': hashes,
                'input_identity_stable': hashes == after, 'invalid_observations': invalid,
+               'independent_semantic_comparisons': comparisons,
                'warmup_observations': WARMUPS * len(MODES), 'measured_observations': REPETITIONS * len(MODES),
                'metrics': summarize_case(records)}
     (directory / 'summary.json').write_text(json.dumps(summary, indent=2) + '\n', encoding='utf-8')
@@ -260,7 +314,7 @@ def main():
     compiler = build['compiler']
     build_out = args.out / 'build'
     build_out.mkdir()
-    for name in ('build.json', 'cargo.stdout', 'cargo.stderr'):
+    for name in ('build.json', 'cargo.stdout', 'cargo.stderr', 'compiler.stdout', 'compiler.stderr'):
         shutil.copyfile(args.build_receipt.parent / name, build_out / name)
     commit = subprocess.run(['git', 'rev-parse', 'HEAD'], cwd=ROOT, capture_output=True, text=True, check=True).stdout.strip()
     dirty = bool(subprocess.run(['git', 'status', '--porcelain'], cwd=ROOT, capture_output=True, text=True, check=True).stdout.strip())
@@ -276,7 +330,7 @@ def main():
                   chosen[-1]]
         chosen = [dict(row, expected_product_status='E_BUDGET' if row['family'] == 'budget' else 'OK') for row in chosen]
         seeds = SEEDS[:1]
-    manifest = {'schema_version': 2, 'profile': args.profile, 'started_utc': dt.datetime.now(dt.timezone.utc).isoformat(),
+    manifest = {'schema_version': 3, 'profile': args.profile, 'started_utc': dt.datetime.now(dt.timezone.utc).isoformat(),
                 'source': identity, 'commit': commit, 'dirty': dirty, 'binary_sha256': binary_hash,
                 'cargo_lock_sha256': sha(ROOT / 'Cargo.lock'), 'compiler': compiler, 'build_profile': 'release',
                 'build_receipt_sha256': build_hash, 'build': build,
@@ -304,11 +358,13 @@ def main():
     stable = identity['sha256'] == source_identity(ROOT)['sha256'] and binary_hash == sha(binary) and build_hash == sha(args.build_receipt)
     complete = len(summaries) == manifest['expected_cases'] and all(row['input_identity_stable'] for row in summaries)
     invalid = sum(row['invalid_observations'] for row in summaries) + int(batch_control['status'] != 'PASS')
-    result = {'schema_version': 2, 'profile': args.profile, 'completed_cases': len(summaries),
+    comparisons = sum(row['independent_semantic_comparisons'] for row in summaries)
+    result = {'schema_version': 3, 'profile': args.profile, 'completed_cases': len(summaries),
               'expected_cases': manifest['expected_cases'], 'complete_grid': args.profile == 'full' and complete,
               'invalid_observations': invalid, 'source_binary_inputs_stable': stable and complete,
+              'independent_semantic_comparisons': comparisons,
               'batch_limit_control': batch_control,
-              'instrumentation_status': 'PASS' if stable and complete and invalid == 0 else 'FAIL',
+              'instrumentation_status': 'PASS' if stable and complete and invalid == 0 and comparisons > 0 else 'FAIL',
               'release_status': 'NOT EVALUATED: reference host/cancellation and final release evidence are separate',
               'finished_utc': dt.datetime.now(dt.timezone.utc).isoformat(), 'samples_sha256': sha(args.out / 'samples.jsonl'),
               'pair_verdicts_sha256': sha(args.out / 'pair-verdicts.jsonl'),

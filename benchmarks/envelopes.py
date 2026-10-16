@@ -30,6 +30,20 @@ def terminal(stdout, stderr, code, mode):
         if 'error' in value: raise ValueError('success includes an error')
         if not isinstance(value.get('rows'), list) or not isinstance(value.get('schema'), list):
             raise ValueError('success lacks typed result')
+        for field in value['schema']:
+            if (not isinstance(field, dict) or set(field) != {'name','type','nullable'}
+                    or not isinstance(field['name'], str) or field['type'] not in ('i64','bool','text')
+                    or type(field['nullable']) is not bool): raise ValueError('invalid typed result schema')
+        for row in value['rows']:
+            if not isinstance(row, list) or len(row) != len(value['schema']): raise ValueError('invalid typed row width')
+            for cell, field in zip(row, value['schema']):
+                if cell is None:
+                    if not field['nullable']: raise ValueError('NULL in required field')
+                elif field['type'] == 'i64':
+                    if type(cell) is not int or not -(2**63) <= cell < 2**63: raise ValueError('invalid i64 cell')
+                elif field['type'] == 'bool':
+                    if type(cell) is not bool: raise ValueError('invalid Boolean cell')
+                elif type(cell) is not str: raise ValueError('invalid text cell')
         expected = 0
     if code != expected: raise ValueError('exit code/envelope disagreement')
     if mode == 'sqlite':

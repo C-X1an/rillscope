@@ -36,7 +36,8 @@ def audit():
     own = [p for p in metadata['packages'] if p['source'] is None]
     if len(own) != 1 or own[0]['license'] != 'MIT' or b'MIT' not in (ROOT / 'LICENSE').read_bytes():
         errors.append('first-party MIT declaration missing')
-    return {'registry_packages': len(actual), 'preserved_notice_files': sum(len(p['notices']) for p in inventory['packages']),
+    return {'license_audit_status': 'PASS' if not errors else 'FAIL', 'first_party_license': 'MIT' if len(own) == 1 and own[0]['license'] == 'MIT' else None,
+            'registry_packages': len(actual), 'preserved_notice_files': sum(len(p['notices']) for p in inventory['packages']),
             'lockfile_sha256': inventory['lockfile_sha256'], 'errors': errors,
             'scope': 'resolved metadata, declarations and exact preserved notice bytes; not exhaustive legal assurance'}
 

@@ -19,6 +19,7 @@ CONTROLS = [
     ('binding_identity_anchor', 'src/verify.rs', '!plan.binding_identity_matches()', 'false', 'verify::tests::reject_context_and_snapshot_substitution_before_verification'),
     ('retained_schema_reservation', 'src/execute.rs', 'let schema_reservation = budget.reserve(schema_bytes(plan.root())?)?;', 'let schema_reservation = budget.reserve(0)?;', 'execute::tests::empty_result_schema_is_reserved_and_retained'),
     ('batch_conversion_checkpoint', 'src/operators/stream.rs', 'budget.observe("batch_conversion_chunk")?;', '/* Intentionally removed conversion checkpoint. */', 'operators::stream::review_tests::batch_conversion_observes_mid_column_cancellation'),
+    ('repeated_join_probe_keys', 'src/operators/blocking.rs', 'let _key_temporary = budget.reserve(key_bytes)?;', 'let _key_temporary = budget.reserve(0)?;', 'execute::tests::repeated_text_join_probe_keys_reserve_every_copy'),
 ]
 
 def run(command, cwd, out, env):
@@ -68,7 +69,7 @@ def main():
             reports.append(report)
             print(json.dumps({'control': control, 'sequence': [baseline.returncode, mutant.returncode, restored.returncode], 'status': report['status']}), flush=True)
     summary = {'source_commit': commit, 'controls': reports, 'status': 'PASS' if all(r['status'] == 'PASS' for r in reports) else 'FAIL',
-               'scope': 'eight selected Rust controls; no broad mutation-coverage percentage is claimed'}
+               'scope': str(len(CONTROLS)) + ' selected Rust controls; no broad mutation-coverage percentage is claimed'}
     (args.out / 'summary.json').write_text(json.dumps(summary, indent=2) + '\n')
     return int(summary['status'] != 'PASS')
 

@@ -23,7 +23,16 @@ class Inspector(HTMLParser):
     def handle_data(self, data): self.text.append(data)
 
 class RustDemo(unittest.TestCase):
+    def test_report_case_ids_cannot_create_markup(self):
+        malicious = 'x"><script>alert(1)</script><section id="y'
+        cases = [{'id': malicious, 'scope': 'Synthetic', 'title': 'Escaping control',
+                  'result': {'status':'error','error':{'code':'E_INPUT','message':'Rejected'}}}]
+        parsed = Inspector(); parsed.feed(demo.render(cases, {}))
+        self.assertNotIn('script', parsed.tags)
+        self.assertIn(('id', malicious), parsed.attributes)
+
     def client(self):
+        demo.bound_binary()
         return FixedScopeAdapter(binary=ROOT / 'target/debug' / ('rillscope.exe' if os.name == 'nt' else 'rillscope'),
                                  catalog=ROOT / 'examples/catalog.json', context=ROOT / 'examples/context.json')
 

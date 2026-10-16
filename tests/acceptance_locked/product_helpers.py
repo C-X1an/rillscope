@@ -5,9 +5,12 @@ import os
 from pathlib import Path
 import sqlite3
 import subprocess
+import sys
 
 ROOT = Path(__file__).resolve().parents[2]
 BINARY = ROOT / 'target/debug' / ('rillscope.exe' if os.name == 'nt' else 'rillscope')
+sys.path.insert(0, str(ROOT / 'scripts'))
+from product_build import bound_binary
 
 def digest(value):
     return hashlib.sha256(json.dumps(value, sort_keys=True, separators=(',', ':'), ensure_ascii=False).encode()).hexdigest()
@@ -58,6 +61,7 @@ class Client:
         self.context.write_text(json.dumps(context(tenant)), encoding='utf-8')
         self.env = {key: os.environ[key] for key in ('PATH', 'SYSTEMROOT', 'WINDIR', 'TEMP', 'TMP', 'USERPROFILE', 'HOME') if key in os.environ}
         if not BINARY.is_file(): raise RuntimeError('Rust CLI is not built; product validation cannot use the reference')
+        self.build = bound_binary()
 
     def call(self, query, format='json', optimize=True, command='run', extra=None):
         data = query if isinstance(query, bytes) else (query.encode() if format == 'sql' else json.dumps({'version': 1, 'plan': query}, ensure_ascii=False).encode())

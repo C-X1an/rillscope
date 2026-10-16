@@ -5,6 +5,7 @@ import tempfile
 import unittest
 import subprocess
 import sys
+import time
 ROOT = Path(__file__).resolve().parents[1]
 
 def module(name):
@@ -45,6 +46,26 @@ class EvidenceTests(unittest.TestCase):
         receipt = self.run_receipt(['rillscope-synthetic-nonexistent-executable-8c4f'])
         self.assertEqual(receipt['verification_status'], 'BLOCKED')
         self.assertEqual(receipt['exit_code'], 77)
+
+    def test_nonexecutable_launch_retains_failed_receipt(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / 'not-executable'
+            path.write_text('synthetic nonexecutable input')
+            receipt = self.run_receipt([str(path)])
+            self.assertEqual(receipt['verification_status'], 'FAIL')
+            self.assertEqual(receipt['execution_outcome'], 'LAUNCH_FAILED')
+            self.assertEqual(receipt['exit_code'], 126)
+
+    def test_timeout_stops_owned_descendant_before_next_gate(self):
+        with tempfile.TemporaryDirectory() as folder:
+            marker = Path(folder) / 'survived'
+            worker = 'import time; from pathlib import Path; time.sleep(2); Path(' + repr(str(marker)) + ').write_text("survived")'
+            parent = 'import subprocess,sys,time; subprocess.Popen([sys.executable,"-c",' + repr(worker) + ']); print("child-started",flush=True); time.sleep(20)'
+            receipt = self.run_receipt([sys.executable, '-c', parent], timeout=1)
+            self.assertEqual(receipt['execution_outcome'], 'TIMEOUT')
+            time.sleep(2)
+            self.assertFalse(marker.exists(), 'timed-out worker survived into a subsequent gate')
+            self.assertEqual(receipt['process_cleanup']['status'], 'PASS')
 
     def test_output_tampering(self):
         evidence = module('evidence')
