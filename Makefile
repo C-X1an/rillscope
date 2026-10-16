@@ -41,13 +41,17 @@ benchmark-pilot:
 	$(PYTHON) benchmarks/dispatch.py --profile instrumentation-pilot
 benchmark-sort-null:
 	$(PYTHON) benchmarks/dispatch.py --profile sort-null-supplement
+publication-check: build
+	$(PYTHON) tests/system/publication_boundary.py --out .local-runs/publication-boundary-$$(date +%s)-$$$$
+	$(PYTHON) tests/system/publication_decision.py --out .local-runs/publication-decision-$$(date +%s)-$$$$
 clean-verify:
 	$(PYTHON) scripts/clean_verify.py
-verify: contracts build fmt lint check test integration acceptance security security-online property fuzz mutation benchmark benchmark-sort-null demo clean-verify
+verify: contracts build fmt lint check test integration acceptance security security-online property fuzz mutation benchmark benchmark-sort-null publication-check demo clean-verify
 release-verify: verify
 	$(PYTHON) scripts/release_audit.py --require-all
 .PHONY: typecheck unit teardown
 .PHONY: benchmark-sort-null
+.PHONY: publication-check
 typecheck: check
 unit: test
 teardown:

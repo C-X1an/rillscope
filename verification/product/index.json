@@ -176,11 +176,11 @@
       "scope": "Static forbid-unsafe/lint and 2000 finite malformed JSON/SQL cases; no libFuzzer-duration claim"
     },
     "AC-026": {
-      "status": "PASS",
+      "status": "NOT RUN",
       "runs": [
         "review-427-native-fixed"
       ],
-      "scope": "Current Windows controls cover successful/exited-root/timeout worker lifetimes and input/output provenance; Linux successful-parent correction still requires its green CI retest"
+      "scope": "Prior narrow controls pass; the new independent review identified a Linux new-session descendant gap requiring its actual regression and repair"
     },
     "AC-027": {
       "status": "NOT RUN",

@@ -79,7 +79,7 @@ jobs:
         with:
           persist-credentials: false
       - run: make bootstrap build
-      - run: python3 tests/system/publication_boundary.py --out .local-runs/publication-boundary
+      - run: make publication-check
       - name: Retain actual transport observations
         if: ${{ always() }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -88,4 +88,11 @@ jobs:
           include-hidden-files: true
           if-no-files-found: error
           retention-days: 7
-          path: .local-runs/publication-boundary/
+          path: |
+            .local-runs/publication-boundary-*/
+            .local-runs/publication-decision-*/
+            .local-runs/build/*/build.json
+            .local-runs/build/*/compiler.stdout
+            .local-runs/build/*/compiler.stderr
+            .local-runs/build/*/cargo.stdout
+            .local-runs/build/*/cargo.stderr

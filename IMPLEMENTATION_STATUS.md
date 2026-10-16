@@ -1,5 +1,7 @@
 # Implementation status
 
+The e7f9426 Linux CI run completed all four jobs, including the full additional 40-case nullable-sort campaign. A subsequent independent inspection identified further release-verifier freshness, metric-type and Linux descendant-ownership gaps. New regression tests are being committed before fixes to retain a real failing control. Final acceptance remains incomplete; the existing Rust compiler/executor source is unchanged.
+
 RillScope is an experimental original Rust restricted-query compiler and executor. Full release readiness remains incomplete; no production use is claimed.
 
 | Layer | Current implementation and recorded evidence |
