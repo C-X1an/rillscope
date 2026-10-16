@@ -1,6 +1,5 @@
 """Independent-review counterexamples; metadata fixtures are not measurements."""
 import json
-import os
 from pathlib import Path
 import subprocess
 import sys
@@ -14,6 +13,40 @@ from evidence_coverage import coverage, required_sources, wording_hashes
 
 
 class Review427(unittest.TestCase):
+    def test_nullable_sort_supplement_realizes_comparator_order_and_both_keys(self):
+        sys.path.insert(0,str(ROOT / 'benchmarks'))
+        from workloads import sort_null_descriptors,make_catalog,validate_workload_catalog,sort_input_characterization
+        descriptions = sort_null_descriptors()
+        self.assertEqual(len(descriptions),8)
+        self.assertEqual({row['rows'] for row in descriptions},{10000,100000})
+        for description in descriptions[:4]:
+            catalog = make_catalog(description,20261014)
+            validate_workload_catalog(description,catalog)
+            shape = sort_input_characterization(catalog)
+            self.assertGreater(shape['null_primary_keys'],0)
+            self.assertTrue(shape['nullable_secondary_key_can_decide'])
+            if description['order'] in ('ordered','all-null-primary'): self.assertTrue(shape['in_query_comparator_order'])
+            if description['order'] == 'reverse': self.assertTrue(shape['in_reverse_query_comparator_order'])
+
+    def test_reference_qualification_binds_actual_experiment_allocations(self):
+        sys.path.insert(0,str(ROOT / 'benchmarks'))
+        from reference_gate import experiment_environment_errors
+        actual = {'system':'Linux','machine':'x86_64','logical_processors':4,'cpu_model':'synthetic unit CPU',
+                  'physical_memory_bytes':8 * 1024**3,'resource_inspection_status':'MEASURED',
+                  'effective_cpu_capacity':4,'process_affinity_cpu_count':4,
+                  'cgroup_memory_limit_bytes':8 * 1024**3,'cgroup_memory_high_bytes':None}
+        receipt = {'source':'actual host allocation and inspection','dedicated':True,
+                   'logical_processors':4,'machine':'x86_64','cpu_model':'synthetic unit CPU'}
+        observed = {name:dict(actual) for name in ('grid-start','grid-end','cancellation-start','cancellation-end','wrapper-end')}
+        self.assertEqual(experiment_environment_errors(actual,receipt,observed),[])
+        observed['grid-start']['effective_cpu_capacity'] = 2
+        self.assertIn('actual experiment allocation differs from preflight: grid-start',
+                      experiment_environment_errors(actual,receipt,observed))
+        observed['grid-start'] = dict(actual)
+        del observed['cancellation-end']
+        self.assertIn('complete experiment environment snapshots missing',
+                      experiment_environment_errors(actual,receipt,observed))
+
     def test_successful_parent_stops_detached_output_worker_before_receipt(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)

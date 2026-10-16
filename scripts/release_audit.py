@@ -84,7 +84,7 @@ def audit(index, require_all=False):
             elif identifier == 'AC-030':
                 if not {'LICENSE-NOTICES', 'PUBLIC-WORDING'} <= subjects: errors.append('license/notices and independent wording evidence missing: ' + identifier)
             elif identifier == 'AC-021':
-                if not {'FULL-GRID-CAPTURE','FULL-GRID-VALIDATION'} <= subjects:
+                if not {'FULL-GRID-CAPTURE','FULL-GRID-VALIDATION','NULL-SORT-VALIDATION'} <= subjects:
                     errors.append('criterion-specific executed observation missing: ' + identifier)
                     errors.append('full captured grid and current-product artifact validation missing: ' + identifier)
             elif identifier not in subjects: errors.append('criterion-specific executed observation missing: ' + identifier)
@@ -115,7 +115,7 @@ def audit(index, require_all=False):
             'stale_required_sources': sorted(set(stale_requirements)),
             'scope': 'public claim status/link/digest/provenance audit; no new runtime execution or independent prose review',
             'claims_sha256': digest(ROOT / 'CLAIMS_EVIDENCE.md'),
-            'wording_binding': 'all public Markdown assertions; canonical evidence-link/status fields are validated live against the index'}
+            'wording_binding': 'public Markdown, HTML, static report assets and generation code; canonical evidence-link/status fields are validated live against the index'}
 
 
 def main():

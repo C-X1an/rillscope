@@ -2,6 +2,43 @@
 import ctypes
 from ctypes import wintypes
 import time
+import os
+from pathlib import Path
+import signal
+
+
+def terminate_posix_group(pid):
+    """Stop the session/group created for this command, including after root exit."""
+    record = {'status':'PASS','method':'SIGKILL owned process group','owned_root_pid':pid}
+    try:
+        os.killpg(pid, signal.SIGKILL)
+    except ProcessLookupError:
+        return dict(record, remaining_active_processes=0)
+    except OSError as error:
+        return dict(record, status='FAIL', error=type(error).__name__)
+    deadline = time.monotonic() + 5
+    while time.monotonic() < deadline:
+        if Path('/proc').is_dir():
+            active = 0
+            try:
+                for path in Path('/proc').iterdir():
+                    if not path.name.isdecimal(): continue
+                    try:
+                        fields = (path / 'stat').read_text().rsplit(')',1)[1].split()
+                    except (FileNotFoundError,ProcessLookupError): continue
+                    # Only the newly owned session/group can count. Zombies
+                    # cannot execute or modify later gate inputs.
+                    if int(fields[2]) == pid and int(fields[3]) == pid and fields[0] not in ('Z','X'):
+                        active += 1
+            except (OSError,ValueError,IndexError) as error:
+                return dict(record, status='FAIL', error=type(error).__name__)
+            if active == 0: return dict(record, remaining_active_processes=0)
+        else:
+            try: os.killpg(pid, 0)
+            except ProcessLookupError: return dict(record, remaining_active_processes=0)
+            except OSError as error: return dict(record, status='FAIL', error=type(error).__name__)
+        time.sleep(.01)
+    return dict(record,status='FAIL',error='owned process group remained active after termination')
 
 
 class WindowsJob:

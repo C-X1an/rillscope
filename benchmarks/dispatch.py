@@ -13,9 +13,9 @@ from build import build_release
 
 
 def main():
-    parser = argparse.ArgumentParser(); parser.add_argument('--profile', choices=('full', 'instrumentation-pilot', 'cancellation-only'), required=True)
+    parser = argparse.ArgumentParser(); parser.add_argument('--profile', choices=('full', 'instrumentation-pilot', 'cancellation-only','sort-null-supplement'), required=True)
     args = parser.parse_args()
-    label = {'full': 'f', 'instrumentation-pilot': 'p', 'cancellation-only': 'c'}[args.profile]
+    label = {'full': 'f', 'instrumentation-pilot': 'p', 'cancellation-only': 'c','sort-null-supplement':'s'}[args.profile]
     # Keep actual case/measurement paths below legacy Windows component-tool limits.
     # The complete experiment name/dimensions remain in each manifest and case record.
     out = ROOT / '.local-runs/bench' / (label + '-' + str(time.time_ns()))

@@ -65,7 +65,7 @@ def main():
     targets = ['bootstrap', 'verify', 'demo']
     # A failed make verify stops its dependency sequence. Retain that failure and
     # execute subsequent independent gates explicitly; never relabel the aggregate.
-    supplemental = ['verify-reference', 'security', 'property', 'fuzz', 'mutation', 'benchmark', 'security-online']
+    supplemental = ['verify-reference', 'security', 'property', 'fuzz', 'mutation', 'benchmark', 'benchmark-sort-null','security-online']
     results = []
     for target in targets + supplemental:
         command = ['make', target]

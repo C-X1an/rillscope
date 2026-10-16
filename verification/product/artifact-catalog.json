@@ -146,5 +146,37 @@
   "current-native-product": {
     "path": "verification/product/runs/current-native-product.json",
     "sha256": "e209f685eb87ee1306b0a300156f605e0793b403b5e62e84f39270838641fb4f"
+  },
+  "review-427-native-fixed": {
+    "path": "verification/product/runs/review-427-native-fixed.json",
+    "sha256": "e25bdc50896c471251c087a368aa0f0c27d109242ecdd20ecad1f73900d565dd"
+  },
+  "review-427-controls-before": {
+    "path": "verification/product/runs/review-427-controls-before.json",
+    "sha256": "a304aa29482c090c7896ccf98a4807d835e69c956d9bfcfce6dba96985ab8b2c"
+  },
+  "review-427-summary-controls": {
+    "path": "verification/product/runs/review-427-summary-controls.json",
+    "sha256": "2c0b8c59e61339badf5c94c0c0e7717b79ea849536029ba24486175dab1c626d"
+  },
+  "review-427-cancellation-controls": {
+    "path": "verification/product/runs/review-427-cancellation-controls.json",
+    "sha256": "c8962d24c1aa60a4eb6c715cae4ce278ea8e14645687b3c4a9e84abb618a001e"
+  },
+  "review-427-fresh-checkout": {
+    "path": "verification/product/runs/review-427-fresh-checkout.json",
+    "sha256": "22c559943a052b0023de4830d378cf77c09923413471ccef7bc537453174bbba"
+  },
+  "review-427-html-controls": {
+    "path": "verification/product/runs/review-427-html-controls.json",
+    "sha256": "81f3b0940c85f014b52160137a3eb813b00adcf5e3f33acff0b43b1451100ba5"
+  },
+  "review-427-linux-ci": {
+    "path": "verification/product/runs/review-427-linux-ci.json",
+    "sha256": "5f54a1f6ef47f6b58353fe06520d7d2763adb1f5a5970b8c3d317048ffc9b533"
+  },
+  "review-427-artifact-control-timeout": {
+    "path": "verification/product/runs/review-427-artifact-control-timeout.json",
+    "sha256": "f238acb0b16d9297c9d24fffbe7d6bf913dd9b4f3e225bae96a9e037fa4101c7"
   }
 }

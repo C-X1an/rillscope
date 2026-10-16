@@ -40,6 +40,26 @@ def descriptors():
             row.setdefault('expected_product_status', 'E_OUTPUT_LIMIT' if oversized else 'OK')
     return out
 
+
+def sort_null_descriptors():
+    return [{'id':f'B04-null-primary-n{size}-{order}','family':'sort','rows':size,'order':order,
+             'null_percent':10,'batch_rows':1024,'sort_null_primary':True,
+             'expected_product_status':'OK','expected_oracle_status':'OK'}
+            for size in (10000,100000) for order in ('ordered','reverse','random','all-null-primary')]
+
+
+def sort_input_characterization(catalog):
+    values = [(row[1],row[2]) for row in catalog['tables']['sales']['rows'] if row[0] == 'alpha']
+    key = lambda row: (row[0] is None,-row[0] if row[0] is not None else 0,
+                       row[1] is None,row[1] if row[1] is not None else 0)
+    ordered = sorted(values,key=key)
+    groups = {}
+    for first, second in values: groups.setdefault(first,set()).add(second)
+    return {'in_query_comparator_order':values == ordered,
+            'in_reverse_query_comparator_order':values == list(reversed(ordered)),
+            'null_primary_keys':sum(first is None for first,_ in values),
+            'nullable_secondary_key_can_decide':any(None in group and len(group) > 1 for group in groups.values())}
+
 def make_catalog(description, seed):
     rng = random.Random(seed)
     columns = [{'name': 'tenant', 'type': 'text', 'nullable': False}, {'name': 'id', 'type': 'i64', 'nullable': True},
@@ -64,6 +84,8 @@ def make_catalog(description, seed):
             # Coverage is guaranteed inside the authorized relation, independently of tenant/NULL/skew.
             if tenant == 'alpha' and authorized_ordinal < description['keys']: key = authorized_ordinal
         elif family == 'sort' and description['order'] == 'equal': key = 1
+        if family == 'sort' and description.get('sort_null_primary'):
+            key = None if nullable or description['order'] == 'all-null-primary' else i // 4
         group = None if nullable else 'g' + str(i % max(1, description.get('groups', 100)))
         if family == 'aggregate' and description.get('groups', 0):
             groups = description['groups']
@@ -73,13 +95,23 @@ def make_catalog(description, seed):
                 group = None if nullable else 'g' + str(i % max(1, groups - 1))
         amount = None if nullable or description.get('all_null') else i % 100
         if family == 'sort' and description['order'] == 'equal': amount = 0
+        if family == 'sort' and description.get('sort_null_primary'):
+            # Independent draws make NULLs in the second key decide within
+            # tied/NULL first-key groups, instead of correlating both NULLs.
+            amount = None if rng.randrange(100) < description['null_percent'] else i % 100
         if family in ('join', 'budget'):
             group = None if key is None else 'g' + str(i % 7)
         sales.append([tenant, key, amount, group, None if nullable else i % 2 == 0, 'SYNTHETIC_HIDDEN'])
         if family in ('join', 'budget'):
             lookup.append([tenant, key, group, None if nullable else i % 2 == 0, 'SYNTHETIC_LOOKUP_HIDDEN'])
     if description['family'] == 'sort':
-        if description['order'] == 'reverse': sales.reverse()
+        if description.get('sort_null_primary'):
+            key = lambda row: (row[1] is None,-row[1] if row[1] is not None else 0,
+                               row[2] is None,row[2] if row[2] is not None else 0)
+            if description['order'] in ('ordered','all-null-primary'): sales.sort(key=key)
+            elif description['order'] == 'reverse': sales.sort(key=key,reverse=True)
+            elif description['order'] == 'random': rng.shuffle(sales)
+        elif description['order'] == 'reverse': sales.reverse()
         elif description['order'] == 'random': rng.shuffle(sales)
     return {'version': 1, 'snapshot': 'synthetic-benchmark-' + str(seed),
             'tables': {'sales': {'columns': columns, 'rows': sales}, 'lookup': {'columns': lookup_columns, 'rows': lookup}}}
@@ -160,6 +192,19 @@ def validate_workload_catalog(description, catalog):
             raise ValueError('composite components are not independently distinguishing')
     if description['family'] == 'sort' and description['order'] == 'equal' and realized['authorized_distinct_complete_sort_keys'] != 1:
         raise ValueError('equal sort workload does not have equal complete keys')
+    if description['family'] == 'sort':
+        shape = sort_input_characterization(catalog)
+        if description.get('sort_null_primary'):
+            if shape['null_primary_keys'] == 0 or not shape['nullable_secondary_key_can_decide']:
+                raise ValueError('NULL sort workload does not exercise both sort keys')
+            if description['order'] in ('ordered','all-null-primary') and not shape['in_query_comparator_order']:
+                raise ValueError('ordered NULL workload does not follow the query comparator')
+            if description['order'] == 'reverse' and not shape['in_reverse_query_comparator_order']:
+                raise ValueError('reverse NULL workload does not oppose the query comparator')
+        elif description['order'] == 'ordered' and not shape['in_reverse_query_comparator_order']:
+            raise ValueError('legacy ascending-ID input dimension changed')
+        elif description['order'] == 'reverse' and not shape['in_query_comparator_order']:
+            raise ValueError('legacy descending-ID input dimension changed')
     return realized
 
 

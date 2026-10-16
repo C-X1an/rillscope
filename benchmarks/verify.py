@@ -10,7 +10,7 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'benchmarks'))
 from run import METRICS, MODES, REPETITIONS, WARMUPS, semantic_digest, sha, summarize_case, pair_verdict
-from workloads import SEEDS, descriptors, query, context, make_catalog, validate_workload_catalog
+from workloads import SEEDS, descriptors, sort_null_descriptors, query, context, make_catalog, validate_workload_catalog, sort_input_characterization
 from envelopes import terminal
 from evidence import source_identity
 
@@ -66,6 +66,10 @@ def verify(directory, require_current_product=False):
     results = json.loads((directory / 'results.json').read_bytes())
     rows = [json.loads(line) for line in (directory / 'samples.jsonl').read_text(encoding='utf-8').splitlines()]
     version = manifest.get('schema_version', 1)
+    if type(version) is not int or version not in (1,2,3): errors.append('unsupported benchmark evidence schema')
+    if results.get('schema_version',1) != version: errors.append('manifest/results evidence schema differs')
+    if require_current_product and version != 3:
+        errors.append('current release qualification requires schema-3 build/process evidence')
     product_file = lambda name: name.startswith('src/') or name in ('Cargo.toml','Cargo.lock','rust-toolchain.toml')
     captured_product = {name:digest for name,digest in manifest['source']['files'] if product_file(name)}
     current_product = {name:digest for name,digest in source_identity(ROOT)['files'] if product_file(name)}
@@ -103,6 +107,9 @@ def verify(directory, require_current_product=False):
         if [dimensions(row) for row in manifest['chosen_workloads']] != [dimensions(row) for row in descriptors()] or manifest['seeds'] != list(SEEDS):
             errors.append('full predetermined grid changed')
         if not results['complete_grid']: errors.append('full grid incomplete')
+    if manifest['profile'] == 'sort-null-supplement':
+        if manifest['chosen_workloads'] != sort_null_descriptors() or manifest['seeds'] != list(SEEDS):
+            errors.append('complete declared NULL-sort supplement changed')
     if len(rows) != manifest['expected_observations']: errors.append('missing or extra observations')
     if not results['source_binary_inputs_stable']: errors.append('source/binary/input identity was not stable during execution')
     by_case = defaultdict(list)
@@ -116,6 +123,7 @@ def verify(directory, require_current_product=False):
     total_invalid = 0
     total_comparisons = 0
     required_success_cases = 0
+    sort_conditions = []
     for description in manifest['chosen_workloads']:
         validation_description = next((row for row in descriptors() if row['id'] == description['id']), description) if manifest['profile'] == 'full' else description
         for seed in manifest['seeds']:
@@ -130,6 +138,9 @@ def verify(directory, require_current_product=False):
             catalog_path = case / 'inputs/catalog.json'
             if catalog_path.stat().st_size > 256 * 1024 * 1024: raise ValueError('catalog evidence exceeds locked input bound')
             actual_shape = validate_workload_catalog(description,json.loads(catalog_path.read_bytes()))
+            if description['family'] == 'sort':
+                sort_conditions.append({'workload':description['id'],'seed':seed,
+                                        **sort_input_characterization(json.loads(catalog_path.read_bytes()))})
             expected_catalog = json.dumps(make_catalog(description,seed),ensure_ascii=False,separators=(',',':')).encode()
             if hashlib.sha256(expected_catalog).hexdigest() != sha(catalog_path):
                 errors.append('catalog differs from declared deterministic workload/seed recipe')
@@ -179,6 +190,12 @@ def verify(directory, require_current_product=False):
                 if any(value['problems'] for value in verdict['modes'].values()): errors.append('independent oracle mismatch/unavailable')
                 if key[0] == 'measured': comparisons += sum(value['oracle_comparison'] == 'EXACT' for mode, value in verdict['modes'].items() if mode != 'sqlite')
             saved = json.loads((case / 'summary.json').read_bytes())
+            expected_summary = {'workload':description,'seed':seed,'inputs':hashes,
+                                'input_identity_stable':all(row['inputs'] == hashes for row in case_rows),
+                                'invalid_observations':case_invalid,'independent_semantic_comparisons':comparisons,
+                                'warmup_observations':WARMUPS * len(MODES),
+                                'measured_observations':REPETITIONS * len(MODES),'metrics':summarize_case(case_rows)}
+            if saved != expected_summary: errors.append('case summary identity/counts differ from verified case: ' + description['id'])
             if saved['metrics'] != summarize_case(case_rows): errors.append('summary omits/changes observations: ' + description['id'])
             if saved['invalid_observations'] != case_invalid: errors.append('case invalid count mismatch')
             total_invalid += case_invalid
@@ -206,6 +223,9 @@ def verify(directory, require_current_product=False):
     return {'profile': manifest['profile'], 'observations_checked': len(rows), 'cases_checked': len(by_case),
             'status': 'FAIL' if errors else 'PASS', 'errors': errors,
             'current_product_source_matches_capture':current_product_matches,
+            'evidence_schema_version':version,
+            'current_release_evidence_qualified':not errors and version == 3 and current_product_matches,
+            'sort_input_conditions':sort_conditions,
             'independent_semantic_comparisons':total_comparisons,'required_success_cases_checked':required_success_cases,
             'build_provenance_status': 'RECORDED' if version >= 2 else 'NOT RECORDED: historical schema 1 instrument evidence only',
             'scope': 'recorded observations and artifacts verified; this command executed no queries and establishes no reference-host target'}

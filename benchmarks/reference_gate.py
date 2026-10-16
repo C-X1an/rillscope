@@ -39,6 +39,24 @@ def host_reasons(actual, receipt):
     return reasons
 
 
+def experiment_environment_errors(preflight, receipt, observations):
+    expected = {'grid-start','grid-end','cancellation-start','cancellation-end','wrapper-end'}
+    errors = []
+    if set(observations) != expected: errors.append('complete experiment environment snapshots missing')
+    fields = ('system','machine','logical_processors','cpu_model','physical_memory_bytes',
+              'resource_inspection_status','effective_cpu_capacity','process_affinity_cpu_count',
+              'cgroup_memory_limit_bytes','cgroup_memory_high_bytes')
+    for name, actual in observations.items():
+        if not isinstance(actual,dict):
+            errors.append('actual experiment environment missing: ' + name); continue
+        if any(key not in actual for key in fields):
+            errors.append('actual experiment environment incomplete: ' + name); continue
+        errors.extend(name + ': ' + reason for reason in host_reasons(actual,receipt))
+        if any(actual.get(key) != preflight.get(key) for key in fields):
+            errors.append('actual experiment allocation differs from preflight: ' + name)
+    return errors
+
+
 def main():
     parser = argparse.ArgumentParser(); parser.add_argument('--out', type=Path, required=True)
     parser.add_argument('--host-receipt', type=Path)
@@ -82,12 +100,20 @@ def main():
     from cancellation import verify_cancellation
     cancellation_check = verify_cancellation(args.out / 'cancel')
     if cancellation_check['status'] != 'PASS': raise ValueError('cancellation artifacts do not validate')
+    experiment_environments = {
+        'grid-start':json.loads((args.out / 'grid/manifest.json').read_bytes()).get('environment'),
+        'grid-end':grid.get('environment_after'),
+        'cancellation-start':json.loads((args.out / 'cancel/manifest.json').read_bytes()).get('environment'),
+        'cancellation-end':cancellation.get('environment_after'), 'wrapper-end':environment()}
+    environment_errors = experiment_environment_errors(actual,receipt,experiment_environments)
     cancel_target = 'MET' if cancellation['measured_observations'] == 150 and cancellation['target_observations_over_100ms'] == 0 else 'MISSED'
     stable_receipt = args.host_receipt is not None and args.host_receipt.read_bytes() == receipt_bytes
     report = {'reference_host_preflight': record, 'filter_project_target_by_seed': targets,
               'cancellation': cancellation, 'cancellation_reference_target': {'status': cancel_target, 'definition': 'all 150 measured signal-to-exit upper bounds <=100ms; misses retained'},
               'allocation_receipt_stable': stable_receipt,
-              'status': 'PASS' if len(targets) == 5 and stable_receipt else 'FAIL',
+              'experiment_environment_errors':environment_errors,
+              'experiment_environments':experiment_environments,
+              'status': 'PASS' if len(targets) == 5 and stable_receipt and not environment_errors else 'FAIL',
               'meaning': 'targets reported as met or missed; a speed target miss is retained, not a correctness waiver'}
     (args.out / 'reference-results.json').write_text(json.dumps(report, indent=2) + '\n')
     print(json.dumps(report, indent=2))

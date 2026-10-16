@@ -23,7 +23,7 @@ sys.path.insert(0, str(ROOT / 'scripts'))
 sys.path.insert(0, str(ROOT / 'benchmarks'))
 from evidence import source_identity
 from process_metrics import measured_child
-from workloads import SEEDS, descriptors, write_case
+from workloads import SEEDS, descriptors, sort_null_descriptors, write_case
 from envelopes import terminal
 from build import verify_build
 
@@ -310,7 +310,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--out', type=Path, required=True)
     parser.add_argument('--binary', type=Path, default=ROOT / 'target/release' / ('rillscope-measure.exe' if os.name == 'nt' else 'rillscope-measure'))
-    parser.add_argument('--profile', choices=('full', 'instrumentation-pilot'), default='full')
+    parser.add_argument('--profile', choices=('full', 'instrumentation-pilot','sort-null-supplement'), default='full')
     parser.add_argument('--build-receipt', type=Path, required=True)
     args = parser.parse_args()
     binary = args.binary.resolve()
@@ -330,6 +330,7 @@ def main():
     dirty = bool(subprocess.run(['git', 'status', '--porcelain'], cwd=ROOT, capture_output=True, text=True, check=True).stdout.strip())
     chosen = descriptors()
     seeds = SEEDS
+    if args.profile == 'sort-null-supplement': chosen = sort_null_descriptors()
     if args.profile == 'instrumentation-pilot':
         # Predetermined instrument verification, not a reduced full-grid claim.
         chosen = [dict(chosen[0], id='pilot-filter-empty'),
@@ -377,6 +378,7 @@ def main():
               'instrumentation_status': 'PASS' if stable and complete and invalid == 0 and comparisons > 0 else 'FAIL',
               'release_status': 'NOT EVALUATED: reference host/cancellation and final release evidence are separate',
               'finished_utc': dt.datetime.now(dt.timezone.utc).isoformat(), 'samples_sha256': sha(args.out / 'samples.jsonl'),
+              'environment_after':environment(),
               'pair_verdicts_sha256': sha(args.out / 'pair-verdicts.jsonl'),
               'summaries': summaries}
     (args.out / 'results.json').write_text(json.dumps(result, indent=2) + '\n', encoding='utf-8')

@@ -8,9 +8,24 @@ from evidence import source_identity
 
 def wording_hashes(root):
     result = {}
-    for name, _ in source_identity(root)['files']:
-        if not name.endswith('.md'): continue
-        text = (root / name).read_text(encoding='utf-8')
+    # Published reports/images can make assertions too. Include generated public
+    # artifacts while pruning only implementation caches and Git metadata.
+    candidates, pending = [], [root]
+    generators = {'scripts/demo.py','scripts/demo_reference.py','tools/fixed_scope.py'}
+    while pending:
+        for path in pending.pop().iterdir():
+            if path.name in {'.git','.local-runs','target','__pycache__'}: continue
+            if path.is_symlink() or (hasattr(path,'is_junction') and path.is_junction()):
+                raise ValueError('wording binding cannot follow a symbolic link')
+            if path.is_dir(): pending.append(path)
+            elif path.is_file(): candidates.append(path)
+    for path in sorted(candidates):
+        name = path.relative_to(root).as_posix()
+        if path.suffix.lower() not in {'.md','.html','.htm','.svg','.png','.jpg','.jpeg','.webp'} and name not in generators: continue
+        if path.suffix.lower() in {'.png','.jpg','.jpeg','.webp'}:
+            result[name] = hashlib.sha256(path.read_bytes()).hexdigest()
+            continue
+        text = path.read_text(encoding='utf-8')
         if name == 'CLAIMS_EVIDENCE.md':
             normalized = []
             for line in text.splitlines():
@@ -49,6 +64,7 @@ def coverage(data, root=None):
                          'test_missing_executable_receipt', 'test_output_tampering',
                          'test_nonexecutable_launch_retains_failed_receipt', 'test_timeout_stops_owned_descendant_before_next_gate',
                          'test_timeout_stops_descendant_after_its_root_has_exited',
+                         'test_successful_parent_stops_detached_output_worker_before_receipt',
                          'test_external_input_mutation_prevents_verification_pass',
                          'test_external_stdin_and_file_inputs_have_actual_hashes'}
     if evidence_controls <= names and {'scripts/evidence.py', 'tests/test_evidence.py'} <= sources: result.add('AC-026')
@@ -78,12 +94,22 @@ def coverage(data, root=None):
             result.add('FULL-GRID-CAPTURE')
         if (observation.get('status') == 'PASS' and observation.get('profile') == 'full' and observation.get('observations_checked') == 43050
                 and observation.get('cases_checked') == 410 and observation.get('current_product_source_matches_capture') is True
+                and observation.get('evidence_schema_version') == 3 and observation.get('build_provenance_status') == 'RECORDED'
+                and observation.get('current_release_evidence_qualified') is True
                 and observation.get('required_success_cases_checked') == 290 and observation.get('independent_semantic_comparisons',0) > 0):
             result.add('FULL-GRID-VALIDATION')
+        if (observation.get('status') == 'PASS' and observation.get('profile') == 'sort-null-supplement'
+                and observation.get('observations_checked') == 4200 and observation.get('cases_checked') == 40
+                and observation.get('required_success_cases_checked') == 40
+                and observation.get('current_release_evidence_qualified') is True
+                and observation.get('independent_semantic_comparisons') == 2400):
+            result.add('NULL-SORT-VALIDATION')
         if observation.get('audit_status') == 'PASS' and observation.get('errors') == [] and 'scripts/release_audit.py' in sources:
             result.add('AC-027')
         reference = observation.get('reference_host_preflight')
-        if reference and reference.get('status') == 'READY' and observation.get('allocation_receipt_stable') is True and observation.get('status') == 'PASS':
+        if (reference and reference.get('status') == 'READY' and observation.get('allocation_receipt_stable') is True
+                and observation.get('status') == 'PASS' and observation.get('experiment_environment_errors') == []
+                and set(observation.get('experiment_environments',{})) == {'grid-start','grid-end','cancellation-start','cancellation-end','wrapper-end'}):
             targets = observation.get('filter_project_target_by_seed', [])
             if len(targets) == 5 and all(row.get('target_status') in ('MET', 'MISSED') and row.get('execution_ns',{}).get('n') == 30
                     and row.get('end_to_end_ns',{}).get('n') == 30 and row.get('independent_semantic_comparisons') == 60 for row in targets): result.add('AC-022')
@@ -96,7 +122,7 @@ def coverage(data, root=None):
 
 def required_sources(identifier, root):
     if identifier in {'AC-016'}: return {'scripts/export_policy.py', 'tests/security/test_export.py'}
-    if identifier == 'AC-026': return {'scripts/evidence.py','scripts/owned_process.py', 'tests/test_evidence.py'}
+    if identifier == 'AC-026': return {'scripts/evidence.py','scripts/owned_process.py', 'tests/test_evidence.py','tests/test_review_427.py'}
     if identifier == 'AC-027': return {'scripts/release_audit.py', 'scripts/evidence_coverage.py', 'CLAIMS_EVIDENCE.md'}
     if identifier == 'AC-030':
         inventory = json.loads((root / 'licenses/dependency-inventory.json').read_bytes())
@@ -111,6 +137,9 @@ def required_sources(identifier, root):
             path.relative_to(root).as_posix() for path in (root / 'licenses').rglob('*') if path.is_file()}
     core = {file.relative_to(root).as_posix() for file in (root / 'src').rglob('*.rs') if 'bin' not in file.parts and file.name != 'seed.rs'}
     core |= {'Cargo.toml', 'Cargo.lock', 'ACCEPTANCE_SPEC.md', 'spec/acceptance.json', 'verification/spec-lock.json'}
+    if identifier in {'AC-008','AC-029'}:
+        core |= {'scripts/demo.py','tools/fixed_scope.py','tests/acceptance_locked/test_demo.py',
+                 'tests/acceptance_locked/product_helpers.py'}
     if identifier in {'AC-021', 'AC-022', 'AC-023'}:
         core |= {file.relative_to(root).as_posix() for file in (root / 'benchmarks').glob('*.py')}
         core.add('src/bin/rillscope-measure.rs')

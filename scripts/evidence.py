@@ -14,7 +14,7 @@ import subprocess
 import sys
 import time
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from owned_process import WindowsJob
+from owned_process import WindowsJob, terminate_posix_group
 
 ROOT = Path(__file__).resolve().parents[1]
 EXCLUDED = {'.git', '.local-runs', '__pycache__', 'target', 'verification'}
@@ -68,7 +68,7 @@ def verify_receipt(path: Path) -> bool:
 
 
 def run_owned(command, *, cwd, timeout, stdin_data):
-    """Stop this command's owned descendants before returning a timeout receipt."""
+    """Stop this command's owned descendants before final provenance capture."""
     job = WindowsJob() if os.name == 'nt' else None
     options = {'creationflags': subprocess.CREATE_NEW_PROCESS_GROUP | WindowsJob.CREATE_SUSPENDED} if job else {'start_new_session': True}
     try:
@@ -80,7 +80,7 @@ def run_owned(command, *, cwd, timeout, stdin_data):
                 process.kill(); process.communicate(); raise
         try:
             stdout, stderr = process.communicate(stdin_data, timeout=timeout)
-            cleanup = job.terminate() if job else {'status':'NOT REQUIRED'}
+            cleanup = job.terminate() if job else terminate_posix_group(process.pid)
             return process.returncode, stdout, stderr, 'EXECUTED' if cleanup['status'] != 'FAIL' else 'CLEANUP_FAILED', cleanup
         except subprocess.TimeoutExpired as expired:
             cleanup = {'status': 'PASS', 'owned_root_pid': process.pid}
@@ -88,8 +88,7 @@ def run_owned(command, *, cwd, timeout, stdin_data):
                 if job:
                     cleanup.update(job.terminate())
                 else:
-                    cleanup['method'] = 'SIGKILL owned process group'
-                    os.killpg(process.pid, signal.SIGKILL)
+                    cleanup.update(terminate_posix_group(process.pid))
             except (OSError, subprocess.TimeoutExpired) as error:
                 cleanup.update(status='FAIL', error=type(error).__name__)
             if cleanup['status'] != 'PASS': process.kill()
