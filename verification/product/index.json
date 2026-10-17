@@ -169,9 +169,9 @@
     "AC-024": {
       "status": "FAIL",
       "runs": [
-        "review-427-fresh-checkout"
+        "fresh-ec4-windows-failed"
       ],
-      "scope": "Frozen 427aaf9 fresh Windows checkout executed all gates; security/verify failed on symlink setup and dedicated reference benchmark was unavailable; corrected-source final reproduction incomplete"
+      "scope": "Complete ec4 fresh Windows recipe executed all twelve targets: Win1314 security/verify and GNU long-path release build failed; reference benchmark blocked. New full Linux fresh reproduction remains pending"
     },
     "AC-025": {
       "status": "PASS",
@@ -192,9 +192,9 @@
     "AC-027": {
       "status": "PASS",
       "runs": [
-        "current-claims-link-audit"
+        "helper-current-claims-link-audit"
       ],
-      "scope": "Current public claim/link/digest/source-association audit PASS; exact table values validated live, full-release and independent-wording conclusions remain separate"
+      "scope": "Current public claim/link/digest/source-association audit PASS; canonical link/status fields validated live, no full release certification"
     },
     "AC-028": {
       "status": "PASS",
@@ -214,11 +214,12 @@
       "scope": "Actual escaped Rust text and fresh source-bound HTML PASS-FAIL-PASS control; renderer/adapter/tests now explicitly bound; no user study"
     },
     "AC-030": {
-      "status": "BLOCKED",
+      "status": "PASS",
       "runs": [
-        "current-notice-components"
+        "current-notice-components",
+        "review-ec4-wording-followup"
       ],
-      "scope": "Recorded lock/license/notices remain dated PASS; independent current wording follow-up unavailable, earlier d8 inspection does not qualify changed prose"
+      "scope": "Current preserved notice/license bytes plus independent wording manifest delta follow-up associated with the prior d8 full inspection; no repeated unchanged-image inspection or legal assurance"
     }
   },
   "artifacts": {
@@ -557,6 +558,58 @@
     "current-notice-components": {
       "path": "verification/product/runs/current-notice-components.json",
       "sha256": "257fc7f6da9c0c5b472fe1c876b4aa224c20fc5775e0a959dda262ca164b9465"
+    },
+    "review-ec4-wording-followup": {
+      "path": "verification/product/runs/review-ec4-wording-followup.json",
+      "sha256": "c8d7efae2d218511cffb73ceffaedbfd7c1b4bcc7b16e1483202b50f077acbf8"
+    },
+    "review-ec4-helper-before": {
+      "path": "verification/product/runs/review-ec4-helper-before.json",
+      "sha256": "ec0c10e5c98c1d069b6b9310c8c136305c98ccfc1e11e50a777f641b080d13da"
+    },
+    "review-ec4-helper-after": {
+      "path": "verification/product/runs/review-ec4-helper-after.json",
+      "sha256": "f73e6dc5e8ab6f80fc9b7058fc0d2e5c15f6841dbcd18e96d961f00b0d29e907"
+    },
+    "review-ec4-transitive-before": {
+      "path": "verification/product/runs/review-ec4-transitive-before.json",
+      "sha256": "b4720c5fe6688a3b375d07989d06ef629fc3fce1392290321237a568331d6eeb"
+    },
+    "review-ec4-transitive-after": {
+      "path": "verification/product/runs/review-ec4-transitive-after.json",
+      "sha256": "f6d93f2957e825caa7f1a6c108fe6c60ab2dfc5dd0faf989ea4c9b2afac18618"
+    },
+    "review-ec4-helper-reference": {
+      "path": "verification/product/runs/review-ec4-helper-reference.json",
+      "sha256": "f2d939bb5b50c5bbda9ec754d962ed50eac15c5d64718ead5fb91757e8591853"
+    },
+    "linux-ec4-native-bootstrap": {
+      "path": "verification/product/runs/linux-ec4-native-bootstrap.json",
+      "sha256": "26edba288a0da87fab2a9b54a9e441522acf746aaf05d1acd71cc0efcd9dc8ba"
+    },
+    "fresh-ec4-windows-failed": {
+      "path": "verification/product/runs/fresh-ec4-windows-failed.json",
+      "sha256": "bac85fd4ae25d7e77af2602acae4b78401ceb783b7845f8aa2f18061f1bc9681"
+    },
+    "review-ec4-wording-license-before": {
+      "path": "verification/product/runs/review-ec4-wording-license-before.json",
+      "sha256": "086eaa1bfef37d706532aa5c1caca523ae63c2bda18e4c385d9e32e8be31c476"
+    },
+    "review-ec4-wording-license-after": {
+      "path": "verification/product/runs/review-ec4-wording-license-after.json",
+      "sha256": "8dd51d9a1aad70db11eda5ed54f013eba9a4791db7a06f77ddf1dfd4b6f5b3ed"
+    },
+    "review-ec4-current-reference": {
+      "path": "verification/product/runs/review-ec4-current-reference.json",
+      "sha256": "c989819492542c2cde23cc7c3aa96178a6927ef811ce763c0e17018699cba14a"
+    },
+    "review-ec4-claim-association-failed": {
+      "path": "verification/product/runs/review-ec4-claim-association-failed.json",
+      "sha256": "0769dd4db8b5646c8a5e410cd0588e76572d59719e3fd347359fe7d5784e89c8"
+    },
+    "helper-current-claims-link-audit": {
+      "path": "verification/product/runs/helper-current-claims-link-audit.json",
+      "sha256": "7dfd0bcc729a6cbae422095685f103494ae030da230df48f7f94585578321651"
     }
   },
   "release_status": "INCOMPLETE",

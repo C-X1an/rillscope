@@ -187,26 +187,30 @@ def coverage(data, root=None):
     return result
 
 
+def license_sources(root):
+    inventory = json.loads((root / 'licenses/dependency-inventory.json').read_bytes())
+    expected_notices = set()
+    for package in inventory['packages']:
+        for notice in package['notices']:
+            path = Path(notice['path'])
+            if path.is_absolute() or '..' in path.parts or not path.parts or path.parts[0] != 'licenses':
+                raise ValueError('non-public notice path')
+            expected_notices.add(path.as_posix())
+    return {'Cargo.lock','LICENSE','scripts/license_audit.py','THIRD_PARTY_NOTICES.md'} | expected_notices | {
+        path.relative_to(root).as_posix() for path in (root / 'licenses').rglob('*') if path.is_file()}
+
+
 def required_sources(identifier, root):
     if identifier in {'AC-016'}: return {'scripts/export_policy.py', 'tests/security/test_export.py','scripts/verify_ci_observations.py'}
     if identifier == 'AC-026': return {'scripts/evidence.py','scripts/owned_process.py', 'tests/test_evidence.py','tests/test_review_427.py','tests/test_review_e7.py','scripts/verify_ci_observations.py'}
     if identifier == 'AC-027': return {'scripts/release_audit.py', 'scripts/evidence_coverage.py', 'CLAIMS_EVIDENCE.md'}
-    if identifier == 'AC-030':
-        inventory = json.loads((root / 'licenses/dependency-inventory.json').read_bytes())
-        expected_notices = set()
-        for package in inventory['packages']:
-            for notice in package['notices']:
-                path = Path(notice['path'])
-                if path.is_absolute() or '..' in path.parts or not path.parts or path.parts[0] != 'licenses':
-                    raise ValueError('non-public notice path')
-                expected_notices.add(path.as_posix())
-        return {'Cargo.lock','LICENSE','scripts/license_audit.py','THIRD_PARTY_NOTICES.md'} | set(wording_hashes(root)) | expected_notices | {
-            path.relative_to(root).as_posix() for path in (root / 'licenses').rglob('*') if path.is_file()}
+    if identifier == 'AC-030': return license_sources(root) | set(wording_hashes(root))
     core = {file.relative_to(root).as_posix() for file in (root / 'src').rglob('*.rs') if 'bin' not in file.parts and file.name != 'seed.rs'}
     core |= {'Cargo.toml', 'Cargo.lock', 'ACCEPTANCE_SPEC.md', 'spec/acceptance.json', 'verification/spec-lock.json'}
     if identifier == 'AC-018':
         core |= {'rust-toolchain.toml','TEST_SPEC_EXCEPTION_AC-018.md','spec/ac018-clarification.json','scripts/verify_publication_evidence.py',
-                 'scripts/product_build.py','benchmarks/build.py','tests/acceptance_locked/test_product.py',
+                 'scripts/product_build.py','benchmarks/build.py','scripts/evidence.py',
+                 'scripts/verify_ci_observations.py','tests/acceptance_locked/test_product.py',
                  'tests/acceptance_locked/product_helpers.py','tests/system/publication_decision.py',
                  'tests/system/publication_mutation.py','tests/system/publication_record_control.py'}
     if identifier == 'AC-024':

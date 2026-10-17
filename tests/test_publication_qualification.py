@@ -22,11 +22,13 @@ class PublicationQualification(unittest.TestCase):
             public = Path(__file__).resolve().parents[1]
             (root/'spec/acceptance.json').write_bytes((public/'spec/acceptance.json').read_bytes())
             (root/'src/example.rs').write_text('current unit source\n')
-            for name in required_sources('AC-018',root):
+            fixture_sources = required_sources('AC-018',root) | {
+                'scripts/evidence.py','scripts/verify_ci_observations.py'}
+            for name in fixture_sources:
                 path = root/name; path.parent.mkdir(parents=True,exist_ok=True)
                 if not path.exists(): path.write_text('current unit fixture\n')
             current = [[name,hashlib.sha256((root/name).read_bytes()).hexdigest()]
-                       for name in sorted(required_sources('AC-018',root))]
+                       for name in sorted(fixture_sources)]
             base = {'status':'PASS','exit_code':0,'source_before_sha256':'a'*64,'source_after_sha256':'a'*64,
                     'raw_stdout_sha256':'b'*64,'raw_stderr_sha256':'c'*64,'source_files':current}
             caps = dict(base,unit_subjects=['AC-018','OUTPUT-CAPS'])
@@ -54,11 +56,22 @@ class PublicationQualification(unittest.TestCase):
             expected = 'AC-018: no single current OUTPUT-CAPS run matches its complete dependency set'
             self.assertIn(expected,check(stale_caps,final)['stale_required_sources'])
             self.assertEqual(check(caps,final)['stale_required_sources'],[])
-            stale_final = copy.deepcopy(final)
-            next(row for row in stale_final['source_files'] if row[0] == 'scripts/verify_publication_evidence.py')[1] = '0'*64
-            self.assertIn('AC-018: no single current FINAL-CANCELLATION run matches its complete dependency set',
-                          check(caps,stale_final)['stale_required_sources'])
-            self.assertEqual(check(caps,final)['stale_required_sources'],[])
+            # These helpers establish the executable binding of the ordinary
+            # cap observations; a current final-boundary run cannot refresh them.
+            for helper in ('scripts/product_build.py','benchmarks/build.py','scripts/evidence.py'):
+                with self.subTest(stale_ordinary_executable_helper=helper):
+                    stale_caps = copy.deepcopy(caps)
+                    next(row for row in stale_caps['source_files'] if row[0] == helper)[1] = '0'*64
+                    self.assertIn(expected,check(stale_caps,final)['stale_required_sources'])
+                    self.assertEqual(check(caps,final)['stale_required_sources'],[])
+            for helper in ('scripts/verify_publication_evidence.py','scripts/evidence.py',
+                           'scripts/verify_ci_observations.py'):
+                with self.subTest(stale_final_validation_helper=helper):
+                    stale_final = copy.deepcopy(final)
+                    next(row for row in stale_final['source_files'] if row[0] == helper)[1] = '0'*64
+                    self.assertIn('AC-018: no single current FINAL-CANCELLATION run matches its complete dependency set',
+                                  check(caps,stale_final)['stale_required_sources'])
+                    self.assertEqual(check(caps,final)['stale_required_sources'],[])
 
     def test_ordinary_cancel_and_caps_do_not_supply_final_boundary(self):
         value = {'python_test_names':['test_ac018_actual_cli_cancel_before_publication','test_ac018_actual_cli_row_and_byte_caps'],

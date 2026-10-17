@@ -1,0 +1,29 @@
+name: Existing Linux VM capability probe
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: reference-vm-probe-${{ github.run_id }}
+  cancel-in-progress: false
+jobs:
+  existing-capability:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Inspect actual existing KVM and resource access
+        run: python3 scripts/evidence.py --out .local-runs/reference-vm-probe-command --timeout 90 -- python3 scripts/probe_reference_vm.py --out .local-runs/reference-vm-probe
+      - name: Retain actual capability observation including a blocked result
+        if: ${{ always() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: actual-reference-vm-capability
+          retention-days: 7
+          include-hidden-files: true
+          if-no-files-found: error
+          path: |
+            .local-runs/reference-vm-probe-command/
+            .local-runs/reference-vm-probe/

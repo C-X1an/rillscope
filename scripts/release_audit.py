@@ -6,7 +6,7 @@ import hashlib
 import json
 from pathlib import Path
 import re
-from evidence_coverage import coverage, required_sources, wording_hashes
+from evidence_coverage import coverage, license_sources, required_sources
 
 ROOT = Path(__file__).resolve().parents[1]
 STATUSES = {'PASS', 'FAIL', 'BLOCKED', 'NOT RUN', 'NOT YET MEASURED'}
@@ -107,28 +107,29 @@ def audit(index, require_all=False):
             else:
                 source_candidates = [data for data in selected if identifier in coverage(data,ROOT)]
             supplied = set().union(*({source for source, _ in data.get('source_files', [])} for data in source_candidates))
-            needed = required_sources(identifier, ROOT)
+            # A full live-validated PUBLIC-WORDING map supplies wording coverage.
+            # License obligations remain separate, including overlapping prose.
+            needed = license_sources(ROOT) if identifier == 'AC-030' else required_sources(identifier, ROOT)
             missing = needed - supplied
             if missing: errors.append('criterion source coverage missing: ' + identifier + ': ' + ', '.join(sorted(missing)))
-            reviewed_words = set(wording_hashes(ROOT)) if 'PUBLIC-WORDING' in subjects else set()
             current_sources = {}
             for source in needed - missing:
                 # This invocation reads and validates the live claim table above.
                 # Its proof-link/status fields cannot hash their own future receipt.
                 if identifier == 'AC-027' and source == 'CLAIMS_EVIDENCE.md': continue
-                if identifier == 'AC-030' and source in reviewed_words: continue
                 file = public_file(source,allow_missing=True)
                 current = digest(file) if file.is_file() else None
                 current_sources[source] = current
                 if current is None or not any([source,current] in data['source_files'] for data in source_candidates):
                     stale_requirements.append(identifier + ': ' + source)
-            if identifier == 'AC-024' and (missing or not any(
+            if identifier in {'AC-024','AC-030'} and (missing or not any(
                     all(current_sources.get(source) is not None and [source,current_sources[source]] in data['source_files']
                         for source in needed) for data in source_candidates)):
                 stale_requirements.append(identifier + ': no single qualifying run matches the complete required source set')
             if identifier == 'AC-018':
                 ordinary_tests = {'tests/acceptance_locked/test_product.py','tests/acceptance_locked/product_helpers.py'}
-                ordinary = required_sources('AC-001',ROOT) | ordinary_tests | {'rust-toolchain.toml'}
+                ordinary = required_sources('AC-001',ROOT) | ordinary_tests | {
+                    'rust-toolchain.toml','scripts/product_build.py','benchmarks/build.py','scripts/evidence.py'}
                 boundary = needed - ordinary_tests
                 for subject,dependencies in (('OUTPUT-CAPS',ordinary),('FINAL-CANCELLATION',boundary)):
                     candidates = [data for data in selected if subject in coverage(data,ROOT)]
