@@ -6,6 +6,7 @@ rt_sigreturn syscall. No flag/memory patch, product hook, privilege change or
 network access is used. This records terminal commitment, not atomic transport.
 Signal command: https://sourceware.org/gdb/current/onlinedocs/gdb.html/Signaling.html
 Run arguments: https://sourceware.org/gdb/current/onlinedocs/gdb.html/Arguments.html
+Stop events: https://sourceware.org/gdb/current/onlinedocs/gdb.html/Events-In-Python.html
 """
 import argparse
 import hashlib
@@ -27,7 +28,6 @@ DRIVER = r'''
 import gdb
 import json
 from pathlib import Path
-import re
 import shlex
 
 config = json.loads(CONFIG_JSON)
@@ -35,7 +35,7 @@ out = Path(config['out'])
 stdout = out / 'stdout.bin'
 stderr = out / 'stderr.bin'
 exits = []
-gdb.events.exited.connect(lambda event: exits.append(event.exit_code))
+gdb.events.exited.connect(lambda event: exits.append(getattr(event,'exit_code',None)))
 gdb.execute('set pagination off')
 gdb.execute('set confirm off')
 gdb.execute('set disable-randomization off')
@@ -66,14 +66,30 @@ if config['signal']:
     if len(added) != 1:
         raise RuntimeError('cannot identify the owned signal-return catchpoint')
     catch = added.pop()
+    stops = []
+    def stopped(event):
+        stops.append({'event_type':type(event).__name__,
+                      'details':{str(key):str(value) for key,value in event.details.items()},
+                      'breakpoint_numbers':[point.number for point in getattr(event,'breakpoints',[])]})
+    gdb.events.stop.connect(stopped)
     signal_output = gdb.execute('signal ' + config['signal'], to_string=True)
+    gdb.events.stop.disconnect(stopped)
     (out / 'signal-stop.txt').write_text(signal_output)
-    if catch.hit_count != 1 or not re.search(r'Catchpoint\s+\d+\s+\(call to syscall [\'\"]?rt_sigreturn', signal_output):
+    syscall = int(gdb.parse_and_eval('$orig_rax'))
+    diagnostics = {'catchpoint_number':catch.number,'catchpoint_hit_count':catch.hit_count,
+                   'orig_rax':syscall,'stops':stops}
+    (out / 'signal-stop.json').write_text(json.dumps(diagnostics,indent=2)+'\n')
+    # Stop notifications may bypass execute(to_string=True); use GDB's actual
+    # structured MI-equivalent stop event and the x86_64 syscall register.
+    if (len(stops) != 1 or stops[0]['details'].get('reason') != 'syscall-entry'
+            or stops[0]['details'].get('syscall-name') != 'rt_sigreturn'
+            or stops[0]['details'].get('syscall-number') != '15' or syscall != 15):
         raise RuntimeError('actual signal handler return was not observed')
     if stdout.stat().st_size != 0 or stderr.stat().st_size != 0:
         raise RuntimeError('output escaped before the controlled handler returned')
     record.update(signal_method='GDB signal ' + config['signal'] + ' to the owned stopped inferior',
                   handler_return_syscall_observed=True,
+                  handler_return_stop=diagnostics,
                   stdout_bytes_at_handler_return=stdout.stat().st_size)
     catch.delete()
 gdb.execute('continue')

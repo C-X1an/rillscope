@@ -52,11 +52,11 @@
       "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
     },
     "AC-008": {
-      "status": "NOT RUN",
+      "status": "PASS",
       "runs": [
-        "fresh-rust-demo-bound"
+        "fresh-rust-demo-manifest-bound"
       ],
-      "scope": "Dated fresh report is real; the stricter all-artifact generator binding requires a new current fresh capture and browser record"
+      "scope": "Actual current fresh make demo; captured generator hashes bind report/results/manifest, matching execution/renderer source and real browser/keyboard record; integrator inspection, no user study"
     },
     "AC-009": {
       "status": "PASS",
@@ -494,6 +494,18 @@
     "review-951-native-fixed": {
       "path": "verification/product/runs/review-951-native-fixed.json",
       "sha256": "78a1f1cbbf699e775b5ab8ba67c5faef892c2e4d57671eb231a157c85ea8e12f"
+    },
+    "fresh-rust-demo-manifest-bound": {
+      "path": "verification/product/runs/fresh-rust-demo-manifest-bound.json",
+      "sha256": "d8202a552305f191cbd5ad83d0b33faf6cf437c6c2ac770a4977663c1ad98396"
+    },
+    "review-c3a-report-binding": {
+      "path": "verification/product/runs/review-c3a-report-binding.json",
+      "sha256": "50c926ed231952345eb07f3d5075af450dae39d0f75eded247f3bb23ac871717"
+    },
+    "review-c3a-results-binding": {
+      "path": "verification/product/runs/review-c3a-results-binding.json",
+      "sha256": "56da07631529219682ae520646af00de142957d92272df726c4d196ac282a95d"
     }
   },
   "release_status": "INCOMPLETE",

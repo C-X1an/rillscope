@@ -9,7 +9,7 @@ Public claims must never exceed the linked implementation/environment evidence. 
 | C-005: Apply documented nullable semantics | FR-005 / AC-005 | case results | [review-951-native-fixed](verification/product/runs/review-951-native-fixed.json) | PASS |
 | C-006: Rewrites preserve result and schema | FR-006 / AC-006 | seeds and all verdicts | [review-followup-differential](verification/product/runs/review-followup-differential.json) | PASS |
 | C-007: Expose safe rule/operator names without hidden values/statistics | FR-007 / AC-007 | explain output and canary check | [review-951-native-fixed](verification/product/runs/review-951-native-fixed.json) | PASS |
-| C-008: Drive actual Rust CLI, not reference implementation masquerading as product | FR-008 / AC-008 | commands and report hash | [fresh-rust-demo-bound](verification/product/runs/fresh-rust-demo-bound.json) | NOT RUN |
+| C-008: Drive actual Rust CLI, not reference implementation masquerading as product | FR-008 / AC-008 | commands and report hash | [fresh-rust-demo-manifest-bound](verification/product/runs/fresh-rust-demo-manifest-bound.json) | PASS |
 | C-009: Reject catalog before query | FR-009 / AC-009 | invalid fixtures | [review-951-native-fixed](verification/product/runs/review-951-native-fixed.json) | PASS |
 | C-010: All base scans enforce A scope | SEC-001 / AC-010 | tenant-paired fixtures | [review-951-native-fixed](verification/product/runs/review-951-native-fixed.json) | PASS |
 | C-011: Reject every reference before execution | SEC-002 / AC-011 | denial matrix | [review-951-native-fixed](verification/product/runs/review-951-native-fixed.json) | PASS |
