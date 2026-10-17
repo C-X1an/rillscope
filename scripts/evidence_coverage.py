@@ -42,6 +42,24 @@ def wording_hashes(root):
     return result
 
 
+def applied_publication_clarification(observation, root):
+    """A recorded experiment cannot approve an unapplied interpretation."""
+    try:
+        record = json.loads((root/'spec/ac018-clarification.json').read_bytes())
+        review = record['independent_assessment']
+        return (record['criterion'] == 'AC-018' and record['status'] == 'APPLIED'
+                and record['decision'] == 'final-success-path-atomic-cancellation-decision'
+                and record['clarification_path'] == 'TEST_SPEC_EXCEPTION_AC-018.md'
+                and record['clarification_sha256'] == hashlib.sha256((root/record['clarification_path']).read_bytes()).hexdigest()
+                and record['contract_lock_sha256'] == hashlib.sha256((root/'verification/spec-lock.json').read_bytes()).hexdigest()
+                and review['status'] == 'RECOMMENDED' and review['independent_runtime_execution'] is False
+                and review['instruction_disassembly_sha256'] == observation['instruction_disassembly_sha256']
+                and all(record[key] == observation[key] for key in ('remote_repository','remote_commit','remote_run_id',
+                    'remote_job_id','remote_artifact_id','remote_artifact_sha256')))
+    except (OSError, ValueError, KeyError, TypeError):
+        return False
+
+
 def coverage(data, root=None):
     root = Path(__file__).resolve().parents[1] if root is None else root
     names = set(data.get('python_test_names', []))
@@ -57,6 +75,8 @@ def coverage(data, root=None):
         if 'test_frontend_and_binding_denials_have_zero_actual_scans' in names: result.update(('AC-001', 'AC-003'))
         if 'test_cli_duplicate_unknown_flags_and_no_required_keys' in names: result.add('AC-028')
         if 'test_actual_text_output_and_supplied_labels_are_escaped_offline' in names: result.add('AC-029')
+        if {'test_ac018_actual_cli_cancel_before_publication','test_ac018_actual_cli_row_and_byte_caps'} <= names:
+            result.add('OUTPUT-CAPS')
     if 'test_symbolic_link_is_rejected' in names and {'test_even_allowlisted_env_resume_marker_and_credentials_fail',
             'test_exact_allowlist_and_missing_files', 'test_real_staging_and_zip_have_exact_regular_allowlist'} <= names:
         result.add('AC-016')
@@ -74,6 +94,19 @@ def coverage(data, root=None):
         # Existing narrow budget cases alone do not establish the now-known conversion guarantee.
         result.discard('AC-015')
     for observation in data.get('observations', []):
+        if (observation.get('status') == 'PASS' and observation.get('campaign') == 'recorded-final-cancellation-validation'
+                and observation.get('cases') == 5 and observation.get('signals') == ['SIGINT','SIGTERM']
+                and observation.get('behavioral_control_sequence') == ['PASS','FAIL','PASS']
+                and observation.get('current_product_source_matches_capture') is True
+                and observation.get('remote_repository') == 'C-X1an/rillscope'
+                and observation.get('remote_job_name') == 'publication-boundary'
+                and observation.get('remote_job_conclusion') == 'success'
+                and 'ubuntu-24.04' in observation.get('remote_runner_labels',[])
+                and re.fullmatch('[0-9a-f]{64}',observation.get('remote_artifact_sha256',''))
+                and {'scripts/verify_publication_evidence.py','tests/system/publication_decision.py',
+                     'tests/system/publication_mutation.py'} <= sources
+                and applied_publication_clarification(observation,root)):
+            result.update(('AC-018','FINAL-CANCELLATION'))
         if (observation.get('status') == 'PASS' and observation.get('campaign') == 'observed-public-linux-CI'
                 and observation.get('remote_repository') == 'C-X1an/rillscope'
                 and observation.get('remote_job_conclusion') == 'success'
@@ -171,6 +204,11 @@ def required_sources(identifier, root):
             path.relative_to(root).as_posix() for path in (root / 'licenses').rglob('*') if path.is_file()}
     core = {file.relative_to(root).as_posix() for file in (root / 'src').rglob('*.rs') if 'bin' not in file.parts and file.name != 'seed.rs'}
     core |= {'Cargo.toml', 'Cargo.lock', 'ACCEPTANCE_SPEC.md', 'spec/acceptance.json', 'verification/spec-lock.json'}
+    if identifier == 'AC-018':
+        core |= {'rust-toolchain.toml','TEST_SPEC_EXCEPTION_AC-018.md','spec/ac018-clarification.json','scripts/verify_publication_evidence.py',
+                 'scripts/product_build.py','benchmarks/build.py','tests/acceptance_locked/test_product.py',
+                 'tests/acceptance_locked/product_helpers.py','tests/system/publication_decision.py',
+                 'tests/system/publication_mutation.py','tests/system/publication_record_control.py'}
     if identifier == 'AC-024':
         # A historical fresh checkout cannot approve a changed verification
         # recipe or a narrowed test/measurement/security procedure.

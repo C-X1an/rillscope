@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "criterion": "AC-018",
+  "status": "APPLIED",
+  "decision": "final-success-path-atomic-cancellation-decision",
+  "disposed_utc": "2026-10-17T09:25:36.017347+00:00",
+  "clarification_path": "TEST_SPEC_EXCEPTION_AC-018.md",
+  "clarification_sha256": "25e86857ec62635b31b86a3fe3d03616bc5679993bc6768789410cebd62e14f0",
+  "contract_lock_sha256": "d93b88379c57f4282ff70bc216577f1a675e4521607fe0c5300796bed989d5cf",
+  "remote_repository": "C-X1an/rillscope",
+  "remote_commit": "d8e1312c5c9a9d43715c45e0314c9064ca125bab",
+  "remote_run_id": 39020186943,
+  "remote_job_id": 117360281667,
+  "remote_artifact_id": 12096800477,
+  "remote_artifact_sha256": "185a2175240e31b04541e613c23a3adc9e7c5578f447751bf3a5ef82298c182d",
+  "independent_assessment": {
+    "status": "RECOMMENDED",
+    "kind": "source and actual recorded instruction/handler/envelope/control inspection",
+    "independent_runtime_execution": false,
+    "instruction_disassembly_sha256": {
+      "no-signal": "58c61a8677f45ae04802fdb2ac576eee0e4c6b594e8d671944918d0dbd9a0145",
+      "before-commit-sigint": "b07fee6e89f2d22acd16d7ff69e648652352603195b770086c0cfa3d0246b945",
+      "before-commit-sigterm": "c1eeafcc8ec2140695ddf78ed17208cac8a079b2dee3f8f40be49878752a50f7",
+      "after-commit-before-write-sigint": "242e5b17b6116839c49f55ddf17189adc72c78f522f465691195b5c5846941ed",
+      "after-commit-before-write-sigterm": "3ad3bda115b81d67fed983982548053b066c3ca462d7257fbc41f98e769aaf64"
+    },
+    "scope": "recorded build hashes inspected; executables not independently run or rehashed; remote origin supported by supplied job/artifact association"
+  },
+  "ordinary_execution_evidence": "current native actual cancellation, row/byte output caps and framing tests passed separately",
+  "limitations": [
+    "No last-byte cooperative cancellation or atomic transport guarantee",
+    "Exit0 does not acknowledge reader parsing/persistence",
+    "Closed output can truncate or omit an envelope and returns exit6",
+    "No final release or fresh-checkout qualification follows"
+  ]
+}

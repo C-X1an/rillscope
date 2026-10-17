@@ -83,6 +83,9 @@ def audit(index, require_all=False):
                 if 'MALFORMED-CORPUS' not in subjects or not static: errors.append('static/malformed criterion evidence missing: ' + identifier)
             elif identifier == 'AC-030':
                 if not {'LICENSE-NOTICES', 'PUBLIC-WORDING'} <= subjects: errors.append('license/notices and independent wording evidence missing: ' + identifier)
+            elif identifier == 'AC-018':
+                if not {'AC-018','OUTPUT-CAPS','FINAL-CANCELLATION'} <= subjects:
+                    errors.append('ordinary output/cancel tests and explicitly disposed final-boundary evidence missing: ' + identifier)
             elif identifier == 'AC-021':
                 if not {'FULL-GRID-CAPTURE','FULL-GRID-VALIDATION','NULL-SORT-VALIDATION'} <= subjects:
                     errors.append('criterion-specific executed observation missing: ' + identifier)
@@ -123,6 +126,16 @@ def audit(index, require_all=False):
                     all(current_sources.get(source) is not None and [source,current_sources[source]] in data['source_files']
                         for source in needed) for data in source_candidates)):
                 stale_requirements.append(identifier + ': no single qualifying run matches the complete required source set')
+            if identifier == 'AC-018':
+                ordinary_tests = {'tests/acceptance_locked/test_product.py','tests/acceptance_locked/product_helpers.py'}
+                ordinary = required_sources('AC-001',ROOT) | ordinary_tests | {'rust-toolchain.toml'}
+                boundary = needed - ordinary_tests
+                for subject,dependencies in (('OUTPUT-CAPS',ordinary),('FINAL-CANCELLATION',boundary)):
+                    candidates = [data for data in selected if subject in coverage(data,ROOT)]
+                    if not any(all(current_sources.get(source) is not None and
+                            [source,current_sources[source]] in data['source_files'] for source in dependencies)
+                            for data in candidates):
+                        stale_requirements.append(identifier + ': no single current ' + subject + ' run matches its complete dependency set')
     referenced = {name for row in index['criteria'].values() if row['status'] == 'PASS' for name in row['runs']}
     if require_all:
         errors += ['unproved required criterion: ' + value for value in unproved]

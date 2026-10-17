@@ -1,9 +1,6 @@
 name: Complete available-host grid (not reference targets)
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths: [.github/workflows/full-available.yml]
 permissions:
   contents: read
 # A later documentation/fix push must not discard a running complete capture.
@@ -47,9 +44,13 @@ jobs:
                   if path.is_file():
                       archive.add(path, arcname=path.relative_to(grid.parent.parent).as_posix(), recursive=False)
           size = pending.stat().st_size
+          archive_digest = hashlib.sha256()
+          with pending.open('rb') as stream:
+              while block := stream.read(1024 * 1024):
+                  archive_digest.update(block)
           result = {'status':'RECORDED', 'files':sum(path.is_file() for path in paths),
                     'uncompressed_bytes':total, 'compressed_bytes':size,
-                    'archive_sha256':hashlib.sha256(pending.read_bytes()).hexdigest(),
+                    'archive_sha256':archive_digest.hexdigest(),
                     'scope':'all actual grid files, including every failure; no dedicated reference-host or release claim'}
           if size > 100 * 1024**2:
               result['status'] = 'BLOCKED'

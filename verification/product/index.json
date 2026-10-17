@@ -4,21 +4,21 @@
     "AC-001": {
       "status": "PASS",
       "runs": [
-        "review-951-native-fixed"
+        "review-d8-native-fixed"
       ],
       "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
     },
     "AC-002": {
       "status": "PASS",
       "runs": [
-        "review-951-native-fixed"
+        "review-d8-native-fixed"
       ],
       "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
     },
     "AC-003": {
       "status": "PASS",
       "runs": [
-        "review-951-native-fixed",
+        "review-d8-native-fixed",
         "ambiguous-zero-scan"
       ],
       "scope": "Unknown, type-mismatched and ambiguous columns denied before actual scan counters advance"
@@ -26,14 +26,14 @@
     "AC-004": {
       "status": "PASS",
       "runs": [
-        "review-951-native-fixed"
+        "review-d8-native-fixed"
       ],
       "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
     },
     "AC-005": {
       "status": "PASS",
       "runs": [
-        "review-951-native-fixed"
+        "review-d8-native-fixed"
       ],
       "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
     },
@@ -47,7 +47,7 @@
     "AC-007": {
       "status": "PASS",
       "runs": [
-        "review-951-native-fixed"
+        "review-d8-native-fixed"
       ],
       "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
     },
@@ -61,28 +61,28 @@
     "AC-009": {
       "status": "PASS",
       "runs": [
-        "review-951-native-fixed"
+        "review-d8-native-fixed"
       ],
       "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
     },
     "AC-010": {
       "status": "PASS",
       "runs": [
-        "review-951-native-fixed"
+        "review-d8-native-fixed"
       ],
       "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
     },
     "AC-011": {
       "status": "PASS",
       "runs": [
-        "review-951-native-fixed"
+        "review-d8-native-fixed"
       ],
       "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
     },
     "AC-012": {
       "status": "PASS",
       "runs": [
-        "review-951-native-fixed",
+        "review-d8-native-fixed",
         "eight-rust-controls"
       ],
       "scope": "Known-bad physical plans and selected real PASS-FAIL-PASS controls; source revisions are recorded"
@@ -90,21 +90,21 @@
     "AC-013": {
       "status": "PASS",
       "runs": [
-        "review-951-native-fixed"
+        "review-d8-native-fixed"
       ],
       "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
     },
     "AC-014": {
       "status": "PASS",
       "runs": [
-        "review-951-native-fixed"
+        "review-d8-native-fixed"
       ],
       "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
     },
     "AC-015": {
       "status": "PASS",
       "runs": [
-        "review-951-native-fixed",
+        "review-d8-native-fixed",
         "eight-rust-controls",
         "source-bound-pilot-v2"
       ],
@@ -120,28 +120,29 @@
     "AC-017": {
       "status": "PASS",
       "runs": [
-        "review-951-native-fixed"
+        "review-d8-native-fixed"
       ],
       "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
     },
     "AC-018": {
-      "status": "NOT RUN",
+      "status": "PASS",
       "runs": [
-        "review-951-native-fixed"
+        "review-d8-native-fixed",
+        "final-cancellation-records-qualified"
       ],
-      "scope": "Existing pre-publication hook passes; precise terminal-commit versus transport boundary requires the new Linux experiment and contract clarification"
+      "scope": "Current ordinary cancellation/output caps plus actual Linux no-signal and both-signal before/after decision records, behavioral PASS-FAIL-PASS and explicit independently assessed clarification; no atomic transport or last-byte guarantee"
     },
     "AC-019": {
       "status": "PASS",
       "runs": [
-        "review-951-native-fixed"
+        "review-d8-native-fixed"
       ],
       "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
     },
     "AC-020": {
       "status": "PASS",
       "runs": [
-        "review-951-native-fixed"
+        "review-d8-native-fixed"
       ],
       "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
     },
@@ -149,9 +150,11 @@
       "status": "FAIL",
       "runs": [
         "full-grid-windows-failed",
+        "full-grid-windows-strong-failed",
+        "full-linux-retention-failed",
         "nullable-sort-current"
       ],
-      "scope": "Full available-host Windows grid completed410 cases/43050 observations with3 process timeouts and FAIL; every record retained, separate complete Linux repetition and current validation required"
+      "scope": "All43050 Windows records retained and strongly revalidated:3timeouts, FAIL. Separate Linux run cancelled while packaging with no capture artifact; count unknown. New complete qualifying capture remains required"
     },
     "AC-022": {
       "status": "BLOCKED",
@@ -173,7 +176,7 @@
     "AC-025": {
       "status": "PASS",
       "runs": [
-        "review-951-native-fixed",
+        "review-d8-native-fixed",
         "review-followup-malformed"
       ],
       "scope": "Static forbid-unsafe/lint and 2000 finite malformed JSON/SQL cases; no libFuzzer-duration claim"
@@ -181,22 +184,22 @@
     "AC-026": {
       "status": "PASS",
       "runs": [
-        "review-951-native-fixed",
+        "review-d8-native-fixed",
         "review-72-linux-owned-controls"
       ],
       "scope": "Current local runner controls and actual successful Ubuntu reference-job descendant/input/output controls, including new-session worker cleanup; selected remote source bytes match; whole-workflow status is separate"
     },
     "AC-027": {
-      "status": "NOT RUN",
+      "status": "PASS",
       "runs": [
-        "claims-link-audit"
+        "current-claims-link-audit"
       ],
-      "scope": "Dated audit retained; current final closure and independently bound public wording review remain pending"
+      "scope": "Current public claim/link/digest/source-association audit PASS; exact table values validated live, full-release and independent-wording conclusions remain separate"
     },
     "AC-028": {
       "status": "PASS",
       "runs": [
-        "review-951-native-fixed",
+        "review-d8-native-fixed",
         "rust-demo"
       ],
       "scope": "Actual fixed-scope Rust adapter/report runs with minimal OS environment, no required model/cloud keys"
@@ -204,18 +207,18 @@
     "AC-029": {
       "status": "PASS",
       "runs": [
-        "review-951-native-fixed",
+        "review-d8-native-fixed",
         "rust-demo",
         "review-427-html-controls"
       ],
       "scope": "Actual escaped Rust text and fresh source-bound HTML PASS-FAIL-PASS control; renderer/adapter/tests now explicitly bound; no user study"
     },
     "AC-030": {
-      "status": "NOT RUN",
+      "status": "BLOCKED",
       "runs": [
-        "resolved-notice-components"
+        "current-notice-components"
       ],
-      "scope": "Actual lock/license/notice and online policy scans recorded; final release wording review pending"
+      "scope": "Recorded lock/license/notices remain dated PASS; independent current wording follow-up unavailable, earlier d8 inspection does not qualify changed prose"
     }
   },
   "artifacts": {
@@ -506,6 +509,54 @@
     "review-c3a-results-binding": {
       "path": "verification/product/runs/review-c3a-results-binding.json",
       "sha256": "56da07631529219682ae520646af00de142957d92272df726c4d196ac282a95d"
+    },
+    "review-d8-native-fixed": {
+      "path": "verification/product/runs/review-d8-native-fixed.json",
+      "sha256": "1b3a8ecc3a4eb07ef420988e7eb0ca79b684777886e21bca3a10628ed885ee2b"
+    },
+    "final-cancellation-records-qualified": {
+      "path": "verification/product/runs/final-cancellation-records-qualified.json",
+      "sha256": "2fe46b7118a8dad9623a17375eb9d4ff8f6b63c579b886511753bea7420dd937"
+    },
+    "review-d8-publication-record-controls": {
+      "path": "verification/product/runs/review-d8-publication-record-controls.json",
+      "sha256": "6a2e6afc9fd3b49381be9df0c057fae55b4ce96aca8eba427a6a4d6eb12bf278"
+    },
+    "review-d8-cap-association-before": {
+      "path": "verification/product/runs/review-d8-cap-association-before.json",
+      "sha256": "8ed4cedac51042de60a7e09fcf99f9ffd8a782e4d9648b1598b020d78de476ba"
+    },
+    "review-d8-cap-association-after": {
+      "path": "verification/product/runs/review-d8-cap-association-after.json",
+      "sha256": "7c94aa680bdf4cb5e7d69b3fe2235fb5a2c561f873868ec5b625605eaab45249"
+    },
+    "review-d8-reference-clarification": {
+      "path": "verification/product/runs/review-d8-reference-clarification.json",
+      "sha256": "798b55b5f2355f00b64fa13b06675239f5c816833183eb0ab4aa252d38e0e685"
+    },
+    "full-grid-windows-strong-failed": {
+      "path": "verification/product/runs/full-grid-windows-strong-failed.json",
+      "sha256": "35b9c19c8700dbf8640f8f7aa0e9978c53371441cdf250ecbefbb52cbcc4da77"
+    },
+    "full-linux-retention-failed": {
+      "path": "verification/product/runs/full-linux-retention-failed.json",
+      "sha256": "87612a2b80b133bb1d3db8434f0dcb9658bc72b3b89734d0aba313092279d1b1"
+    },
+    "current-claims-link-audit": {
+      "path": "verification/product/runs/current-claims-link-audit.json",
+      "sha256": "9a2043b59d1fc5b8f3d2dd5bee405575ed79cdc7e773b1d99cb5dcbc66b7b77c"
+    },
+    "review-clarified-reference-current": {
+      "path": "verification/product/runs/review-clarified-reference-current.json",
+      "sha256": "f246d7fe5e5fd3e3652c104158fd96501798f178f6788e89b7d2e37172bd0237"
+    },
+    "license-runtime-path-failed": {
+      "path": "verification/product/runs/license-runtime-path-failed.json",
+      "sha256": "c52d6dfbb80510100066f3d0eb56ac716ec2517a2800a1558d4f0249095e952a"
+    },
+    "current-notice-components": {
+      "path": "verification/product/runs/current-notice-components.json",
+      "sha256": "257fc7f6da9c0c5b472fe1c876b4aa224c20fc5775e0a959dda262ca164b9465"
     }
   },
   "release_status": "INCOMPLETE",

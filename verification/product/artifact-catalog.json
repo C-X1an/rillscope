@@ -286,5 +286,53 @@
   "review-c3a-results-binding": {
     "path": "verification/product/runs/review-c3a-results-binding.json",
     "sha256": "56da07631529219682ae520646af00de142957d92272df726c4d196ac282a95d"
+  },
+  "review-d8-native-fixed": {
+    "path": "verification/product/runs/review-d8-native-fixed.json",
+    "sha256": "1b3a8ecc3a4eb07ef420988e7eb0ca79b684777886e21bca3a10628ed885ee2b"
+  },
+  "final-cancellation-records-qualified": {
+    "path": "verification/product/runs/final-cancellation-records-qualified.json",
+    "sha256": "2fe46b7118a8dad9623a17375eb9d4ff8f6b63c579b886511753bea7420dd937"
+  },
+  "review-d8-publication-record-controls": {
+    "path": "verification/product/runs/review-d8-publication-record-controls.json",
+    "sha256": "6a2e6afc9fd3b49381be9df0c057fae55b4ce96aca8eba427a6a4d6eb12bf278"
+  },
+  "review-d8-cap-association-before": {
+    "path": "verification/product/runs/review-d8-cap-association-before.json",
+    "sha256": "8ed4cedac51042de60a7e09fcf99f9ffd8a782e4d9648b1598b020d78de476ba"
+  },
+  "review-d8-cap-association-after": {
+    "path": "verification/product/runs/review-d8-cap-association-after.json",
+    "sha256": "7c94aa680bdf4cb5e7d69b3fe2235fb5a2c561f873868ec5b625605eaab45249"
+  },
+  "review-d8-reference-clarification": {
+    "path": "verification/product/runs/review-d8-reference-clarification.json",
+    "sha256": "798b55b5f2355f00b64fa13b06675239f5c816833183eb0ab4aa252d38e0e685"
+  },
+  "full-grid-windows-strong-failed": {
+    "path": "verification/product/runs/full-grid-windows-strong-failed.json",
+    "sha256": "35b9c19c8700dbf8640f8f7aa0e9978c53371441cdf250ecbefbb52cbcc4da77"
+  },
+  "full-linux-retention-failed": {
+    "path": "verification/product/runs/full-linux-retention-failed.json",
+    "sha256": "87612a2b80b133bb1d3db8434f0dcb9658bc72b3b89734d0aba313092279d1b1"
+  },
+  "current-claims-link-audit": {
+    "path": "verification/product/runs/current-claims-link-audit.json",
+    "sha256": "9a2043b59d1fc5b8f3d2dd5bee405575ed79cdc7e773b1d99cb5dcbc66b7b77c"
+  },
+  "review-clarified-reference-current": {
+    "path": "verification/product/runs/review-clarified-reference-current.json",
+    "sha256": "f246d7fe5e5fd3e3652c104158fd96501798f178f6788e89b7d2e37172bd0237"
+  },
+  "license-runtime-path-failed": {
+    "path": "verification/product/runs/license-runtime-path-failed.json",
+    "sha256": "c52d6dfbb80510100066f3d0eb56ac716ec2517a2800a1558d4f0249095e952a"
+  },
+  "current-notice-components": {
+    "path": "verification/product/runs/current-notice-components.json",
+    "sha256": "257fc7f6da9c0c5b472fe1c876b4aa224c20fc5775e0a959dda262ca164b9465"
   }
 }
