@@ -4,21 +4,21 @@
     "AC-001": {
       "status": "PASS",
       "runs": [
-        "review-72-native-fixed"
+        "review-951-native-fixed"
       ],
       "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
     },
     "AC-002": {
       "status": "PASS",
       "runs": [
-        "review-72-native-fixed"
+        "review-951-native-fixed"
       ],
       "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
     },
     "AC-003": {
       "status": "PASS",
       "runs": [
-        "review-72-native-fixed",
+        "review-951-native-fixed",
         "ambiguous-zero-scan"
       ],
       "scope": "Unknown, type-mismatched and ambiguous columns denied before actual scan counters advance"
@@ -26,14 +26,14 @@
     "AC-004": {
       "status": "PASS",
       "runs": [
-        "review-72-native-fixed"
+        "review-951-native-fixed"
       ],
       "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
     },
     "AC-005": {
       "status": "PASS",
       "runs": [
-        "review-72-native-fixed"
+        "review-951-native-fixed"
       ],
       "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
     },
@@ -47,42 +47,42 @@
     "AC-007": {
       "status": "PASS",
       "runs": [
-        "review-72-native-fixed"
+        "review-951-native-fixed"
       ],
       "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
     },
     "AC-008": {
-      "status": "PASS",
+      "status": "NOT RUN",
       "runs": [
         "fresh-rust-demo-bound"
       ],
-      "scope": "Actual fresh make demo; captured generator path/hash bind the report, current execution/renderer bytes match and actual Chrome/keyboard record is retained; integrator visual check, no user study"
+      "scope": "Dated fresh report is real; the stricter all-artifact generator binding requires a new current fresh capture and browser record"
     },
     "AC-009": {
       "status": "PASS",
       "runs": [
-        "review-72-native-fixed"
+        "review-951-native-fixed"
       ],
       "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
     },
     "AC-010": {
       "status": "PASS",
       "runs": [
-        "review-72-native-fixed"
+        "review-951-native-fixed"
       ],
       "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
     },
     "AC-011": {
       "status": "PASS",
       "runs": [
-        "review-72-native-fixed"
+        "review-951-native-fixed"
       ],
       "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
     },
     "AC-012": {
       "status": "PASS",
       "runs": [
-        "review-72-native-fixed",
+        "review-951-native-fixed",
         "eight-rust-controls"
       ],
       "scope": "Known-bad physical plans and selected real PASS-FAIL-PASS controls; source revisions are recorded"
@@ -90,21 +90,21 @@
     "AC-013": {
       "status": "PASS",
       "runs": [
-        "review-72-native-fixed"
+        "review-951-native-fixed"
       ],
       "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
     },
     "AC-014": {
       "status": "PASS",
       "runs": [
-        "review-72-native-fixed"
+        "review-951-native-fixed"
       ],
       "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
     },
     "AC-015": {
       "status": "PASS",
       "runs": [
-        "review-72-native-fixed",
+        "review-951-native-fixed",
         "eight-rust-controls",
         "source-bound-pilot-v2"
       ],
@@ -120,37 +120,38 @@
     "AC-017": {
       "status": "PASS",
       "runs": [
-        "review-72-native-fixed"
+        "review-951-native-fixed"
       ],
       "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
     },
     "AC-018": {
       "status": "NOT RUN",
       "runs": [
-        "review-72-native-fixed"
+        "review-951-native-fixed"
       ],
       "scope": "Existing pre-publication hook passes; precise terminal-commit versus transport boundary requires the new Linux experiment and contract clarification"
     },
     "AC-019": {
       "status": "PASS",
       "runs": [
-        "review-72-native-fixed"
+        "review-951-native-fixed"
       ],
       "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
     },
     "AC-020": {
       "status": "PASS",
       "runs": [
-        "review-72-native-fixed"
+        "review-951-native-fixed"
       ],
       "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
     },
     "AC-021": {
-      "status": "NOT YET MEASURED",
+      "status": "FAIL",
       "runs": [
-        "source-bound-pilot-v2"
+        "full-grid-windows-failed",
+        "nullable-sort-current"
       ],
-      "scope": "Frozen 410-case/43050-observation capture running; current validation and additional complete 40-case NULL-sort campaign still required"
+      "scope": "Full available-host Windows grid completed410 cases/43050 observations with3 process timeouts and FAIL; every record retained, separate complete Linux repetition and current validation required"
     },
     "AC-022": {
       "status": "BLOCKED",
@@ -172,7 +173,7 @@
     "AC-025": {
       "status": "PASS",
       "runs": [
-        "review-72-native-fixed",
+        "review-951-native-fixed",
         "review-followup-malformed"
       ],
       "scope": "Static forbid-unsafe/lint and 2000 finite malformed JSON/SQL cases; no libFuzzer-duration claim"
@@ -180,7 +181,7 @@
     "AC-026": {
       "status": "PASS",
       "runs": [
-        "review-72-native-fixed",
+        "review-951-native-fixed",
         "review-72-linux-owned-controls"
       ],
       "scope": "Current local runner controls and actual successful Ubuntu reference-job descendant/input/output controls, including new-session worker cleanup; selected remote source bytes match; whole-workflow status is separate"
@@ -195,7 +196,7 @@
     "AC-028": {
       "status": "PASS",
       "runs": [
-        "review-72-native-fixed",
+        "review-951-native-fixed",
         "rust-demo"
       ],
       "scope": "Actual fixed-scope Rust adapter/report runs with minimal OS environment, no required model/cloud keys"
@@ -203,7 +204,7 @@
     "AC-029": {
       "status": "PASS",
       "runs": [
-        "review-72-native-fixed",
+        "review-951-native-fixed",
         "rust-demo",
         "review-427-html-controls"
       ],
@@ -469,6 +470,30 @@
     "review-72-reference-closure": {
       "path": "verification/product/runs/review-72-reference-closure.json",
       "sha256": "b901337aacac6fe39fd1f833b8161d103feae36229af8c66c1d0923867719f3e"
+    },
+    "review-951-mosaic-before": {
+      "path": "verification/product/runs/review-951-mosaic-before.json",
+      "sha256": "170d11aacc9ebb64507f35f5f30de317c37c88f7e8a2349c6fcfed3a28fdb4d9"
+    },
+    "review-951-mosaic-after": {
+      "path": "verification/product/runs/review-951-mosaic-after.json",
+      "sha256": "a66dc6d1f97972e35fc5ca552749eb259895bf461decd27e1e0f38535eb9d79a"
+    },
+    "review-951-results-before": {
+      "path": "verification/product/runs/review-951-results-before.json",
+      "sha256": "af277f8cd3efafc44392e4e7a96de1e2a77a03fdfe5f977744b84be50a948e6a"
+    },
+    "full-grid-windows-failed": {
+      "path": "verification/product/runs/full-grid-windows-failed.json",
+      "sha256": "dd3f4516870aaff431fda284c6fb093b0e5c4f75bdfc45e2eb7fbbd91d67f69f"
+    },
+    "review-951-reference-current": {
+      "path": "verification/product/runs/review-951-reference-current.json",
+      "sha256": "ba4fe51b40f969b12606673378806c3e408e3396dcb39203ce7128990a3dfb14"
+    },
+    "review-951-native-fixed": {
+      "path": "verification/product/runs/review-951-native-fixed.json",
+      "sha256": "78a1f1cbbf699e775b5ab8ba67c5faef892c2e4d57671eb231a157c85ea8e12f"
     }
   },
   "release_status": "INCOMPLETE",

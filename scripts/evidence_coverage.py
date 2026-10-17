@@ -97,6 +97,7 @@ def coverage(data, root=None):
                 and observation.get('fresh_checkout') is True and observation.get('recorded_make_demo_status') == 'PASS'
                 and observation.get('current_execution_source_identity_matches') is True
                 and observation.get('captured_generator_report_matches') is True
+                and observation.get('captured_generator_artifacts_match') is True
                 and observation.get('implementation') == 'rust' and observation.get('cases') == 3
                 and observation.get('oracle_match') is True and observation.get('browser_review_status') == 'RECORDED'
                 and re.fullmatch('[0-9a-f]{40}',observation.get('fresh_checkout_commit',''))

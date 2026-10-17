@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Run the real product from a new committed clone, retaining all failures."""
+import argparse
 import datetime as dt
 import json
 import os
@@ -36,6 +37,9 @@ def nested_check(marker):
 
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--demo-only',action='store_true',help='fresh bootstrap/build/demo capture only; never qualifies AC-024')
+    args = parser.parse_args()
     marker_value = os.environ.get('RILLSCOPE_CLEAN_SCOPE_FILE')
     if marker_value:
         try: return nested_check(Path(marker_value).resolve())
@@ -62,10 +66,11 @@ def main():
     target_directory = clone / 'target'
     if target_directory.exists(): raise ValueError('fresh clone already has build output')
     env['CARGO_TARGET_DIR'] = 'target'  # Every command below has cwd=clone; avoid GNU absolute-path limits.
-    targets = ['bootstrap', 'verify', 'demo']
+    targets = ['bootstrap','build','demo'] if args.demo_only else ['bootstrap', 'verify', 'demo']
     # A failed make verify stops its dependency sequence. Retain that failure and
     # execute subsequent independent gates explicitly; never relabel the aggregate.
     supplemental = ['verify-reference', 'security', 'property', 'fuzz', 'mutation', 'benchmark', 'benchmark-sort-null','publication-check','security-online']
+    if args.demo_only: supplemental = []
     results = []
     for target in targets + supplemental:
         command = ['make', target]
@@ -77,7 +82,7 @@ def main():
                         'source_before': recorded['source_before']['sha256'], 'source_after': recorded['source_after_sha256']})
     stable = source_identity(clone)['sha256'] == identity['sha256'] and not git('status', '--porcelain', root=clone)
     passed = stable and all(item['status'] == 'PASS' for item in results)
-    report = {'mode': 'fresh-committed-Rust-checkout', 'status': 'PASS' if passed else 'FAIL',
+    report = {'mode': 'fresh-committed-Rust-demo-checkout' if args.demo_only else 'fresh-committed-Rust-checkout', 'status': 'PASS' if passed else 'FAIL',
               'commit': commit, 'source_sha256': identity['sha256'], 'source_stable': stable,
               'same_os_and_toolchain_installation': True, 'target_directory_was_fresh': True,
               'cargo_target_dir_enforced_inside_fresh_clone': True,

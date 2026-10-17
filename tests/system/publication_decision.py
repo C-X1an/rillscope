@@ -5,6 +5,7 @@ GDB delivers a real SIGINT at a source-bound stop and observes the handler's
 rt_sigreturn syscall. No flag/memory patch, product hook, privilege change or
 network access is used. This records terminal commitment, not atomic transport.
 Signal command: https://sourceware.org/gdb/current/onlinedocs/gdb.html/Signaling.html
+Run arguments: https://sourceware.org/gdb/current/onlinedocs/gdb.html/Arguments.html
 """
 import argparse
 import hashlib
@@ -42,7 +43,9 @@ gdb.execute('set debuginfod enabled off')
 gdb.execute('handle SIGINT nostop print pass')
 gdb.execute('handle SIGTERM nostop print pass')
 point = gdb.Breakpoint(config['source'] + ':' + str(config['line']), internal=True)
-gdb.execute('run > ' + shlex.quote(str(stdout)) + ' 2> ' + shlex.quote(str(stderr)))
+# Redirection is itself a run argument. Supply the complete inferior argument
+# list here: a run command with arguments replaces those saved by --args.
+gdb.execute('run ' + shlex.join(config['inferior_args']) + ' > ' + shlex.quote(str(stdout)) + ' 2> ' + shlex.quote(str(stderr)))
 if point.hit_count != 1:
     raise RuntimeError('required final-decision breakpoint was not hit once')
 sal = gdb.newest_frame().find_sal()
@@ -101,14 +104,15 @@ def observe(out, case, line, deliver_signal, expected_exit):
                                 'columns':[{'name':'id','expr':{'col':'s.id'}}]}}
     for name, value in (('catalog',catalog), ('context',context), ('query',query)):
         (out / (name + '.json')).write_text(json.dumps(value) + '\n')
+    inferior_args = ['run', '--catalog', str(out / 'catalog.json'),
+                     '--context', str(out / 'context.json'), '--query', str(out / 'query.json')]
     config = {'out':str(out), 'case':case, 'source':str(ROOT / 'src/main.rs'),
-              'line':line, 'signal':deliver_signal, 'expected_exit':expected_exit}
+              'line':line, 'signal':deliver_signal, 'expected_exit':expected_exit,'inferior_args':inferior_args}
     driver = out / 'control.py'
     driver.write_text(DRIVER.replace('CONFIG_JSON', repr(json.dumps(config))), encoding='utf-8')
     if any(value in str(driver) for value in ('\r','\n')):
         raise ValueError('debugger command-file path contains a line break')
-    args = [str(BINARY), 'run', '--catalog', str(out / 'catalog.json'),
-            '--context', str(out / 'context.json'), '--query', str(out / 'query.json')]
+    args = [str(BINARY), *inferior_args]
     command = [shutil.which('gdb'), '--nx', '--batch', '-iex', 'set auto-load off',
                '-ex', 'source ' + str(driver), '--args', *args]
     # Disable network debuginfo lookup and preserve ordinary ASLR. Tracing must be

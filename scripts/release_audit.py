@@ -108,6 +108,7 @@ def audit(index, require_all=False):
             missing = needed - supplied
             if missing: errors.append('criterion source coverage missing: ' + identifier + ': ' + ', '.join(sorted(missing)))
             reviewed_words = set(wording_hashes(ROOT)) if 'PUBLIC-WORDING' in subjects else set()
+            current_sources = {}
             for source in needed - missing:
                 # This invocation reads and validates the live claim table above.
                 # Its proof-link/status fields cannot hash their own future receipt.
@@ -115,8 +116,13 @@ def audit(index, require_all=False):
                 if identifier == 'AC-030' and source in reviewed_words: continue
                 file = public_file(source,allow_missing=True)
                 current = digest(file) if file.is_file() else None
+                current_sources[source] = current
                 if current is None or not any([source,current] in data['source_files'] for data in source_candidates):
                     stale_requirements.append(identifier + ': ' + source)
+            if identifier == 'AC-024' and (missing or not any(
+                    all(current_sources.get(source) is not None and [source,current_sources[source]] in data['source_files']
+                        for source in needed) for data in source_candidates)):
+                stale_requirements.append(identifier + ': no single qualifying run matches the complete required source set')
     referenced = {name for row in index['criteria'].values() if row['status'] == 'PASS' for name in row['runs']}
     if require_all:
         errors += ['unproved required criterion: ' + value for value in unproved]

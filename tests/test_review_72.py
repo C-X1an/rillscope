@@ -21,15 +21,20 @@ class Review72(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder).resolve(); demo = root / '.local-runs/demo-unit'; demo.mkdir(parents=True)
             report = demo / 'report.html'; report.write_bytes(b'unit rendered bytes')
+            results = demo / 'results.json'; results.write_bytes(b'unit results bytes')
+            manifest = demo / 'manifest.json'; manifest.write_bytes(b'unit manifest bytes')
             stdout = root / 'stdout.txt'; receipt_path = root / 'receipt.json'
             receipt = {'cwd':str(root),'stdout':{'file':'stdout.txt'}}
             observed = {'implementation':'rust','cases':3,'oracle_match':True,
-                        'report':'.local-runs/demo-unit/report.html','report_sha256':hashlib.sha256(report.read_bytes()).hexdigest()}
+                        'report':'.local-runs/demo-unit/report.html','report_sha256':hashlib.sha256(report.read_bytes()).hexdigest(),
+                        'results_sha256':hashlib.sha256(results.read_bytes()).hexdigest(),
+                        'manifest_sha256':hashlib.sha256(manifest.read_bytes()).hexdigest()}
             def bind(value):
                 stdout.write_text(json.dumps(value)+'\n')
                 return verify_demo_evidence.bind_generator_observation(receipt_path,receipt,root,demo)
             self.assertEqual(bind(observed),observed)
-            for change in ({'report_sha256':'0'*64},{'report':'.local-runs/another/report.html'},
+            for change in ({'report_sha256':'0'*64},{'results_sha256':'0'*64},{'manifest_sha256':'0'*64},
+                           {'report':'.local-runs/another/report.html'},
                            {'oracle_match':False},{'cases':2}):
                 with self.subTest(change=change),self.assertRaises(ValueError): bind(dict(observed,**change))
             stdout.write_text((json.dumps(observed)+'\n')*2)
@@ -64,8 +69,8 @@ class Review72(unittest.TestCase):
                 links = ', '.join('['+name+'](verification/'+name+'.json)' for name in row['runs']) or row['scope']
                 table.append('| C-'+identifier[3:]+': fixture | unit | fixture | '+links+' | '+row['status']+' |')
             (root / 'CLAIMS_EVIDENCE.md').write_text('\n'.join(table)+'\n')
-            def check(fresh_data):
-                for name,data in (('fresh',fresh_data),('trivial',trivial)):
+            def check(fresh_data, second_data=None):
+                for name,data in (('fresh',fresh_data),('trivial',trivial if second_data is None else second_data)):
                     path = root / 'verification' / (name+'.json'); path.write_text(json.dumps(data))
                     index['artifacts'][name] = {'path':path.relative_to(root).as_posix(),
                                                'sha256':hashlib.sha256(path.read_bytes()).hexdigest()}
@@ -73,6 +78,12 @@ class Review72(unittest.TestCase):
             self.assertEqual(check(fresh)['stale_required_sources'],[])
             old = copy.deepcopy(fresh)
             next(pair for pair in old['source_files'] if pair[0] == 'Makefile')[1] = '0'*64
+            other = copy.deepcopy(fresh)
+            next(pair for pair in other['source_files'] if pair[0] == 'scripts/clean_verify.py')[1] = '0'*64
+            mixed = check(old,other)
+            self.assertIn('AC-024: no single qualifying run matches the complete required source set',mixed['stale_required_sources'],
+                          'two historical fresh runs supplied complementary current hashes')
+            self.assertEqual(check(fresh,fresh)['stale_required_sources'],[])
             self.assertIn('AC-024: Makefile',check(old)['stale_required_sources'],
                           'unrelated current command supplied freshness for an old checkout run')
             self.assertEqual(check(fresh)['stale_required_sources'],[])

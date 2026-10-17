@@ -23,6 +23,7 @@ def sha(path): return hashlib.sha256(path.read_bytes()).hexdigest()
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--checker-root',type=Path,default=ROOT,help='explicit historical checkout for before-fix reproduction')
+    parser.add_argument('--mutation',choices=('report','results'),default='report')
     for name in ('fresh-checkout','demo-dir','demo-receipt','browser-record'):
         parser.add_argument('--'+name,type=Path,required=True)
     args = parser.parse_args(); checker = args.checker_root.resolve()
@@ -32,11 +33,18 @@ def main():
                                      ('fresh_checkout','demo_dir','demo_receipt','browser_record'))
     report, manifest = demo / 'report.html', demo / 'manifest.json'
     original_read = Path.read_bytes
-    changed = report.read_bytes() + b'\n<!-- virtual post-capture corruption control -->\n'
+    target = report if args.mutation == 'report' else demo / 'results.json'
+    changed = target.read_bytes() + b'\n<!-- virtual post-capture corruption control -->\n'
+    if args.mutation == 'results':
+        cases = json.loads(target.read_bytes())
+        next(row for row in cases['cases'] if row['id'] == 'allowed')['result']['implementation'] = 'python-reference'
+        changed = json.dumps(cases).encode()
     changed_sha = hashlib.sha256(changed).hexdigest()
-    metadata = json.loads(manifest.read_bytes()); metadata['report_sha256'] = changed_sha
-    manual = json.loads(browser.read_bytes()); manual['report_sha256'] = changed_sha
-    overlays = {report:changed,manifest:json.dumps(metadata).encode(),browser:json.dumps(manual).encode()}
+    metadata = json.loads(manifest.read_bytes()); metadata[args.mutation+'_sha256'] = changed_sha
+    overlays = {target:changed,manifest:json.dumps(metadata).encode()}
+    if args.mutation == 'report':
+        manual = json.loads(browser.read_bytes()); manual['report_sha256'] = changed_sha
+        overlays[browser] = json.dumps(manual).encode()
     argv = ['verify_demo_evidence','--fresh-checkout',str(fresh),'--demo-dir',str(demo),
             '--demo-receipt',str(receipt),'--browser-record',str(browser)]
     def invoke(mutant=False):
@@ -51,7 +59,8 @@ def main():
     baseline, mutant, restored = invoke(),invoke(True),invoke()
     result = {'campaign':'actual-fresh-demo-validator-binding-control','original_files_mutated':False,
               'new_query_execution':False,'fresh_checkout_commit':baseline.get('observation',{}).get('fresh_checkout_commit'),
-              'original_report_sha256':sha(report),'virtual_changed_report_sha256':changed_sha,
+              'control':'post-capture-'+args.mutation+'-substitution',
+              'original_report_sha256':sha(report),'mutated_artifact':target.name,'virtual_changed_artifact_sha256':changed_sha,
               'recorded_demo_receipt_sha256':sha(receipt),
               'checker_source_sha256':sha(checker / 'scripts/verify_demo_evidence.py'),
               'checker_commit':subprocess.check_output(['git','rev-parse','HEAD'],cwd=checker,text=True).strip(),

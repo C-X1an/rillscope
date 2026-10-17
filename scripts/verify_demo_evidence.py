@@ -37,6 +37,8 @@ def bind_generator_observation(receipt_path, receipt, fresh, demo):
     path = Path(observation['report'])
     if not path.is_absolute(): path = fresh / path
     if (path.resolve() != demo / 'report.html' or observation.get('report_sha256') != sha(demo / 'report.html')
+            or observation.get('results_sha256') != sha(demo / 'results.json')
+            or observation.get('manifest_sha256') != sha(demo / 'manifest.json')
             or observation.get('cases') != 3 or observation.get('oracle_match') is not True):
         raise ValueError('selected report differs from the captured generator observation')
     return observation
@@ -98,7 +100,7 @@ def main():
         screenshots.append(sha(path))
     result = {'status':'PASS','campaign':'fresh-committed-Rust-demo', 'fresh_checkout_commit':commit,
               'fresh_checkout':True,'recorded_make_demo_status':'PASS','current_execution_source_identity_matches':True,
-              'implementation':'rust','cases':3,'captured_generator_report_matches':True,
+              'implementation':'rust','cases':3,'captured_generator_report_matches':True,'captured_generator_artifacts_match':True,
               'report_sha256':sha(report),'results_sha256':sha(results),
               'binary_sha256':sha(binary),'browser_review_status':'RECORDED','browser_record_sha256':sha(args.browser_record),
               'actual_screenshot_sha256':screenshots,'oracle_match':True,

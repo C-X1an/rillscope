@@ -97,9 +97,11 @@ def main():
                                                ('second', 'run', 'examples/context-beta.json', query_data),
                                                ('explain', 'explain', 'examples/context.json', query_data)]
     ]
-    (args.out / 'manifest.json').write_text(as_json(manifest), encoding='utf-8')
+    manifest_bytes = as_json(manifest).encode('utf-8')
+    (args.out / 'manifest.json').write_bytes(manifest_bytes)
     print(json.dumps({'implementation': 'rust', 'cases': 3, 'report': str(args.out / 'report.html'),
-                      'report_sha256': digest(report), 'oracle_match': True}))
+                      'report_sha256': digest(report), 'results_sha256':digest(payload),
+                      'manifest_sha256':digest(manifest_bytes), 'oracle_match': True}))
     return 0
 
 if __name__ == '__main__': raise SystemExit(main())
