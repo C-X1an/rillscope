@@ -52,6 +52,7 @@ def main():
     if memory_limit is not None and memory_limit < 12 * 1024**3:
         reasons.append('effective host memory limit leaves insufficient guest headroom')
     result = {'status': 'BLOCKED' if reasons else 'AVAILABLE', 'actual_environment': actual,
+              'process_effective_user_id': os.geteuid() if hasattr(os, 'geteuid') else None,
               'kvm': kvm, 'reasons': reasons, 'reference_qualified': False,
               'scope': 'existing host capability observation only; no guest, allocation, benchmark or reference qualification',
               'provider_limitation': 'GitHub nested VMs are experimental and not officially supported',
