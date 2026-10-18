@@ -20,6 +20,7 @@ jobs:
       - name: Install only guest tools and the pinned Rust toolchain
         timeout-minutes: 20
         run: |
+          mkdir -p .local-runs
           sudo -n python3 scripts/evidence.py --out .local-runs/kvm-system-setup --timeout 300 -- sh -eu -c 'id -u && apt-get update && apt-get install --yes --no-install-recommends qemu-system-x86 qemu-utils cloud-image-utils gpg gpgv e2fsprogs'
           python3 scripts/evidence.py --out .local-runs/kvm-rust-setup --timeout 780 -- make bootstrap
       - name: Check actual privileged helper ownership before boot
@@ -40,7 +41,7 @@ jobs:
       - name: Validate every original retained record, including upstream failures
         if: ${{ always() }}
         timeout-minutes: 25
-        run: sudo -n python3 scripts/evidence.py --out .local-runs/kvm-validation-command --timeout 1440 --input .local-runs/kvm-command/receipt.json -- python3 scripts/verify_kvm_pilot.py --artifact .local-runs/kp/artifact --owner-receipt .local-runs/kvm-command/receipt.json --out .local-runs/kvm-validation
+        run: sudo -n python3 scripts/evidence.py --out .local-runs/kvm-validation-command --timeout 1440 -- python3 scripts/verify_kvm_pilot.py --artifact .local-runs/kp/artifact --owner-receipt .local-runs/kvm-command/receipt.json --out .local-runs/kvm-validation
       - name: Retain original captures, failed packages, proofs and diagnostics
         if: ${{ always() }}
         timeout-minutes: 5

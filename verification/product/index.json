@@ -691,6 +691,18 @@
     "kvm-reference-current": {
       "path": "verification/product/runs/kvm-reference-current.json",
       "sha256": "b4a027b5b3961ed5a0a289f50158f269f2ad090b5ec17f451b13128d27f25999"
+    },
+    "kvm-workflow-before": {
+      "path": "verification/product/runs/kvm-workflow-before.json",
+      "sha256": "d204077add69c839301ca2401ecd6bc3c34fdff7f613203a869ac0adc24749d8"
+    },
+    "kvm-workflow-independent": {
+      "path": "verification/product/runs/kvm-workflow-independent.json",
+      "sha256": "c8917a61bda0b9c4aa81163ee0bc16994451d4d17dab14fed334f6271d111fb8"
+    },
+    "kvm-workflow-reference": {
+      "path": "verification/product/runs/kvm-workflow-reference.json",
+      "sha256": "cbbccedcb1b50fe48cd4d2dd1c68481d13044b9ceefacb52ad01187272e8c41b"
     }
   },
   "release_status": "INCOMPLETE",
