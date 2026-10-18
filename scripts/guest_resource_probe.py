@@ -1,6 +1,7 @@
 """Observe an actual booted guest; this never certifies a reference allocation."""
 import base64
 import json
+import os
 from pathlib import Path
 import platform
 import sys
@@ -11,6 +12,49 @@ sys.path.insert(0,str(ROOT/'benchmarks'))
 from run import environment
 
 PREFIX='RILLSCOPE_GUEST_PROBE_V1 '
+
+
+def kernel_text(path,limit=1024):
+    """Bounded diagnostics preserve missing/truncated states, never invent0."""
+    try:
+        with path.open('rb') as source: data=source.read(limit+1)
+        retained=data[:limit]
+        try: text=retained.decode('utf-8');valid='VALID'
+        except UnicodeDecodeError: text=None;valid='INVALID'
+        return {'path':str(path),'status':'READ' if len(data)<=limit else 'TRUNCATED',
+                'prefix_base64':base64.b64encode(retained).decode('ascii'),
+                'bytes_retained':len(retained),'utf8':valid,'text':text}
+    except OSError as error:
+        return {'path':str(path),'status':'UNAVAILABLE','error':type(error).__name__}
+
+
+def cgroup_diagnostics(root=Path('/sys/fs/cgroup'),membership=Path('/proc/self/cgroup')):
+    result={'scope':'actual bounded diagnostic bytes only; no effective-capacity verdict',
+            'membership':kernel_text(membership),'levels':[]}
+    try:
+        result['affinity']={'status':'MEASURED','cpus':sorted(os.sched_getaffinity(0))}
+    except (OSError,AttributeError) as error:
+        result['affinity']={'status':'NOT MEASURED','error':type(error).__name__}
+    try:
+        if result['membership']['status']!='READ' or result['membership']['utf8']!='VALID':
+            raise ValueError('complete valid UTF8 membership unavailable')
+        lines=result['membership']['text'].splitlines()
+        names=[line[3:] for line in lines if line.startswith('0::')]
+        if len(names)!=1: raise ValueError('one actual unified membership required')
+        parts=Path(names[0].lstrip('/')).parts
+        if '..' in parts or len(parts)>16: raise ValueError('diagnostic cgroup path/depth bound exceeded')
+        base=root.resolve();current=base.joinpath(*parts).resolve()
+        if not current.is_relative_to(base): raise ValueError('diagnostic path escaped hierarchy')
+        while True:
+            result['levels'].append({'path':str(current),'files':{
+                name:kernel_text(current/name) for name in ('cgroup.controllers','cgroup.subtree_control',
+                    'cgroup.type','cpu.max','memory.max','memory.high')}})
+            if current==base: break
+            current=current.parent
+        result['status']='CAPTURED'
+    except (OSError,ValueError) as error:
+        result.update(status='NOT MEASURED',error=type(error).__name__,reason=str(error))
+    return result
 
 
 def kernel_counters(path):
@@ -30,7 +74,8 @@ def kernel_counters(path):
 
 def snapshot(phase):
     clock=time.get_clock_info('monotonic')
-    return {'phase':phase,'environment':environment(),'boot_id':Path('/proc/sys/kernel/random/boot_id').read_text().strip(),
+    actual=environment();actual['inspection_diagnostics']=cgroup_diagnostics()
+    return {'phase':phase,'environment':actual,'boot_id':Path('/proc/sys/kernel/random/boot_id').read_text().strip(),
             'utc_ns':time.time_ns(),'monotonic_ns':time.monotonic_ns(),
             'clock_source':Path('/sys/devices/system/clocksource/clocksource0/current_clocksource').read_text().strip(),
             'clock_properties':{'implementation':clock.implementation,'monotonic':clock.monotonic,

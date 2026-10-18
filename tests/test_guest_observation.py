@@ -13,6 +13,54 @@ import inspect_reference_guest
 
 
 class GuestObservation(unittest.TestCase):
+    def test_invalid_utf8_diagnostics_preserve_distinct_bytes_and_cannot_be_paths(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder);membership=root/'membership';captured=[]
+            for raw in (b'0::/\xff\n',b'0::/\xfe\n'):
+                membership.write_bytes(raw)
+                data=guest_resource_probe.kernel_text(membership)
+                self.assertEqual(data['utf8'],'INVALID')
+                self.assertIsNone(data['text'])
+                self.assertEqual(base64.b64decode(data['prefix_base64']),raw)
+                captured.append(data['prefix_base64'])
+                result=guest_resource_probe.cgroup_diagnostics(root,membership)
+                self.assertEqual(result['status'],'NOT MEASURED')
+                self.assertEqual(result['levels'],[])
+            self.assertNotEqual(*captured)
+
+    def test_cgroup_diagnostics_preserve_missing_controller_interfaces(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder)/'cgroup';leaf=root/'system.slice/service';leaf.mkdir(parents=True)
+            membership=Path(folder)/'membership';membership.write_text('0::/system.slice/service\n')
+            (root/'cgroup.controllers').write_text('cpu memory\n')
+            (root/'cgroup.subtree_control').write_text('memory\n')
+            (leaf/'memory.max').write_bytes(b'max\n')
+            result=guest_resource_probe.cgroup_diagnostics(root,membership)
+            self.assertEqual(result['status'],'CAPTURED')
+            self.assertEqual(len(result['levels']),3)
+            self.assertEqual(result['levels'][0]['files']['cpu.max']['status'],'UNAVAILABLE')
+            self.assertEqual(result['levels'][0]['files']['memory.max']['text'],'max\n')
+            self.assertNotIn('effective_cpu_capacity',result)
+
+    def test_cgroup_diagnostics_reject_escape_and_excessive_depth(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder);membership=root/'membership'
+            for value in ('0::/../../escape\n','0::/'+('/'.join(['level']*17))+'\n','0::/one\n0::/two\n'):
+                membership.write_text(value)
+                result=guest_resource_probe.cgroup_diagnostics(root,membership)
+                self.assertEqual(result['status'],'NOT MEASURED')
+                self.assertEqual(result['levels'],[])
+
+    def test_kernel_diagnostic_bytes_are_bounded_and_explicitly_truncated(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path=Path(folder)/'kernel';path.write_bytes(b'abcde')
+            result=guest_resource_probe.kernel_text(path,4)
+            self.assertEqual((result['status'],result['text']),('TRUNCATED','abcd'))
+            path.unlink()
+            result=guest_resource_probe.kernel_text(path,4)
+            self.assertEqual(result['status'],'UNAVAILABLE')
+            self.assertNotIn('text',result)
+
     def test_streamed_external_identity_keeps_every_byte_and_enforces_bound(self):
         with tempfile.TemporaryDirectory() as folder:
             path=Path(folder)/'image'
