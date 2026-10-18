@@ -703,6 +703,18 @@
     "kvm-workflow-reference": {
       "path": "verification/product/runs/kvm-workflow-reference.json",
       "sha256": "cbbccedcb1b50fe48cd4d2dd1c68481d13044b9ceefacb52ad01187272e8c41b"
+    },
+    "kvm-work-disk-before": {
+      "path": "verification/product/runs/kvm-work-disk-before.json",
+      "sha256": "07d8f4947ab9a09334d5f5597418fb89e3be66ed506945fd252c32aeaadea17a"
+    },
+    "kvm-work-disk-independent": {
+      "path": "verification/product/runs/kvm-work-disk-independent.json",
+      "sha256": "c88be43a409124533ec1f536caaa0b258b045da0ab351a82e1c079b262215aa6"
+    },
+    "kvm-work-disk-reference": {
+      "path": "verification/product/runs/kvm-work-disk-reference.json",
+      "sha256": "38cacc26af44041a5b29615d36d3436c8ac52e9fd14d684fd52e3525423d0bcb"
     }
   },
   "release_status": "INCOMPLETE",

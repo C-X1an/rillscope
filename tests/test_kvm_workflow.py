@@ -12,6 +12,18 @@ WORKFLOW = ROOT / '.github/workflows/kvm-feasibility-pilot.yml'
 
 
 class PilotWorkflow(unittest.TestCase):
+    def test_work_disk_serial_belongs_to_device_not_raw_backend(self):
+        sys.path.insert(0, str(ROOT / 'scripts'))
+        from kvm_benchmark_pilot import BOOTSTRAP, qemu_command
+        command = qemu_command(Path('/owned'), Path('/owned/image.qcow2'), 'runner', 12345)
+        drives = [command[index + 1] for index, value in enumerate(command) if value == '-drive']
+        work = [value for value in drives if 'work.raw,' in value]
+        self.assertEqual(len(work), 1)
+        self.assertEqual(work[0].split(',')[1:], ['if=none', 'format=raw', 'id=rillwork-disk'])
+        devices = [command[index + 1] for index, value in enumerate(command) if value == '-device']
+        self.assertIn('virtio-blk-pci,drive=rillwork-disk,serial=rillwork', devices)
+        self.assertIn('/dev/disk/by-id/virtio-rillwork', BOOTSTRAP)
+
     def test_runner_creates_parent_before_first_root_capture(self):
         source = WORKFLOW.read_text(encoding='utf-8')
         self.assertIn('mkdir -p .local-runs', source, 'runner must own the shared capture parent before sudo')

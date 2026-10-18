@@ -303,7 +303,8 @@ def qemu_command(out, image, run_as, port):
         '-device', 'virtserialport,chardev=capture,name=' + PORT_NAME,
         '-qmp', 'tcp:127.0.0.1:' + str(port) + ',server=on,wait=off',
         '-drive', 'file=' + str(out / 'disk.qcow2') + ',if=virtio,format=qcow2',
-        '-drive', 'file=' + str(out / 'work.raw') + ',if=virtio,format=raw,serial=rillwork',
+        '-drive', 'file=' + str(out / 'work.raw') + ',if=none,format=raw,id=rillwork-disk',
+        '-device', 'virtio-blk-pci,drive=rillwork-disk,serial=rillwork',
         '-drive', 'file=' + str(out / 'seed.iso') + ',media=cdrom,format=raw,readonly=on']
 
 
