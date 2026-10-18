@@ -50,7 +50,7 @@ def retain(out):
     if out.exists(): raise ValueError('release retention output must be new')
     out.mkdir(parents=True)
     result={'status':'RUNNING','metadata':[],'captures':[],'metadata_bytes':0,
-        'scope':'fixed actual release metadata and available reference/NULL-sort/publication raw bytes; incomplete and failed attempts remain incomplete/failed; no validation or reference qualification'}
+        'scope':'fixed actual release metadata and available reference/NULL-sort/publication/harness-failure raw bytes; incomplete and failed attempts remain incomplete/failed; no validation or reference qualification'}
     def persist(): write_json(out/'retention.json',result)
     persist()
     clean=bounded((ROOT/'.local-runs').glob('clean-*'),2)
@@ -67,6 +67,9 @@ def retain(out):
         path=owned_path(ROOT,path)
         if path.exists(): candidates.append(path)
         if len(candidates)>MAX_METADATA_FILES: raise ValueError('metadata file count exceeds bound')
+    def include_build(path):
+        for name in ('build.json','cargo.stdout','cargo.stderr','compiler.stdout','compiler.stderr'):
+            include(path/name)
     for name in ('release-system-setup','release-setup','release-command'):
         for file in ('receipt.json','stdout.txt','stderr.txt'): include(ROOT/'.local-runs'/name/file)
     for attempt in clean:
@@ -75,16 +78,21 @@ def retain(out):
             for command in bounded((attempt/prefix).glob('*'),64):
                 for file in ('receipt.json','stdout.txt','stderr.txt'): include(command/file)
     stages=[]
-    def publication_raw(path):
+    def raw_capture(path,kind):
         source=owned_path(ROOT,path)
         if not source.exists(): return
-        if not source.is_dir(): raise ValueError('publication capture must be an owned directory')
+        if not source.is_dir(): raise ValueError('raw capture must be an owned directory')
         if len(stages)>=MAX_CAPTURES: raise ValueError('release capture count exceeds bound')
-        row={'source':source.relative_to(ROOT).as_posix(),'kind':'publication-transport',
+        row={'source':source.relative_to(ROOT).as_posix(),'kind':kind,
             'package':'capture-'+str(len(stages)),'result':{'status':'PENDING'}}
         stages.append((source,None,row));result['captures'].append(row)
+    def publication_raw(path): raw_capture(path,'publication-transport')
     for root in roots:
         local=root/'.local-runs'
+        for failure in bounded(local.glob('pf-*'),16): raw_capture(failure,'benchmark-harness-failure')
+        # Keep every original functional build association, including failures.
+        # Binaries, targets and unrelated checkout files remain outside this list.
+        for build in bounded((local/'build').glob('dev-*'),64): include_build(build)
         for ledger in bounded(local.glob('verify*/ledger.json'),4):
             include(ledger)
             for command in bounded((ledger.parent/'commands').glob('*'),32):
@@ -93,6 +101,8 @@ def retain(out):
         for experiment in experiments:
             experiment=owned_path(ROOT,experiment)
             if not experiment.is_dir(): raise ValueError('experiment must be an owned directory')
+            # A build can fail before creating grid/build's redundant copy.
+            include_build(experiment/'build')
             for file in ('reference-preflight.json','reference-results.json','retention-grid.json','retention-cancel.json'):
                 include(experiment/file)
             for stage in ('grid','cancel'):
@@ -114,8 +124,7 @@ def retain(out):
             for label in ('baseline','mutant','restored'):
                 publication_raw(control/'checkout/.local-runs'/label)
             for build in bounded((control/'checkout/.local-runs/build').glob('*'),16):
-                for name in ('build.json','cargo.stdout','cargo.stderr','compiler.stdout','compiler.stderr'):
-                    include(build/name)
+                include_build(build)
     # Secure small immutable command/progress bytes before any large operation.
     for path in sorted(set(candidates)):
         if not path.is_file() or path.stat().st_size>MAX_METADATA_FILE:

@@ -14,6 +14,7 @@ from workloads import SEEDS, descriptors, sort_null_descriptors, query, context,
 from envelopes import terminal
 from evidence import source_identity
 from process_metrics import process_problems
+from capture_paths import case_folders
 
 
 def sample_problems(row, value, measurement, description, spec, hashes, stdout):
@@ -64,6 +65,7 @@ def sample_problems(row, value, measurement, description, spec, hashes, stdout):
 def verify(directory, require_current_product=False):
     errors = []
     manifest = json.loads((directory / 'manifest.json').read_bytes())
+    folders=case_folders(manifest)
     results = json.loads((directory / 'results.json').read_bytes())
     rows = [json.loads(line) for line in (directory / 'samples.jsonl').read_text(encoding='utf-8').splitlines()]
     version = manifest.get('schema_version', 1)
@@ -131,7 +133,7 @@ def verify(directory, require_current_product=False):
         validation_description = next((row for row in descriptors() if row['id'] == description['id']), description) if manifest['profile'] == 'full' else description
         for seed in manifest['seeds']:
             case_rows = by_case[(description['id'], seed)]
-            case = directory / (description['id'] + '-seed' + str(seed))
+            case = directory / folders[description['id'],seed]
             counts = Counter((row['phase'], row['repetition'], row['mode']) for row in case_rows)
             expected = {(phase, number, mode) for phase, count in (('warmup', WARMUPS), ('measured', REPETITIONS)) for number in range(count) for mode in MODES}
             if set(counts) != expected or any(count != 1 for count in counts.values()):

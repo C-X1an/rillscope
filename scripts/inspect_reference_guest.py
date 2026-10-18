@@ -38,7 +38,7 @@ IMAGE_LIMIT=800*1024**2
 SERIAL_LIMIT=4*1024**2
 GUEST_FILES=('scripts/guest_resource_probe.py','scripts/evidence.py','scripts/owned_process.py',
              'benchmarks/run.py','benchmarks/build.py','benchmarks/workloads.py',
-             'benchmarks/process_metrics.py','benchmarks/envelopes.py')
+             'benchmarks/process_metrics.py','benchmarks/envelopes.py','benchmarks/capture_paths.py')
 
 
 def require(condition,message):

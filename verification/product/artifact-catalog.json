@@ -398,5 +398,29 @@
   "recipe-claims-current-audit": {
     "path": "verification/product/runs/recipe-claims-current-audit.json",
     "sha256": "d5e104e5a57f2cf6c55f0114386d1d33b2591a438b4b915f337eb1041fac0b17"
+  },
+  "capture-wording-current": {
+    "path": "verification/product/runs/capture-wording-current.json",
+    "sha256": "3c3a4c4797d2ede8eaafc03c3acd82daa2ede7d45c73cf824ca70c7d6093831b"
+  },
+  "capture-source-controls": {
+    "path": "verification/product/runs/capture-source-controls.json",
+    "sha256": "0fdb6c3cfa75f3eec42c5152ba93d0536fbc27c9be7b5d2d2eea9d2e818ca228"
+  },
+  "capture-retention-controls": {
+    "path": "verification/product/runs/capture-retention-controls.json",
+    "sha256": "d9314925fe966a36023eea549683830e5f78820b08e24cbb7e1b2340bc917f67"
+  },
+  "capture-reference-stale-wording": {
+    "path": "verification/product/runs/capture-reference-stale-wording.json",
+    "sha256": "a9993aa5bbc29f56ad104b6b38e10b2994d3726ecaaa699a93c6766e0e4ce76d"
+  },
+  "capture-claims-current-audit": {
+    "path": "verification/product/runs/capture-claims-current-audit.json",
+    "sha256": "d26dc3038982e70d3e784623c353a296bca9d28792f848d60a6dd9af720a65ab"
+  },
+  "capture-reference-current": {
+    "path": "verification/product/runs/capture-reference-current.json",
+    "sha256": "7895b71368b8e7f30d428dfce872fd934bf68499975274c96704ad7c3880d180"
   }
 }

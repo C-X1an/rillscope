@@ -1,13 +1,56 @@
 """Measure only an owned child process; CPU/RSS boundaries cover its entire lifetime."""
 import ctypes
+import hashlib
 import json
 import os
 from pathlib import Path
 import subprocess
+import sys
+import tempfile
 import time
+from capture_paths import preflight_prefix
 
 ENVIRONMENT_KEYS = ('SYSTEMROOT', 'SystemRoot', 'WINDIR', 'TEMP', 'TMP',
                     'SystemDrive', 'SYSTEMDRIVE', 'ProgramData', 'PROGRAMDATA')
+
+
+class CaptureArtifactError(OSError):
+    def __init__(self,reason,failure_directory):
+        self.failure_directory=failure_directory
+        super().__init__('benchmark artifact capture failed: '+reason+'; failure_directory='+str(failure_directory))
+
+
+def capture_failure(command,cwd,prefix,captured,stdout,stderr,error):
+    """Preserve an actual failed attempt away from its failing long/raw path."""
+    record={'status':'FAIL','kind':'benchmark-harness-failure','reference_qualified':False,
+        'command':[os.fsdecode(value) for value in command],'requested_prefix':str(prefix),
+        'process':captured,'reason':type(error).__name__+': '+str(error),
+        'scope':'actual harness attempt and retained child bytes; no replacement sample or measurement success'}
+    for name,data in (('stdout',stdout),('stderr',stderr)):
+        record[name]={'bytes':len(data),'sha256':hashlib.sha256(data).hexdigest()}
+    destination=None
+    try:
+        if max(len(stdout),len(stderr))>16*1024**2: raise OSError('failure raw stream exceeds16MiB retention bound')
+        body=json.dumps(record,separators=(',',':'))+'\n'
+        if len(body.encode('utf-8'))>65536: raise OSError('failure metadata exceeds64KiB retention bound')
+        local=Path(cwd).resolve()/'.local-runs'
+        if local.is_symlink() or (hasattr(local,'is_junction') and local.is_junction()):
+            raise OSError('failure location cannot traverse a link')
+        local.mkdir(exist_ok=True)
+        out=Path(tempfile.mkdtemp(prefix='pf-',dir=local))
+        if (out/'stdout').write_bytes(stdout)!=len(stdout) or (out/'stderr').write_bytes(stderr)!=len(stderr):
+            raise OSError('short failure raw write')
+        if (out/'process.json').write_text(body,encoding='utf-8')!=len(body): raise OSError('short failure metadata write')
+        destination=out
+    except (OSError,ValueError) as fallback:
+        # If storage itself is unavailable, the enclosing evidence owner keeps
+        # this bounded diagnostic. Never say missing raw bytes were retained.
+        summary={key:record[key] for key in ('status','kind','stdout','stderr','reference_qualified','process')}
+        detail=type(fallback).__name__+': '+str(fallback)
+        summary['fallback_error']=detail[:1024]
+        summary['fallback_error_truncated']=len(detail)>1024
+        print(json.dumps(summary,separators=(',',':')),file=sys.stderr,flush=True)
+    raise CaptureArtifactError(record['reason'],destination) from error
 
 def windows_usage(process):
     from ctypes import wintypes
@@ -63,6 +106,11 @@ def measured_child(command, *, cwd, prefix: Path, timeout=120):
     usage = {'cpu_user_ns': None, 'cpu_system_ns': None, 'peak_rss_bytes': None,
              'cpu_rss_status': 'NOT MEASURED', 'cpu_rss_instrument': 'unavailable'}
     outcome = 'NOT STARTED'; problem = None
+    try: preflight_prefix(prefix)
+    except (OSError,ValueError) as error:
+        capture_failure(command,cwd,prefix,{'exit_code':None,'pid':None,'wall_ns':None,
+            'timed_out':False,'process_outcome':outcome,'instrument_problem':'path preflight: '+type(error).__name__,
+            **usage},b'',b'',error)
     try:
         prefix.parent.mkdir(parents=True, exist_ok=True)
         clock = time.perf_counter_ns()
@@ -107,13 +155,16 @@ def measured_child(command, *, cwd, prefix: Path, timeout=120):
             process.kill(); stdout, stderr = process.communicate()
         if outcome == 'EXECUTED': outcome = 'INSTRUMENT FAILED'
     if elapsed is None: elapsed = time.perf_counter_ns() - clock
-    try:
-        prefix.with_suffix('.stdout').write_bytes(stdout)
-        prefix.with_suffix('.stderr').write_bytes(stderr)
-    except OSError as error:
-        problem = 'artifact write: ' + type(error).__name__; outcome = 'ARTIFACT WRITE FAILED'
     captured = {'exit_code': None if process is None else process.returncode,
             'pid': None if process is None else process.pid, 'wall_ns': elapsed, 'timed_out': timed_out,
             'process_outcome': outcome, 'instrument_problem': problem, **usage}
-    prefix.with_suffix('.process.json').write_text(json.dumps(captured, separators=(',', ':')), encoding='utf-8')
+    try:
+        if prefix.with_suffix('.stdout').write_bytes(stdout)!=len(stdout) or prefix.with_suffix('.stderr').write_bytes(stderr)!=len(stderr):
+            raise OSError('short process raw write')
+        body=json.dumps(captured,separators=(',',':'))
+        if prefix.with_suffix('.process.json').write_text(body,encoding='utf-8')!=len(body): raise OSError('short process metadata write')
+    except OSError as error:
+        captured['child_outcome_before_artifact_failure']=captured['process_outcome']
+        captured.update(process_outcome='ARTIFACT WRITE FAILED',instrument_problem='artifact write: '+type(error).__name__)
+        capture_failure(command,cwd,prefix,captured,stdout,stderr,error)
     return captured, stdout, stderr

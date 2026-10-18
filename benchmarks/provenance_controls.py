@@ -18,6 +18,7 @@ def main():
     sys.path[:0] = [str(checker / 'benchmarks'),str(checker / 'scripts')]
     from verify import verify
     from run import sha, summarize_case
+    from capture_paths import case_folders
     original_source_sha = sha(source / 'samples.jsonl')
     shutil.copytree(source,out)
     manifest_path = out / 'manifest.json'; result_path = out / 'results.json'
@@ -48,7 +49,7 @@ def main():
         mutant = verify(out,require_current_product=True); restore(); after = verify(out,require_current_product=True)
         checks.append({'field':field,'sequence':[baseline['status'],mutant['status'],after['status']], 'errors':mutant['errors']})
     save(out / 'samples.jsonl'); save(result_path)
-    case = out / (first['workload']['id'] + '-seed' + str(first['seed']))
+    case = out / case_folders(manifest)[first['workload']['id'],first['seed']]
     summary_path = case / 'summary.json'; save(summary_path)
     rows = [json.loads(line) for line in (out / 'samples.jsonl').read_text().splitlines()]
     for row in rows:

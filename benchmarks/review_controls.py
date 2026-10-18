@@ -19,6 +19,7 @@ def main():
     sys.path[:0] = [str(checker / 'benchmarks'),str(checker / 'scripts')]
     from verify import verify
     from run import sha
+    from capture_paths import case_folders
     if args.out.exists(): raise ValueError('preserve earlier control artifacts; output must be new')
     source_identity = sha(args.source / 'samples.jsonl')
     shutil.copytree(args.source, args.out)
@@ -44,7 +45,8 @@ def main():
     original_results = result_path.read_bytes()
     results = json.loads(original_results)
     first = results['summaries'][0]
-    case_path = args.out / (first['workload']['id'] + '-seed' + str(first['seed'])) / 'summary.json'
+    manifest=json.loads((args.out/'manifest.json').read_bytes())
+    case_path = args.out / case_folders(manifest)[first['workload']['id'],first['seed']] / 'summary.json'
     original_case = case_path.read_bytes()
     changed = copy.deepcopy(first)
     changed['workload']['id'] = 'incorrect-workload-label'

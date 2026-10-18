@@ -27,6 +27,7 @@ from process_metrics import measured_child
 from workloads import SEEDS, descriptors, sort_null_descriptors, write_case
 from envelopes import terminal
 from build import verify_build
+from capture_paths import CASE_LAYOUT,case_folders,preflight_prefix
 
 WARMUPS, REPETITIONS = 5, 30
 MODES = ('rust-on', 'rust-off', 'sqlite')
@@ -366,7 +367,8 @@ def main():
                   chosen[-1]]
         chosen = [dict(row, expected_product_status='E_BUDGET' if row['family'] == 'budget' else 'OK') for row in chosen]
         seeds = SEEDS[:1]
-    manifest = {'schema_version': 3, 'profile': args.profile, 'started_utc': dt.datetime.now(dt.timezone.utc).isoformat(),
+    manifest = {'schema_version': 3, 'profile': args.profile, 'case_directory_layout':CASE_LAYOUT,
+                'started_utc': dt.datetime.now(dt.timezone.utc).isoformat(),
                 'source': identity, 'commit': commit, 'dirty': dirty, 'binary_sha256': binary_hash,
                 'cargo_lock_sha256': sha(ROOT / 'Cargo.lock'), 'compiler': compiler, 'build_profile': 'release',
                 'build_receipt_sha256': build_hash, 'build': build,
@@ -381,12 +383,18 @@ def main():
                                             {'experiment': 'AC-022 reference target', 'status': 'NOT EVALUATED HERE', 'reason': 'separate dedicated reference Linux host preflight and target report required'},
                                             {'experiment': 'AC-023 cancellation reference target', 'status': 'NOT EVALUATED HERE', 'reason': 'separate actual Linux cancellation campaign and reference-host report required'}]}
     (args.out / 'manifest.json').write_text(json.dumps(manifest, indent=2) + '\n', encoding='utf-8')
+    folders=case_folders(manifest)
+    # Check the longest declared filename for each mode before any measured
+    # child, including the batch rejection control, can start.
+    for folder in folders.values():
+        for mode in MODES: preflight_prefix(args.out/folder/'raw'/f'measured-{REPETITIONS-1:02d}-{mode}')
+    preflight_prefix(args.out/'batch-4096-control/actual')
     batch_control = batch_rejection(binary, args.out)
     summaries = []
     with (args.out / 'samples.jsonl').open('x', encoding='utf-8', newline='\n') as stream, (args.out / 'pair-verdicts.jsonl').open('x', encoding='utf-8', newline='\n') as pairing_stream:
         for description in chosen:
             for seed in seeds:
-                case = args.out / (description['id'] + '-seed' + str(seed))
+                case = args.out / folders[description['id'],seed]
                 summary = execute_case(binary, description, seed, case, stream, pairing_stream)
                 summaries.append(summary)
                 print(encode({'completed_cases': len(summaries), 'expected_cases': manifest['expected_cases'],
