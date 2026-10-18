@@ -115,6 +115,13 @@ def verify(directory, require_current_product=False):
     if manifest['profile'] == 'sort-null-supplement':
         if manifest['chosen_workloads'] != sort_null_descriptors() or manifest['seeds'] != list(SEEDS):
             errors.append('complete declared NULL-sort supplement changed')
+    if manifest['profile'] == 'kvm-cost-tail-pilot':
+        from feasibility_profile import header_errors
+        fixed_errors = header_errors(manifest, results)
+        if fixed_errors:
+            return {'profile': manifest['profile'], 'status': 'FAIL', 'errors': errors + fixed_errors,
+                    'observations_checked': 0, 'cases_checked': 0,
+                    'scope': 'independent fixed cost-tail header rejected before case reconstruction; no reference qualification'}
     if len(rows) != manifest['expected_observations']: errors.append('missing or extra observations')
     if not results['source_binary_inputs_stable']: errors.append('source/binary/input identity was not stable during execution')
     by_case = defaultdict(list)
@@ -131,6 +138,9 @@ def verify(directory, require_current_product=False):
     sort_conditions = []
     for description in manifest['chosen_workloads']:
         validation_description = next((row for row in descriptors() if row['id'] == description['id']), description) if manifest['profile'] == 'full' else description
+        if manifest['profile'] == 'kvm-cost-tail-pilot':
+            from feasibility_profile import expectations
+            validation_description = next(row for row in expectations() if row['id'] == description['id'])
         for seed in manifest['seeds']:
             case_rows = by_case[(description['id'], seed)]
             case = directory / folders[description['id'],seed]

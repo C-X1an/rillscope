@@ -336,7 +336,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--out', type=Path, required=True)
     parser.add_argument('--binary', type=Path, default=ROOT / 'target/release' / ('rillscope-measure.exe' if os.name == 'nt' else 'rillscope-measure'))
-    parser.add_argument('--profile', choices=('full', 'instrumentation-pilot','sort-null-supplement'), default='full')
+    parser.add_argument('--profile', choices=('full', 'instrumentation-pilot','sort-null-supplement','kvm-cost-tail-pilot'), default='full')
     parser.add_argument('--build-receipt', type=Path, required=True)
     args = parser.parse_args()
     binary = args.binary.resolve()
@@ -357,6 +357,10 @@ def main():
     chosen = descriptors()
     seeds = SEEDS
     if args.profile == 'sort-null-supplement': chosen = sort_null_descriptors()
+    if args.profile == 'kvm-cost-tail-pilot':
+        from feasibility_profile import IDS
+        chosen = [next(row for row in chosen if row['id'] == name) for name in IDS]
+        seeds = SEEDS[:1]
     if args.profile == 'instrumentation-pilot':
         # Predetermined instrument verification, not a reduced full-grid claim.
         chosen = [dict(chosen[0], id='pilot-filter-empty'),

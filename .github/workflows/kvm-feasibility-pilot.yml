@@ -1,0 +1,73 @@
+name: Unqualified KVM feasibility pilot (three separate campaigns)
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: kvm-feasibility-${{ github.run_id }}
+  cancel-in-progress: false
+jobs:
+  pilot:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 200
+    # 2+20+2+15+112+12+25+5=193min, plus7min job finalization.
+    # The VM's finite campaign budgets may yield partial FAIL; no resampling.
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        timeout-minutes: 2
+        with:
+          persist-credentials: false
+      - name: Install only guest tools and the pinned Rust toolchain
+        timeout-minutes: 20
+        run: |
+          sudo -n python3 scripts/evidence.py --out .local-runs/kvm-system-setup --timeout 300 -- sh -eu -c 'id -u && apt-get update && apt-get install --yes --no-install-recommends qemu-system-x86 qemu-utils cloud-image-utils gpg gpgv e2fsprogs'
+          python3 scripts/evidence.py --out .local-runs/kvm-rust-setup --timeout 780 -- make bootstrap
+      - name: Check actual privileged helper ownership before boot
+        timeout-minutes: 2
+        run: sudo -n python3 scripts/evidence.py --out .local-runs/kvm-lifecycle-command --timeout 45 -- python3 scripts/guest_trial_controls.py --out .local-runs/kvm-lifecycle
+      - name: Build genuine source-bound release binaries once
+        timeout-minutes: 15
+        run: python3 scripts/evidence.py --out .local-runs/kvm-build-command --timeout 840 -- python3 benchmarks/build.py --out .local-runs/kvm-build
+      - name: Collect separate instrument, cost-tail and cancellation campaigns
+        timeout-minutes: 112
+        # Capture/lifecycle have the same existing root identity; QEMU drops UID.
+        # 6600s includes setup, VM, recovery, cleanup and reserve within112min.
+        run: sudo -n python3 scripts/evidence.py --out .local-runs/kvm-command --timeout 6600 -- python3 scripts/kvm_benchmark_pilot.py --out .local-runs/kp --run-as "$(id -un)" --build-receipt .local-runs/kvm-build/build.json --commit "$GITHUB_SHA"
+      - name: Preserve partial bytes after the original owned command has stopped
+        if: ${{ always() }}
+        timeout-minutes: 12
+        run: sudo -n python3 scripts/evidence.py --out .local-runs/kvm-recovery-command --timeout 660 -- python3 scripts/recover_kvm_pilot.py --out .local-runs/kp --owner-receipt .local-runs/kvm-command/receipt.json
+      - name: Validate every original retained record, including upstream failures
+        if: ${{ always() }}
+        timeout-minutes: 25
+        run: sudo -n python3 scripts/evidence.py --out .local-runs/kvm-validation-command --timeout 1440 --input .local-runs/kvm-command/receipt.json -- python3 scripts/verify_kvm_pilot.py --artifact .local-runs/kp/artifact --owner-receipt .local-runs/kvm-command/receipt.json --out .local-runs/kvm-validation
+      - name: Retain original captures, failed packages, proofs and diagnostics
+        if: ${{ always() }}
+        timeout-minutes: 5
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: actual-unqualified-kvm-pilot
+          retention-days: 7
+          compression-level: 0
+          include-hidden-files: true
+          if-no-files-found: error
+          path: |
+            .local-runs/kvm-system-setup/
+            .local-runs/kvm-rust-setup/
+            .local-runs/kvm-lifecycle-command/
+            .local-runs/kvm-lifecycle/
+            .local-runs/kvm-build-command/
+            .local-runs/kvm-build/build.json
+            .local-runs/kvm-build/cargo.stdout
+            .local-runs/kvm-build/cargo.stderr
+            .local-runs/kvm-build/compiler.stdout
+            .local-runs/kvm-build/compiler.stderr
+            .local-runs/kvm-command/
+            .local-runs/kvm-recovery-command/
+            .local-runs/kvm-validation-command/
+            .local-runs/kvm-validation/
+            .local-runs/kp/artifact/
+            .local-runs/kp/commands/
+            .local-runs/kp/SHA256SUMS
+            .local-runs/kp/SHA256SUMS.gpg
+            .local-runs/kp/ubuntu-cloud-image.asc

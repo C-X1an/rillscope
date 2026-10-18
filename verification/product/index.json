@@ -193,9 +193,9 @@
     "AC-027": {
       "status": "PASS",
       "runs": [
-        "capture-claims-current-audit"
+        "kvm-claims-current-audit"
       ],
-      "scope": "Current public claim/link/digest/source audit PASS; required benchmark/reference/fresh release remains incomplete"
+      "scope": "Actual current public claim/link/digest/source audit PASS; benchmark/reference/fresh release criteria remain incomplete"
     },
     "AC-028": {
       "status": "PASS",
@@ -218,9 +218,9 @@
       "status": "PASS",
       "runs": [
         "current-notice-components",
-        "capture-wording-current"
+        "kvm-wording-current"
       ],
-      "scope": "Current45path wording map and BENCHMARKS delta independently inspected with prior reviews; preserved license/notices proof; no repeated unchanged-image inspection or release certification"
+      "scope": "Current45path map and new KVM tooling wording independently inspected; unchanged images not reinspected; existing notice/license proof preserved; no VM or release qualification"
     }
   },
   "artifacts": {
@@ -667,6 +667,30 @@
     "envelope-fixture-independent": {
       "path": "verification/product/runs/envelope-fixture-independent.json",
       "sha256": "30bc1cf2ba30dc4f7f047f3fc808c9a6ec3b4095373a0d4e86403cf9afe979aa"
+    },
+    "kvm-wording-current": {
+      "path": "verification/product/runs/kvm-wording-current.json",
+      "sha256": "6e1f47d297564c99c5b65150af95a7b5fafabc6b0c42da44734fb9ab52bc9e3a"
+    },
+    "kvm-channel-independent": {
+      "path": "verification/product/runs/kvm-channel-independent.json",
+      "sha256": "8ffff91a29ca02fb79655164aea4414e3a94c698c73670e4bdf331a752deea8f"
+    },
+    "kvm-host-owner-independent": {
+      "path": "verification/product/runs/kvm-host-owner-independent.json",
+      "sha256": "e3b62a68501fc15dc2e0687fb9a5807140c627ed9b37e387b6342f6d835465d6"
+    },
+    "kvm-malformed-cas-control": {
+      "path": "verification/product/runs/kvm-malformed-cas-control.json",
+      "sha256": "b912bbfcb983c22ec2b63f42abe6ccad8f99900376bb058f60d6b741ea135472"
+    },
+    "kvm-claims-current-audit": {
+      "path": "verification/product/runs/kvm-claims-current-audit.json",
+      "sha256": "9066b988df486f23b9bea617b36bdd6b93f7f11fa4fe7e0a73fc37ff6c01bf7f"
+    },
+    "kvm-reference-current": {
+      "path": "verification/product/runs/kvm-reference-current.json",
+      "sha256": "b4a027b5b3961ed5a0a289f50158f269f2ad090b5ec17f451b13128d27f25999"
     }
   },
   "release_status": "INCOMPLETE",
