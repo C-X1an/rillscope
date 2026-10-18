@@ -647,6 +647,26 @@
     "capture-reference-current": {
       "path": "verification/product/runs/capture-reference-current.json",
       "sha256": "7895b71368b8e7f30d428dfce872fd934bf68499975274c96704ad7c3880d180"
+    },
+    "windows-null-capture-current": {
+      "path": "verification/product/runs/windows-null-capture-current.json",
+      "sha256": "81e63ca5e5e24d5cd41100ac897de1a65764123d2855edd4a91cbf7685fd0cb5"
+    },
+    "envelope-fixture-restored": {
+      "path": "verification/product/runs/envelope-fixture-restored.json",
+      "sha256": "a3a8ed0fb78a83761008ba0dcdaf464c14d066a5369d14fb7951426ab10345f6"
+    },
+    "envelope-fixture-character-mutant": {
+      "path": "verification/product/runs/envelope-fixture-character-mutant.json",
+      "sha256": "629f14c69b9fed5b510900c137a98a83b68d810f5de4291b8a539a92c224133e"
+    },
+    "envelope-fixture-reference": {
+      "path": "verification/product/runs/envelope-fixture-reference.json",
+      "sha256": "2ed5143322c92367c6c3a547f8da068efb0343230a2498d9ea3983c6e6cea98b"
+    },
+    "envelope-fixture-independent": {
+      "path": "verification/product/runs/envelope-fixture-independent.json",
+      "sha256": "30bc1cf2ba30dc4f7f047f3fc808c9a6ec3b4095373a0d4e86403cf9afe979aa"
     }
   },
   "release_status": "INCOMPLETE",

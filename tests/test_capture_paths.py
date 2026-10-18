@@ -19,6 +19,19 @@ import process_metrics
 
 
 class CapturePaths(unittest.TestCase):
+    def windows_prefix(self, root, units, *, non_bmp=False):
+        # Construct the full independent filename boundary on either OS. A
+        # fixed padding length depends on the actual temporary-directory path.
+        parent=root.resolve()/'envelope'
+        base_units=len(str(parent).encode('utf-16-le'))//2+1
+        padding=units-base_units-len('.measurement.json')-(2 if non_bmp else 0)
+        self.assertGreater(padding,0,'fixture parent must leave room for padding')
+        prefix=parent/(('\U0001f600' if non_bmp else '')+'p'*padding)
+        actual=str(prefix.with_suffix('.measurement.json').absolute())
+        self.assertEqual(len(actual.encode('utf-16-le'))//2,units)
+        if non_bmp: self.assertEqual(len(actual),units-1)
+        return prefix
+
     def test_all_410_logical_cases_remain_unique_and_short(self):
         manifest={'chosen_workloads':descriptors(),'seeds':list(SEEDS),'case_directory_layout':CASE_LAYOUT}
         mapped=case_folders(manifest)
@@ -54,8 +67,15 @@ class CapturePaths(unittest.TestCase):
 
     def test_complete_windows_filename_envelope_is_checked(self):
         with tempfile.TemporaryDirectory() as folder:
-            root=Path(folder).resolve();prefix=root/('p'*200)
-            with self.assertRaisesRegex(OSError,'Windows envelope'): preflight_prefix(prefix,windows=True)
+            root=Path(folder).resolve()
+            for non_bmp in (False,True):
+                with self.subTest(non_bmp=non_bmp):
+                    accepted=self.windows_prefix(root,259,non_bmp=non_bmp)
+                    self.assertEqual(max(len(str(path).encode('utf-16-le'))//2
+                        for path in preflight_prefix(accepted,windows=True)),259)
+                    rejected=self.windows_prefix(root,260,non_bmp=non_bmp)
+                    with self.assertRaisesRegex(OSError,'Windows envelope'):
+                        preflight_prefix(rejected,windows=True)
             paths=preflight_prefix(root/'short',windows=True)
             self.assertEqual({path.suffix for path in paths},{'.stdout','.stderr','.json'})
             self.assertTrue(any(path.name=='short.measurement.json' for path in paths))
@@ -66,9 +86,12 @@ class CapturePaths(unittest.TestCase):
             command=[sys.executable,'-c',"from pathlib import Path;Path("+repr(str(marker))+").write_bytes(b'ran')"]
             # Exercise the Windows envelope on every CI host; the process itself
             # must never launch. On Windows this is also the native path check.
-            with patch.object(process_metrics,'preflight_prefix',side_effect=lambda prefix:preflight_prefix(prefix,windows=True),create=True):
+            prefix=self.windows_prefix(root,260)
+            with patch.object(process_metrics,'preflight_prefix',side_effect=lambda prefix:preflight_prefix(prefix,windows=True),create=True), \
+                    patch.object(process_metrics.subprocess,'Popen') as launch:
                 with self.assertRaises(OSError) as error:
-                    process_metrics.measured_child(command,cwd=root,prefix=root/('p'*200),timeout=5)
+                    process_metrics.measured_child(command,cwd=root,prefix=prefix,timeout=5)
+            launch.assert_not_called()
             self.assertFalse(marker.exists(),'path preflight must precede child creation')
             saved=json.loads((error.exception.failure_directory/'process.json').read_bytes())
             self.assertIsNone(saved['process']['pid'])
