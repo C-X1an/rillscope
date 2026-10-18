@@ -1,0 +1,58 @@
+name: Actual KVM guest resource inspection (not reference qualification)
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: reference-guest-inspection-${{ github.run_id }}
+  cancel-in-progress: false
+jobs:
+  inspect-guest:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 27
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        timeout-minutes: 2
+        with:
+          persist-credentials: false
+      - name: Install official Ubuntu guest tools using existing runner privilege
+        timeout-minutes: 5
+        run: |
+          sudo -n apt-get update
+          sudo -n apt-get install --yes --no-install-recommends qemu-system-x86 qemu-utils cloud-image-utils gpg gpgv
+      - name: Check actual privileged helper cleanup before boot
+        timeout-minutes: 2
+        # Capture and cleanup share the command's already authorized identity.
+        run: /usr/bin/sudo -n -u root /usr/bin/python3 scripts/evidence.py --out .local-runs/guest-lifecycle-command --timeout 45 -- /usr/bin/python3 scripts/guest_trial_controls.py --out .local-runs/guest-lifecycle
+      - name: Boot and inspect the actual signed-image guest
+        timeout-minutes: 15
+        # Root capture owns/adopts descendants even if the coordinator stalls.
+        # Its840second deadline and bounded cleanup fit the15minute step.
+        run: /usr/bin/sudo -n -u root /usr/bin/python3 scripts/evidence.py --out .local-runs/reference-guest-command --timeout 840 -- /usr/bin/python3 scripts/inspect_reference_guest.py --out .local-runs/reference-guest --run-as "$(id -un)"
+      - name: Retain actual observations and failures; exclude images and GPG home
+        if: ${{ always() }}
+        timeout-minutes: 2
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: actual-kvm-guest-inspection
+          retention-days: 7
+          include-hidden-files: true
+          if-no-files-found: error
+          path: |
+            .local-runs/guest-lifecycle-command/
+            .local-runs/guest-lifecycle/
+            .local-runs/reference-guest-command/
+            .local-runs/reference-guest/commands/
+            .local-runs/reference-guest/results.json
+            .local-runs/reference-guest/configuration.json
+            .local-runs/reference-guest/process.json
+            .local-runs/reference-guest/cleanup.json
+            .local-runs/reference-guest/capture.json
+            .local-runs/reference-guest/host-samples.jsonl
+            .local-runs/reference-guest/host-observation-errors.jsonl
+            .local-runs/reference-guest/guest-snapshots.json
+            .local-runs/reference-guest/serial.txt
+            .local-runs/reference-guest/qemu.stderr
+            .local-runs/reference-guest/SHA256SUMS
+            .local-runs/reference-guest/SHA256SUMS.gpg
+            .local-runs/reference-guest/ubuntu-cloud-image.asc
