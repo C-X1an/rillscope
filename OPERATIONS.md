@@ -3,6 +3,12 @@
 ## Supported local mode
 No cloud account, model key or database service. Install the pinned Rust toolchain plus Python3.11+, Git and Make, resolve approved dependencies, then run the documented bootstrap/verify/demo targets. The Python reference demo runs without Rust and is explicitly not the product demo. Never expose local context/file flags to an untrusted caller.
 
+`make verify` executes the complete ordered gate list in the Makefile and records actual attempts under `.local-runs/verify-*/`. It includes the reference-tool tests and the guarded reference benchmark. `make clean-verify` clones committed source with a fresh target directory and executes the explicit `make bootstrap`, `make verify`, `make demo` recipe. `make release-verify` runs that fresh procedure once, then audits the published criterion evidence. A failed canonical command remains a failure; subsequent independent diagnostics never repeat an attempted full grid or convert the fresh result to PASS. The old nested-clean marker is rejected.
+
+The fresh procedure defaults to a bounded12hour wall budget, including cleanup reserve. Set `RILLSCOPE_CLEAN_BUDGET_SECONDS` or pass `--budget-seconds` to `scripts/clean_verify.py` for the actual available host lifetime. This operational budget does not change any benchmark process deadline, case, seed or repetition. The hosted release workflow reserves time for retention within its6hour job limit; a complete qualified fresh recipe has not been shown to fit that host. An incomplete or timed-out attempt remains failed. Reference-host allocation and actual resource checks still apply.
+
+Grid and cancellation raw bytes are packaged before lengthy validation. The release workflow's always-run retention step also packages every available partial or failed reference capture after owned-process cleanup and uploads fixed metadata. The archive bound remains explicit: exceeding it is a retention failure, with metadata preserved, never a claim that every raw byte was uploaded. Artifacts omit images, Git metadata and unrelated workspace files.
+
 ## Environment boundary
 Trusted input files are read-only. Query is bounded stdin/file content. Outputs go under a new ignored `.local-runs/` directory; do not overwrite existing run evidence. No credentials are generated or printed. Operator changes context by starting a new invocation; a long-lived embedding host must handle immediate cancellation/revocation itself. No process-global plan/result cache.
 

@@ -3,15 +3,46 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+concurrency:
+  group: release-attempt-${{ github.run_id }}
+  cancel-in-progress: false
 jobs:
   release-gate:
     runs-on: ubuntu-24.04
     timeout-minutes: 360
+    # 5+30+310+5+5=355min, plus5min job finalization reserve.
+    # This is a bounded hosted attempt. Full qualified recipe duration on this
+    # host is unproven; local clean verification defaults to a12hour budget.
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        timeout-minutes: 5
         with:
           persist-credentials: false
-      - run: make bootstrap
-      - run: cargo install cargo-audit --version 0.22.2 --locked
-      - run: cargo install cargo-deny --version 0.20.2 --locked
-      - run: make release-verify
+      - name: Prepare the pinned toolchain and dependency checks
+        timeout-minutes: 30
+        run: python3 scripts/evidence.py --out .local-runs/release-setup --timeout 1740 -- sh -eu -c 'make bootstrap && cargo install cargo-audit --version 0.22.2 --locked && cargo install cargo-deny --version 0.20.2 --locked'
+      - name: Attempt one fresh canonical release recipe within the actual job budget
+        timeout-minutes: 310
+        env:
+          RILLSCOPE_CLEAN_BUDGET_SECONDS: '18240'
+        run: python3 scripts/evidence.py --out .local-runs/release-command --timeout 18480 -- make release-verify
+      - name: Preserve every available reference capture after owned-process cleanup
+        if: ${{ always() }}
+        timeout-minutes: 5
+        run: python3 scripts/evidence.py --out .local-runs/release-retention-command --timeout 240 -- python3 scripts/retain_release.py --out .local-runs/release-retained
+      - name: Retain actual release outcomes including incomplete and failed attempts
+        if: ${{ always() }}
+        timeout-minutes: 5
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: actual-bounded-release-attempt
+          retention-days: 7
+          compression-level: 0
+          include-hidden-files: true
+          if-no-files-found: error
+          path: |
+            .local-runs/release-retained/
+            !.local-runs/release-retained/**/capture.pending.zip
+            .local-runs/release-setup/
+            .local-runs/release-command/
+            .local-runs/release-retention-command/

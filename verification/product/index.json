@@ -152,7 +152,8 @@
         "full-grid-windows-failed",
         "full-grid-windows-strong-failed",
         "full-linux-retention-failed",
-        "nullable-sort-current"
+        "nullable-sort-current",
+        "full-linux-79e-incomplete"
       ],
       "scope": "All43050 Windows records retained and strongly revalidated:3timeouts, FAIL. Separate Linux run cancelled while packaging with no capture artifact; count unknown. New complete qualifying capture remains required"
     },
@@ -192,9 +193,9 @@
     "AC-027": {
       "status": "PASS",
       "runs": [
-        "helper-current-claims-link-audit"
+        "recipe-claims-current-audit"
       ],
-      "scope": "Current public claim/link/digest/source-association audit PASS; canonical link/status fields validated live, no full release certification"
+      "scope": "Current public claim/link/digest/source association audit PASS; full release remains incomplete"
     },
     "AC-028": {
       "status": "PASS",
@@ -217,7 +218,7 @@
       "status": "PASS",
       "runs": [
         "current-notice-components",
-        "review-ec4-wording-followup"
+        "recipe-wording-current"
       ],
       "scope": "Current preserved notice/license bytes plus independent wording manifest delta follow-up associated with the prior d8 full inspection; no repeated unchanged-image inspection or legal assurance"
     }
@@ -610,6 +611,18 @@
     "helper-current-claims-link-audit": {
       "path": "verification/product/runs/helper-current-claims-link-audit.json",
       "sha256": "7dfd0bcc729a6cbae422095685f103494ae030da230df48f7f94585578321651"
+    },
+    "recipe-wording-current": {
+      "path": "verification/product/runs/recipe-wording-current.json",
+      "sha256": "e8945f7659a4c4e4fdfaf1ffebbdca6760af306d147e826a1b5e0acceaf8abb5"
+    },
+    "full-linux-79e-incomplete": {
+      "path": "verification/product/runs/full-linux-79e-incomplete.json",
+      "sha256": "fdb9ce6774c2d55d6e473d4a0c823c5ed2378edbc6666a077cfad760e5dc6273"
+    },
+    "recipe-claims-current-audit": {
+      "path": "verification/product/runs/recipe-claims-current-audit.json",
+      "sha256": "d5e104e5a57f2cf6c55f0114386d1d33b2591a438b4b915f337eb1041fac0b17"
     }
   },
   "release_status": "INCOMPLETE",

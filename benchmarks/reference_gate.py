@@ -10,8 +10,22 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'benchmarks'))
+sys.path.insert(0, str(ROOT / 'scripts'))
 from run import environment
 from build import build_release
+import archive_capture
+from verify_sequence import write_json
+
+
+def retain_capture(out,stage):
+    """Retain every available raw file before starting the lengthy validator."""
+    try:
+        result=archive_capture.pack(out/stage,out/('capture-'+stage))
+    except (OSError,ValueError,TypeError,KeyError) as error:
+        result={'status':'FAIL','error':type(error).__name__,'reason':str(error)}
+    write_json(out/('retention-'+stage+'.json'),result)
+    print(json.dumps({'retained_stage':stage,**result}),flush=True)
+    return 0 if result['status']=='RECORDED' else (77 if result['status']=='BLOCKED' else 1)
 
 
 def host_reasons(actual, receipt):
@@ -78,10 +92,14 @@ def main():
     proof = args.out / 'build/build.json'
     code = subprocess.call([sys.executable, str(ROOT / 'benchmarks/run.py'), '--binary', str(ROOT / build['bins']['rillscope-measure']['path']),
                             '--build-receipt', str(proof), '--out', str(args.out / 'grid')], cwd=ROOT)
+    retained=retain_capture(args.out,'grid')
     if code: return code
+    if retained: return retained
     code = subprocess.call([sys.executable, str(ROOT / 'benchmarks/cancellation.py'), '--binary', str(ROOT / build['bins']['rillscope']['path']),
                             '--build-receipt', str(proof), '--out', str(args.out / 'cancel')], cwd=ROOT)
+    retained=retain_capture(args.out,'cancel')
     if code: return code
+    if retained: return retained
     code = subprocess.call([sys.executable, str(ROOT / 'benchmarks/verify.py'), str(args.out / 'grid'),'--require-current-product'], cwd=ROOT)
     if code: return code
     grid = json.loads((args.out / 'grid/results.json').read_bytes())

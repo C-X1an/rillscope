@@ -226,5 +226,6 @@ def required_sources(identifier, root):
         if identifier == 'AC-008': core.add('scripts/verify_demo_evidence.py')
     if identifier in {'AC-021', 'AC-022', 'AC-023'}:
         core |= {file.relative_to(root).as_posix() for file in (root / 'benchmarks').glob('*.py')}
+        core |= {'scripts/archive_capture.py','scripts/verify_sequence.py'}
         core.add('src/bin/rillscope-measure.rs')
     return core
