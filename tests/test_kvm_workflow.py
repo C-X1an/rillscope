@@ -1,5 +1,6 @@
 """Published setup ownership and actual missing-owner validation dispatch controls."""
 import json
+import os
 from pathlib import Path
 import shlex
 import subprocess
@@ -12,6 +13,22 @@ WORKFLOW = ROOT / '.github/workflows/kvm-feasibility-pilot.yml'
 
 
 class PilotWorkflow(unittest.TestCase):
+    def test_dispatch_requires_exact_audited_commit_before_checkout(self):
+        source = WORKFLOW.read_text(encoding='utf-8')
+        self.assertIn('expected_commit:', source)
+        block = source.split('expected_commit:', 1)[1].split('permissions:', 1)[0]
+        self.assertIn('required: true', block)
+        self.assertIn('EXPECTED_COMMIT: ${{ inputs.expected_commit }}', source)
+        line = next(line.strip() for line in source.splitlines() if 'run: python3 -c' in line)
+        self.assertLess(source.index(line), source.index('uses: actions/checkout@'))
+        arguments = shlex.split(line.removeprefix('run: ')); arguments[0] = sys.executable
+        for expected, actual, code in [('a' * 40, 'a' * 40, 0), ('a' * 40, 'b' * 40, 1),
+                                       ('', 'a' * 40, 1), ('A' * 40, 'A' * 40, 1)]:
+            with self.subTest(expected=expected, actual=actual):
+                env = dict(os.environ, EXPECTED_COMMIT=expected, GITHUB_SHA=actual)
+                result = subprocess.run(arguments, env=env, capture_output=True, timeout=10)
+                self.assertEqual(result.returncode, code)
+
     def test_work_disk_serial_belongs_to_device_not_raw_backend(self):
         sys.path.insert(0, str(ROOT / 'scripts'))
         from kvm_benchmark_pilot import BOOTSTRAP, qemu_command

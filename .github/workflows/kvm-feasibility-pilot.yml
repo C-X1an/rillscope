@@ -1,6 +1,11 @@
 name: Unqualified KVM feasibility pilot (three separate campaigns)
 on:
   workflow_dispatch:
+    inputs:
+      expected_commit:
+        description: Exact audited public commit SHA
+        required: true
+        type: string
 permissions:
   contents: read
 concurrency:
@@ -10,9 +15,15 @@ jobs:
   pilot:
     runs-on: ubuntu-24.04
     timeout-minutes: 200
-    # 2+20+2+15+112+12+25+5=193min, plus7min job finalization.
+    # 1+2+20+2+15+112+12+25+5=194min, plus6min job finalization.
     # The VM's finite campaign budgets may yield partial FAIL; no resampling.
     steps:
+      - name: Require the exact audited source before checkout or execution
+        id: source_guard
+        timeout-minutes: 1
+        env:
+          EXPECTED_COMMIT: ${{ inputs.expected_commit }}
+        run: python3 -c 'import os,re,sys; e=os.environ["EXPECTED_COMMIT"]; sys.exit(0 if re.fullmatch("[0-9a-f]{40}",e) and e == os.environ["GITHUB_SHA"] else "audited commit mismatch")'
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         timeout-minutes: 2
         with:
@@ -35,15 +46,15 @@ jobs:
         # 6600s includes setup, VM, recovery, cleanup and reserve within112min.
         run: sudo -n python3 scripts/evidence.py --out .local-runs/kvm-command --timeout 6600 -- python3 scripts/kvm_benchmark_pilot.py --out .local-runs/kp --run-as "$(id -un)" --build-receipt .local-runs/kvm-build/build.json --commit "$GITHUB_SHA"
       - name: Preserve partial bytes after the original owned command has stopped
-        if: ${{ always() }}
+        if: ${{ always() && steps.source_guard.outcome == 'success' }}
         timeout-minutes: 12
         run: sudo -n python3 scripts/evidence.py --out .local-runs/kvm-recovery-command --timeout 660 -- python3 scripts/recover_kvm_pilot.py --out .local-runs/kp --owner-receipt .local-runs/kvm-command/receipt.json
       - name: Validate every original retained record, including upstream failures
-        if: ${{ always() }}
+        if: ${{ always() && steps.source_guard.outcome == 'success' }}
         timeout-minutes: 25
         run: sudo -n python3 scripts/evidence.py --out .local-runs/kvm-validation-command --timeout 1440 -- python3 scripts/verify_kvm_pilot.py --artifact .local-runs/kp/artifact --owner-receipt .local-runs/kvm-command/receipt.json --out .local-runs/kvm-validation
       - name: Retain original captures, failed packages, proofs and diagnostics
-        if: ${{ always() }}
+        if: ${{ always() && steps.source_guard.outcome == 'success' }}
         timeout-minutes: 5
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:

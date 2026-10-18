@@ -715,6 +715,18 @@
     "kvm-work-disk-reference": {
       "path": "verification/product/runs/kvm-work-disk-reference.json",
       "sha256": "38cacc26af44041a5b29615d36d3436c8ac52e9fd14d684fd52e3525423d0bcb"
+    },
+    "kvm-guard-before": {
+      "path": "verification/product/runs/kvm-guard-before.json",
+      "sha256": "341d8152c89fed62c3754a98b6a26a6dffa62e78d96a4807385913d1a6186a0a"
+    },
+    "kvm-guard-independent": {
+      "path": "verification/product/runs/kvm-guard-independent.json",
+      "sha256": "8182807d83ddf4ad5fd734bef76b8ae3e53f7937049f957f9da115cc9325d0ff"
+    },
+    "kvm-guard-reference": {
+      "path": "verification/product/runs/kvm-guard-reference.json",
+      "sha256": "4c153370cad24002bae5be559f1e0066bfd0c44be466b9bdf43bae61efea20f0"
     }
   },
   "release_status": "INCOMPLETE",
