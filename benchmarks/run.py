@@ -11,6 +11,7 @@ import os
 from pathlib import Path
 import platform
 import random
+import re
 import shutil
 import sqlite3
 import statistics
@@ -58,37 +59,62 @@ def semantic_digest(result, ordered):
     return hashlib.sha256(encode(value).encode()).hexdigest()
 
 
+def cgroup_controllers(path):
+    words=path.read_text(encoding='utf-8').split()
+    if len(words)>64 or len(set(words))!=len(words) or any(re.fullmatch('[a-z_]+',word) is None for word in words):
+        raise ValueError('invalid cgroup controller metadata')
+    return set(words)
+
+
+def cgroup_limit(current,base,name,controller):
+    try: return (current/name).read_text(encoding='utf-8').strip()
+    except FileNotFoundError:
+        if current==base: return None  # Root interfaces may be absent.
+        # Interfaces belong to the parent and exist only when it delegates the
+        # controller. Absence removes no inherited ancestor limit:
+        # https://docs.kernel.org/admin-guide/cgroup-v2.html#controlling-controllers
+        parent_enabled=cgroup_controllers(current.parent/'cgroup.subtree_control')
+        available=cgroup_controllers(current/'cgroup.controllers')
+        if (controller in parent_enabled or controller in available or parent_enabled!=available
+                or (current/'cgroup.type').read_text(encoding='utf-8').strip()!='domain'
+                or (current.parent!=base and (current.parent/'cgroup.type').read_text(encoding='utf-8').strip()!='domain')):
+            raise ValueError('missing cgroup interface lacks consistent disabled-domain proof')
+        return None
+
+
 def effective_linux_resources(cgroup_root=Path('/sys/fs/cgroup'), membership=Path('/proc/self/cgroup')):
     """Inspect this process's affinity and every applicable cgroup-v2 ancestor."""
     result = {'resource_inspection_status': 'NOT MEASURED'}
     try:
         affinity = len(os.sched_getaffinity(0))
+        if affinity<=0: raise ValueError('empty process affinity')
         lines = membership.read_text().splitlines()
         relative = next(line[3:] for line in lines if line.startswith('0::'))
         parts = Path(relative.lstrip('/')).parts
         if '..' in parts or len(parts) > 64: raise ValueError('invalid cgroup path')
         base = cgroup_root.resolve()
-        if not (base / 'cgroup.controllers').is_file(): raise ValueError('cgroup v2 unavailable')
+        if not {'cpu','memory'}<=cgroup_controllers(base/'cgroup.controllers'):
+            raise ValueError('required unified CPU/memory controllers unavailable')
         current = base.joinpath(*parts).resolve()
         if not current.is_relative_to(base): raise ValueError('cgroup path escaped hierarchy')
         quotas, memories, highs, levels = [], [], [], 0
         while True:
-            # Kernel cgroup-v2 CPU/memory limit files exist on non-root groups:
-            # https://docs.kernel.org/admin-guide/cgroup-v2.html
-            cpu_path, memory_path, high_path = (current / name for name in ('cpu.max','memory.max','memory.high'))
-            cpu = ['max','100000'] if current == base and not cpu_path.exists() else cpu_path.read_text().split()
-            memory = 'max' if current == base and not memory_path.exists() else memory_path.read_text().strip()
-            high = 'max' if current == base and not high_path.exists() else high_path.read_text().strip()
-            if len(cpu) != 2 or int(cpu[1]) <= 0: raise ValueError('invalid CPU quota')
-            if cpu[0] != 'max':
-                quota = int(cpu[0]) / int(cpu[1])
-                if quota <= 0: raise ValueError('invalid CPU quota')
-                quotas.append(quota)
-            if memory != 'max':
+            cpu=cgroup_limit(current,base,'cpu.max','cpu')
+            memory=cgroup_limit(current,base,'memory.max','memory')
+            high=cgroup_limit(current,base,'memory.high','memory')
+            if (memory is None)!=(high is None): raise ValueError('partial memory controller interfaces')
+            if cpu is not None:
+                fields=cpu.split()
+                if len(fields)!=2 or int(fields[1])<=0: raise ValueError('invalid CPU quota')
+                if fields[0]!='max':
+                    quota=int(fields[0])/int(fields[1])
+                    if not math.isfinite(quota) or quota<=0: raise ValueError('invalid CPU quota')
+                    quotas.append(quota)
+            if memory not in (None,'max'):
                 limit = int(memory)
                 if limit <= 0: raise ValueError('invalid memory limit')
                 memories.append(limit)
-            if high != 'max':
+            if high not in (None,'max'):
                 throttle = int(high)
                 if throttle <= 0: raise ValueError('invalid memory throttle')
                 highs.append(throttle)
@@ -99,7 +125,7 @@ def effective_linux_resources(cgroup_root=Path('/sys/fs/cgroup'), membership=Pat
                       cgroup_v2_ancestor_levels=levels, effective_cpu_capacity=min([affinity, *quotas]),
                       cgroup_memory_limit_bytes=min(memories) if memories else None,
                       cgroup_memory_high_bytes=min(highs) if highs else None)
-    except (OSError, ValueError, StopIteration, AttributeError) as error:
+    except (OSError, ValueError, StopIteration, AttributeError,OverflowError) as error:
         result['resource_inspection_problem'] = type(error).__name__
     return result
 
