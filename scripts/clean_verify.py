@@ -8,6 +8,7 @@ from pathlib import Path
 import shutil
 import subprocess
 import sys
+import tempfile
 import time
 from evidence import source_identity
 from verify_sequence import (budget,checked_receipt,diagnostic_plan,gate_timeout,
@@ -42,14 +43,18 @@ def main():
     for tool in ('git','make','rustup','cargo'):
         if shutil.which(tool) is None:
             print('BLOCKED: required tool unavailable: '+tool,file=sys.stderr); return 77
-    out=ROOT/'.local-runs'/('clean-'+str(time.time_ns())); out.mkdir(parents=True)
-    clone=out/'checkout'; identity=source_identity(ROOT)['sha256']
+    local=ROOT/'.local-runs';local.mkdir(parents=True,exist_ok=True)
+    # Keep the exact owned checkout18characters shorter than the timestamped
+    # layout: the pinned Windows GNU linker failed on its272character output.
+    out=Path(tempfile.mkdtemp(prefix='clean-',dir=local))
+    clone=out/'c'; identity=source_identity(ROOT)['sha256']
     env=os.environ.copy(); env['CARGO_TARGET_DIR']='target'; env['GIT_TERMINAL_PROMPT']='0'
     ledger=clone/'.local-runs/verify-ledger/ledger.json'
     env['RILLSCOPE_VERIFY_LEDGER']=str(ledger)
     report={'mode':'fresh-committed-Rust-demo-checkout' if args.demo_only else 'fresh-committed-Rust-checkout',
         'status':'RUNNING','commit':None,'source_sha256':identity,'source_stable':False,
         'same_os_and_toolchain_installation':True,'target_directory_was_fresh':False,
+        'checkout':clone.relative_to(ROOT).as_posix(),
         'cargo_target_dir_enforced_inside_fresh_clone':True,'budget_seconds':args.budget_seconds,
         'preparation':[],'commands':[],'diagnostic_commands':[],'not_run':[],
         'scope':'canonical fresh commands govern status; diagnostic success never repairs their failure'}

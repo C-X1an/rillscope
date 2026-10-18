@@ -12,6 +12,7 @@ ROOT=Path(__file__).resolve().parents[1]
 MAX_METADATA_FILES=1024
 MAX_METADATA_FILE=16*1024**2
 MAX_METADATA_BYTES=64*1024**2
+MAX_CAPTURES=32
 ERRORS=(OSError,ValueError,TypeError,KeyError,zipfile.BadZipFile,NotImplementedError)
 
 
@@ -49,19 +50,24 @@ def retain(out):
     if out.exists(): raise ValueError('release retention output must be new')
     out.mkdir(parents=True)
     result={'status':'RUNNING','metadata':[],'captures':[],'metadata_bytes':0,
-        'scope':'fixed actual release metadata and available reference/NULL-sort raw bytes; incomplete and failed attempts remain incomplete/failed; no validation or reference qualification'}
+        'scope':'fixed actual release metadata and available reference/NULL-sort/publication raw bytes; incomplete and failed attempts remain incomplete/failed; no validation or reference qualification'}
     def persist(): write_json(out/'retention.json',result)
     persist()
     clean=bounded((ROOT/'.local-runs').glob('clean-*'),2)
     if len(clean)>1: raise ValueError('one exact fresh attempt required; never select the latest')
     roots=[ROOT]
-    if clean and (clean[0]/'checkout').is_dir(): roots.append(owned_path(ROOT,clean[0]/'checkout'))
+    if clean:
+        checkouts=[owned_path(ROOT,clean[0]/name) for name in ('c','checkout') if (clean[0]/name).exists()]
+        if len(checkouts)>1: raise ValueError('one exact fresh checkout required; never select an alias')
+        if checkouts:
+            if not checkouts[0].is_dir(): raise ValueError('fresh checkout must be an owned directory')
+            roots.extend(checkouts)
     candidates=[]
     def include(path):
         path=owned_path(ROOT,path)
         if path.exists(): candidates.append(path)
         if len(candidates)>MAX_METADATA_FILES: raise ValueError('metadata file count exceeds bound')
-    for name in ('release-setup','release-command'):
+    for name in ('release-system-setup','release-setup','release-command'):
         for file in ('receipt.json','stdout.txt','stderr.txt'): include(ROOT/'.local-runs'/name/file)
     for attempt in clean:
         include(attempt/'results.json')
@@ -69,6 +75,14 @@ def retain(out):
             for command in bounded((attempt/prefix).glob('*'),64):
                 for file in ('receipt.json','stdout.txt','stderr.txt'): include(command/file)
     stages=[]
+    def publication_raw(path):
+        source=owned_path(ROOT,path)
+        if not source.exists(): return
+        if not source.is_dir(): raise ValueError('publication capture must be an owned directory')
+        if len(stages)>=MAX_CAPTURES: raise ValueError('release capture count exceeds bound')
+        row={'source':source.relative_to(ROOT).as_posix(),'kind':'publication-transport',
+            'package':'capture-'+str(len(stages)),'result':{'status':'PENDING'}}
+        stages.append((source,None,row));result['captures'].append(row)
     for root in roots:
         local=root/'.local-runs'
         for ledger in bounded(local.glob('verify*/ledger.json'),4):
@@ -88,7 +102,20 @@ def retain(out):
                 include(early/'archive-result.json')
                 row={'source':source.relative_to(ROOT).as_posix(),
                     'package':'capture-'+str(len(stages)),'result':{'status':'PENDING'}}
+                if len(stages)>=MAX_CAPTURES: raise ValueError('release capture count exceeds bound')
                 stages.append((source,early,row)); result['captures'].append(row)
+        for pattern in ('publication-boundary-*','publication-decision-*'):
+            for experiment in bounded(local.glob(pattern),4): publication_raw(experiment)
+        for control in bounded(local.glob('publication-control-*'),4):
+            control=owned_path(ROOT,control)
+            include(control/'summary.json')
+            for source in bounded(control.glob('source.*.rs'),8): include(source)
+            publication_raw(control/'commands')
+            for label in ('baseline','mutant','restored'):
+                publication_raw(control/'checkout/.local-runs'/label)
+            for build in bounded((control/'checkout/.local-runs/build').glob('*'),16):
+                for name in ('build.json','cargo.stdout','cargo.stderr','compiler.stdout','compiler.stderr'):
+                    include(build/name)
     # Secure small immutable command/progress bytes before any large operation.
     for path in sorted(set(candidates)):
         if not path.is_file() or path.stat().st_size>MAX_METADATA_FILE:
@@ -104,6 +131,8 @@ def retain(out):
     # Copy every completed early CAS before spending time on new raw packaging.
     # Copied bytes are explicitly unverified until all archive objects are checked.
     for source,early,row in stages:
+        if early is None:
+            pending.append((source,row));continue
         archive=owned_path(ROOT,early/'capture.zip'); record=owned_path(ROOT,early/'archive-result.json')
         if not archive.exists() or not record.exists():
             pending.append((source,row)); continue

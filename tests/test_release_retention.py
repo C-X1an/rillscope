@@ -12,10 +12,10 @@ import retain_release
 
 
 class ReleaseRetention(unittest.TestCase):
-    def fixture(self,root):
+    def fixture(self,root,compact=False):
         command=root/'.local-runs/release-command'; command.mkdir(parents=True)
         (command/'stdout.txt').write_bytes(b'unit canonical failure, not a product run\n')
-        checkout=root/'.local-runs/clean-unit/checkout'
+        checkout=root/'.local-runs/clean-unit'/('c' if compact else 'checkout')
         for stage in ('grid','cancel'):
             path=checkout/'.local-runs/benchmark-unit'/stage; path.mkdir(parents=True)
             (path/'actual-error.txt').write_bytes(b'unit retained failure bytes\n')
@@ -94,6 +94,60 @@ class ReleaseRetention(unittest.TestCase):
             self.assertEqual(result['status'],'RETAINED')
             package=next(row for row in result['captures'] if row['source'].endswith('/grid'))
             self.assertEqual((out/package['package']/'capture.zip').read_bytes(),original)
+
+    def test_compact_fresh_checkout_retains_every_failed_stage(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder).resolve();self.fixture(root,compact=True)
+            with patch.object(retain_release,'ROOT',root),patch.object(archive_capture,'ROOT',root):
+                out=root/'.local-runs/retained';result=retain_release.retain(out)
+                self.assertEqual(result['status'],'RETAINED')
+                self.assertEqual(len(result['captures']),2)
+                for index,row in enumerate(result['captures']):
+                    restored=root/'.local-runs'/('restored-'+str(index))
+                    archive_capture.restore(out/row['package']/'capture.zip',restored)
+                    self.assertEqual((restored/'actual-error.txt').read_bytes(),b'unit retained failure bytes\n')
+
+    def test_publication_transport_and_control_bytes_survive_retention(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder).resolve();local=root/'.local-runs'
+            command=local/'release-command';command.mkdir(parents=True)
+            (command/'stdout.txt').write_bytes(b'unit canonical failure\n')
+            expected={
+                'publication-boundary-unit':('trace.txt',b'actual unit boundary trace\n'),
+                'publication-decision-unit':('stdout.bin',b'actual unit terminal envelope\n'),
+                'publication-control-unit/commands':('mutant/stderr.txt',b'actual unit mutation failure\n'),
+                'publication-control-unit/checkout/.local-runs/baseline':('stdout.bin',b'unit baseline\n'),
+                'publication-control-unit/checkout/.local-runs/mutant':('stdout.bin',b'unit mutant\n'),
+                'publication-control-unit/checkout/.local-runs/restored':('stdout.bin',b'unit restored\n')}
+            for directory,(file,data) in expected.items():
+                path=local/directory/file;path.parent.mkdir(parents=True,exist_ok=True);path.write_bytes(data)
+            control=local/'publication-control-unit'
+            (control/'summary.json').write_bytes(b'{"unit_status":"FAIL"}\n')
+            hidden=control/'checkout/.git';hidden.mkdir(parents=True)
+            (hidden/'config').write_bytes(b'unrelated unit configuration must stay excluded\n')
+            with patch.object(retain_release,'ROOT',root),patch.object(archive_capture,'ROOT',root):
+                out=local/'retained';result=retain_release.retain(out)
+                self.assertEqual(result['status'],'RETAINED')
+                by_source={row['source']:row for row in result['captures']}
+                self.assertEqual(len(by_source),len(expected),'a publication raw campaign was omitted')
+                for index,(directory,(file,data)) in enumerate(expected.items()):
+                    row=by_source['.local-runs/'+directory];restored=local/('restored-'+str(index))
+                    archive_capture.restore(out/row['package']/'capture.zip',restored)
+                    self.assertEqual((restored/file).read_bytes(),data)
+                    self.assertFalse(any('.git' in path.parts for path in restored.rglob('*')))
+            self.assertTrue(any(row['source'].endswith('/summary.json') for row in result['metadata']))
+
+    def test_separate_system_setup_receipt_and_raw_streams_are_retained(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder).resolve();setup=root/'.local-runs/release-system-setup';setup.mkdir(parents=True)
+            expected={'receipt.json':b'{"unit_owner":0}\n','stdout.txt':b'unit system setup\n','stderr.txt':b'unit failure\n'}
+            for name,data in expected.items(): (setup/name).write_bytes(data)
+            with patch.object(retain_release,'ROOT',root),patch.object(archive_capture,'ROOT',root):
+                out=root/'.local-runs/retained';result=retain_release.retain(out)
+            self.assertEqual(result['status'],'RETAINED')
+            self.assertEqual(len(result['metadata']),3,'separate privileged setup evidence was omitted')
+            for row in result['metadata']:
+                self.assertEqual((out/row['file']).read_bytes(),expected[Path(row['source']).name])
 
 
 if __name__=='__main__': unittest.main()

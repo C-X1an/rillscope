@@ -126,5 +126,15 @@ class CleanRecipe(unittest.TestCase):
         self.assertGreater(query.call_args.kwargs['timeout'],0)
         self.assertLessEqual(query.call_args.kwargs['timeout'],30)
 
+    def test_fresh_checkout_leaves_headroom_for_windows_gnu_paths(self):
+        self.invoke()
+        command,kwargs=self.clone_attempt
+        child=command[command.index('--')+1:]
+        checkout=Path(child[-1]);root=Path(kwargs['cwd'])
+        # The retained actual failing linker path was272characters. Removing
+        # at least18 layout characters puts that exact output below260.
+        self.assertLessEqual(len(checkout.relative_to(root).as_posix()),28)
+        self.assertEqual(checkout.name,'c')
+
 
 if __name__=='__main__': unittest.main()

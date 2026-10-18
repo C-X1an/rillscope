@@ -18,9 +18,13 @@ jobs:
         timeout-minutes: 5
         with:
           persist-credentials: false
-      - name: Prepare the pinned toolchain and dependency checks
+      - name: Prepare the pinned toolchain, debugger and dependency checks
         timeout-minutes: 30
-        run: python3 scripts/evidence.py --out .local-runs/release-setup --timeout 1740 -- sh -eu -c 'make bootstrap && cargo install cargo-audit --version 0.22.2 --locked && cargo install cargo-deny --version 0.20.2 --locked'
+        # 4min owned-root apt +24min runner-owned Rust, with2min overhead reserve.
+        run: |
+          mkdir -p .local-runs
+          sudo -n python3 scripts/evidence.py --out .local-runs/release-system-setup --timeout 240 -- sh -eu -c 'id -u && apt-get update && apt-get install --yes --no-install-recommends gdb strace && gdb --version && strace --version'
+          python3 scripts/evidence.py --out .local-runs/release-setup --timeout 1440 -- sh -eu -c 'id -u && make bootstrap && cargo install cargo-audit --version 0.22.2 --locked && cargo install cargo-deny --version 0.20.2 --locked'
       - name: Attempt one fresh canonical release recipe within the actual job budget
         timeout-minutes: 310
         env:
@@ -44,5 +48,6 @@ jobs:
             .local-runs/release-retained/
             !.local-runs/release-retained/**/capture.pending.zip
             .local-runs/release-setup/
+            .local-runs/release-system-setup/
             .local-runs/release-command/
             .local-runs/release-retention-command/
