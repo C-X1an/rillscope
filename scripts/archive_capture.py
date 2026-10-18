@@ -13,7 +13,9 @@ MAX_FILES = 500000
 MAX_BYTES = 16 * 1024**3
 MAX_FILE = 256 * 1024**2
 MAX_MANIFEST = 128 * 1024**2
-MAX_ARCHIVE = 100 * 1024**2
+# The first real full capture compressed to117455647bytes; preserve a bounded
+# complete capture instead of uploading only its command summaries.
+MAX_ARCHIVE = 128 * 1024**2
 FORMAT = 'rillscope-cas-capture-v1'
 
 

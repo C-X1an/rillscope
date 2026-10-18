@@ -10,7 +10,8 @@ concurrency:
 jobs:
   complete-grid:
     runs-on: ubuntu-24.04
-    # Step maxima: 5+10+312+22+5=354min, leaving6min for job finalization.
+    # Collection is retained before validation on the dependent job.
+    # Step maxima: 5+10+327+5+5=352min, leaving8min for job finalization.
     timeout-minutes: 360
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -19,12 +20,12 @@ jobs:
           persist-credentials: false
       - run: make bootstrap
         timeout-minutes: 10
-      - name: Execute every full-grid observation and current artifact validation
-        timeout-minutes: 312
-        run: python3 scripts/evidence.py --out .local-runs/full-grid-command --timeout 18600 -- python3 benchmarks/dispatch.py --profile full
+      - name: Collect every full-grid observation; no validation claim yet
+        timeout-minutes: 327
+        run: python3 scripts/evidence.py --out .local-runs/full-grid-command --timeout 19500 -- python3 benchmarks/dispatch.py --profile full --capture-only
       - name: Preserve the complete synthetic capture without filtering failures
         if: ${{ always() }}
-        timeout-minutes: 22
+        timeout-minutes: 5
         shell: python
         run: |
           import subprocess, sys
@@ -33,7 +34,7 @@ jobs:
           if len(grids) != 1:
               raise RuntimeError('expected one actual complete or failed capture directory')
           raise SystemExit(subprocess.call([sys.executable,'scripts/evidence.py',
-              '--out','.local-runs/full-grid-pack-command','--timeout','1200','--',
+              '--out','.local-runs/full-grid-pack-command','--timeout','180','--',
               sys.executable,'scripts/archive_capture.py','pack','--source',str(grids[0]),
               '--out','.local-runs/full-grid-package']))
       - name: Retain actual full-grid evidence
@@ -43,6 +44,7 @@ jobs:
         with:
           name: complete-available-host-grid
           retention-days: 7
+          compression-level: 0
           include-hidden-files: true
           if-no-files-found: error
           path: |
@@ -50,3 +52,39 @@ jobs:
             .local-runs/full-grid-pack-command/
             .local-runs/full-grid-package/archive-result.json
             .local-runs/full-grid-package/capture.zip
+  validate-grid:
+    # An upstream failure still keeps the entire workflow failed.
+    if: ${{ always() }}
+    needs: complete-grid
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        timeout-minutes: 5
+        with:
+          persist-credentials: false
+      - name: Download this run's complete capture
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        timeout-minutes: 5
+        with:
+          name: complete-available-host-grid
+          path: .local-runs/downloaded-grid
+          digest-mismatch: error
+      - name: Verify every object and restore exact bytes
+        timeout-minutes: 10
+        run: python3 scripts/evidence.py --out .local-runs/full-grid-restore-command --timeout 540 -- python3 scripts/archive_capture.py restore --archive .local-runs/downloaded-grid/full-grid-package/capture.zip --out .local-runs/restored-grid
+      - name: Validate every original sample and required independent comparison
+        timeout-minutes: 90
+        run: python3 scripts/evidence.py --out .local-runs/full-grid-validation-command --timeout 5280 -- python3 benchmarks/verify.py .local-runs/restored-grid --require-current-product
+      - name: Retain actual restoration and validation outcomes
+        if: ${{ always() }}
+        timeout-minutes: 5
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: complete-available-host-grid-validation
+          retention-days: 7
+          include-hidden-files: true
+          if-no-files-found: error
+          path: |
+            .local-runs/full-grid-restore-command/
+            .local-runs/full-grid-validation-command/

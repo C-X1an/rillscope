@@ -14,7 +14,10 @@ from build import build_release
 
 def main():
     parser = argparse.ArgumentParser(); parser.add_argument('--profile', choices=('full', 'instrumentation-pilot', 'cancellation-only','sort-null-supplement'), required=True)
+    parser.add_argument('--capture-only',action='store_true',
+                        help='full collection only; artifact validation and reference qualification remain separate')
     args = parser.parse_args()
+    if args.capture_only and args.profile != 'full': parser.error('--capture-only requires the complete full profile')
     label = {'full': 'f', 'instrumentation-pilot': 'p', 'cancellation-only': 'c','sort-null-supplement':'s'}[args.profile]
     # Keep actual case/measurement paths below legacy Windows component-tool limits.
     # The complete experiment name/dimensions remain in each manifest and case record.
@@ -34,6 +37,7 @@ def main():
                '--build-receipt', str(out / 'build/build.json'), '--profile', args.profile, '--out', str(out / 'grid')]
     code = subprocess.call(command, cwd=ROOT)
     if code: return code
+    if args.capture_only: return 0
     return subprocess.call([sys.executable, str(ROOT / 'benchmarks/verify.py'), str(out / 'grid')], cwd=ROOT)
 
 
