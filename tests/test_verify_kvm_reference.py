@@ -6,6 +6,7 @@ from pathlib import Path
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 ROOT = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(ROOT / 'scripts'), str(ROOT / 'benchmarks')]
 import verify_kvm_reference as check
@@ -73,6 +74,120 @@ class FullValidation(unittest.TestCase):
             self.assertEqual(result['canonical_fresh'], 'NOT RUN')
             self.assertTrue(result['errors'])
             self.assertTrue((base / 'validation/results.json').is_file())
+
+
+class OriginalDevicePreflight(unittest.TestCase):
+    def fixture(self, base):
+        artifact = base / 'artifact'; guest = base / 'guest'; owner = base / 'owner'
+        for path in [artifact, guest, owner / 'capture-device-open']: path.mkdir(parents=True)
+        payload = {'commit': '1' * 40, 'source': {'sha256': '2' * 64}}
+        raw = b'{"original_payload":true}\n'; (artifact / 'payload.json').write_bytes(raw)
+        value = {'alias': '/dev/virtio-ports/org.rillscope.reference-capture',
+            'node': '/dev/vport1p2', 'port_name': 'org.rillscope.reference-capture',
+            'major': 1, 'minor': 2, 'filesystem_device': 7, 'inode': 91,
+            'rdev': 258, 'uid': 65534, 'gid': 65534, 'mode': 0o600}
+        common = {'identity_before': value, 'identity_after': value, 'groups': [],
+            'bytes_read': 0, 'bytes_written': 0}
+        grant = dict(common, status='GRANTED', uid=0, gid=0, opened_monotonic_ns=100, closed_monotonic_ns=200)
+        probe = dict(common, status='OPENED', uid=65534, gid=65534, opened_monotonic_ns=300, closed_monotonic_ns=400)
+        report = {'schema_version': 1, 'status': 'VERIFIED', 'commit': payload['commit'],
+            'source_sha256': payload['source']['sha256'], 'grant': grant, 'probe': probe}
+        (guest / 'device-access.json').write_text(json.dumps(report))
+        (owner / 'capture-device-open/stdout.txt').write_text(json.dumps(probe))
+        inputs = [{'path': '/work/c/.local-runs/kvm-input/payload.json',
+            'bytes': len(raw), 'sha256': hashlib.sha256(raw).hexdigest()}]
+        receipt = {'command': ['/usr/bin/setpriv', '--reuid=65534', '--regid=65534', '--clear-groups', '--',
+            '/usr/bin/python3', '/work/c/scripts/kvm_reference_device.py', 'probe'],
+            'inputs_before': inputs, 'inputs_after': inputs}
+        return artifact, payload, guest, owner, report, receipt
+
+    def test_original_source_bound_nobody_open_and_close_before_measurement_are_mandatory(self):
+        with tempfile.TemporaryDirectory(dir=ROOT / '.local-runs') as temp:
+            artifact, payload, guest, owner, report, receipt = self.fixture(Path(temp))
+            with patch.object(check, 'passing_receipt', return_value=receipt) as passing:
+                self.assertEqual(check.capture_device_access(artifact, payload, guest, owner, 1000), report)
+            passing.assert_called_once_with(owner / 'capture-device-open', payload['source'])
+            (guest / 'device-access.json').unlink()
+            with self.assertRaisesRegex(ValueError, 'bounded regular measurement record'):
+                check.capture_device_access(artifact, payload, guest, owner, 1000)
+
+    def test_root_probe_changed_input_or_source_and_late_preflight_are_rejected(self):
+        with tempfile.TemporaryDirectory(dir=ROOT / '.local-runs') as temp:
+            artifact, payload, guest, owner, report, receipt = self.fixture(Path(temp))
+            for field, value in [('status', 'FAIL'), ('source_sha256', '3' * 64), ('schema_version', True)]:
+                changed = copy.deepcopy(report); changed[field] = value
+                (guest / 'device-access.json').write_text(json.dumps(changed))
+                with patch.object(check, 'passing_receipt', return_value=receipt), self.assertRaises(ValueError):
+                    check.capture_device_access(artifact, payload, guest, owner, 1000)
+            (guest / 'device-access.json').write_text(json.dumps(report))
+            for changed in [dict(receipt, command=receipt['command'][5:]),
+                dict(receipt, inputs_after=[])]:
+                with patch.object(check, 'passing_receipt', return_value=changed), self.assertRaises(ValueError):
+                    check.capture_device_access(artifact, payload, guest, owner, 1000)
+            with patch.object(check, 'passing_receipt', return_value=receipt), self.assertRaises(ValueError):
+                check.capture_device_access(artifact, payload, guest, owner, 399)
+
+    def test_retained_stdout_must_equal_the_validated_probe_observation(self):
+        with tempfile.TemporaryDirectory(dir=ROOT / '.local-runs') as temp:
+            artifact, payload, guest, owner, report, receipt = self.fixture(Path(temp))
+            changed = copy.deepcopy(report['probe']); changed['uid'] = 0
+            (owner / 'capture-device-open/stdout.txt').write_text(json.dumps(changed))
+            with patch.object(check, 'passing_receipt', return_value=receipt), self.assertRaises(ValueError):
+                check.capture_device_access(artifact, payload, guest, owner, 1000)
+
+
+class FullResultsMetadata(unittest.TestCase):
+    def full_fixture(self):
+        # Independently specified, full-scale producer-shaped metadata. These
+        # literal statistics are a parser fixture, never benchmark measurements.
+        metric_names = ['wall_ns', 'cpu_user_ns', 'cpu_system_ns', 'peak_rss_bytes',
+            'execution_only_ns', 'execution_call_wall_ns', 'load_ns', 'compile_ns',
+            'serialization_ns', 'materialization_ns', 'consumed_work', 'visible_work', 'peak_reserved_bytes']
+        distribution = {'n': 30, 'min': 123456789, 'p50': 234567890,
+            'p95': 345678901, 'p99': 456789012, 'max': 456789012,
+            'median_absolute_deviation': 12345678}
+        modes = {name: {'observations': 30, 'outcomes': {'OK': 30}, 'invalid_observations': 0,
+            'all_outcome_metrics': {metric: distribution for metric in metric_names},
+            'success_only_execution_ns': distribution} for name in ['rust-on', 'rust-off', 'sqlite']}
+        modes['pairing'] = {'pairs': 30, 'wall_on_minus_off_ns': distribution,
+            'p99_interpretation': 'nearest-rank descriptive order statistic; 30 observations do not establish a tail guarantee'}
+        rows = [{'workload': description, 'seed': seed,
+            'inputs': {name: {'bytes': 16384, 'sha256': 'a' * 64}
+                for name in ['catalog.json', 'context.json', 'query.json', 'case.json']},
+            'input_identity_stable': True, 'invalid_observations': 0,
+            'independent_semantic_comparisons': 60, 'warmup_observations': 15,
+            'measured_observations': 90, 'metrics': modes}
+            for description in descriptors() for seed in [20261014, 20261015, 20261016, 20261017, 20261018]]
+        self.assertEqual(len(rows), 410)
+        return {'schema_version': 3, 'profile': 'full', 'completed_cases': 410, 'expected_cases': 410,
+            'complete_grid': True, 'invalid_observations': 0, 'source_binary_inputs_stable': True,
+            'independent_semantic_comparisons': 24600, 'instrumentation_status': 'PASS', 'summaries': rows}
+
+    def test_full_scale_report_uses_archive_file_bound_while_small_metadata_stays_bounded(self):
+        value = self.full_fixture(); raw = (json.dumps(value, indent=2) + '\n').encode()
+        self.assertGreater(len(raw), 4 * 1024**2)
+        self.assertLess(len(raw), check.archive_capture.MAX_FILE)
+        with tempfile.TemporaryDirectory(dir=ROOT / '.local-runs') as temp:
+            path = Path(temp) / 'results.json'; path.write_bytes(raw)
+            with self.assertRaisesRegex(ValueError, 'bounded regular measurement record'):
+                check.read_json(path)
+            self.assertEqual(check.read_results(path), value)
+        self.assertEqual(check.MAX_RESULTS_BYTES, check.archive_capture.MAX_FILE)
+
+    def test_oversized_results_are_rejected_before_json_allocation(self):
+        with tempfile.TemporaryDirectory(dir=ROOT / '.local-runs') as temp:
+            path = Path(temp) / 'results.json'; path.write_bytes(b' ' * 1024 + b'{}')
+            with patch.object(check, 'MAX_RESULTS_BYTES', 1024, create=True), \
+                 patch.object(check, 'strict_json', side_effect=AssertionError('oversize must fail before parsing')):
+                with self.assertRaisesRegex(ValueError, 'bounded regular measurement record'):
+                    check.read_results(path)
+
+    def test_full_results_preserve_closed_json_objects_duplicate_and_nonfinite_rejection(self):
+        with tempfile.TemporaryDirectory(dir=ROOT / '.local-runs') as temp:
+            path = Path(temp) / 'results.json'
+            for raw in [b'{"n":NaN}', b'{"n":1,"n":2}', b'[]']:
+                path.write_bytes(raw)
+                with self.subTest(raw=raw), self.assertRaises(ValueError): check.read_results(path)
 
 
 if __name__ == '__main__': unittest.main()

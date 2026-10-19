@@ -28,14 +28,23 @@ from cancellation import verify_cancellation
 from feasibility_profile import exact
 from reference_guest_observer import GuestObserver
 import reference_measurement_barrier as barrier
+import kvm_reference_device as capture_device
 
 COUNTS = {'grid': (410, 43050), 'cancel': (5, 175), 'sort-null': (40, 4200)}
+# A genuine410-case report exceeds4MiB. Results were already inspected under
+# the archive's finite per-file limit; use that same limit only for results.
+# Payloads, owner/control records and other metadata keep their smaller bounds.
+MAX_RESULTS_BYTES = archive_capture.MAX_FILE
 
 
 def read_json(path, limit=4 * 1024**2):
     value = strict_json(barrier.bounded(path, limit))
     require(type(value) is dict, 'bounded original metadata object required')
     return value
+
+
+def read_results(path):
+    return read_json(path, MAX_RESULTS_BYTES)
 
 
 def json_lines(path, count, byte_limit, line_limit=MAX_SAMPLE_BYTES):
@@ -129,6 +138,30 @@ def input_bindings(row, expected):
     require(actual == expected, 'original full input bytes differ from retained source-bound configuration')
 
 
+def capture_device_access(artifact, payload, guest, owner, first_measurement_ns):
+    record = read_json(guest / 'device-access.json', 8192)
+    require(set(record) == {'schema_version', 'status', 'commit', 'source_sha256', 'grant', 'probe'}
+        and type(record['schema_version']) is int and record['schema_version'] == 1
+        and record['status'] == 'VERIFIED' and record['commit'] == payload['commit']
+        and record['source_sha256'] == payload['source']['sha256'],
+        'original source-bound capture device access proof missing or failed')
+    capture_device.validate_access(record['grant'], record['probe'])
+    require(type(first_measurement_ns) is int
+        and record['probe']['closed_monotonic_ns'] < first_measurement_ns,
+        'actual nobody capture device preflight must finish before measurement')
+    directory = owner / 'capture-device-open'
+    receipt = passing_receipt(directory, payload['source'])
+    require(receipt['command'] == ['/usr/bin/setpriv', '--reuid=65534', '--regid=65534',
+        '--clear-groups', '--', '/usr/bin/python3', '/work/c/scripts/kvm_reference_device.py', 'probe'],
+        'actual capture device probe command or measurement identity differs')
+    path = artifact / 'payload.json'
+    input_bindings(receipt, {'/work/c/.local-runs/kvm-input/payload.json':
+        {'sha256': sha(path), 'bytes': path.stat().st_size}})
+    require(read_json(directory / 'stdout.txt', 8192) == record['probe'],
+        'original capture device probe stdout differs from retained observation')
+    return record
+
+
 def guest_controls(artifact, payload, guest, events):
     controls = recovered_tree(artifact, 'guest-control', 'control')
     configs = artifact / 'guest-config'
@@ -203,6 +236,8 @@ def guest_controls(artifact, payload, guest, events):
     require(set((owner / 'serial-getty-state/stdout.txt').read_text(encoding='utf-8').splitlines()) ==
         {'LoadState=masked', 'ActiveState=inactive'}, 'actual full guest console policy differs')
     require(b'RILLTIME ' in (owner / 'gnu-time/stderr.txt').read_bytes(), 'actual full guest GNU time probe missing')
+    capture_device_access(artifact, payload, guest, owner,
+        boundaries['grid-start']['sample']['monotonic_ns'])
     for stage in STAGES:
         original = passing_receipt(nested / stage, payload['source']); input_bindings(original, expected)
         command = original['command']; root = PurePosixPath('/work/c')
@@ -378,7 +413,7 @@ def validate(artifact, out, owner_receipt):
                         and verification['required_success_cases_checked'] == (290 if stage == 'grid' else 40)
                         and verification['independent_semantic_comparisons'] >= (17400 if stage == 'grid' else 2400),
                         'required successful seeded comparisons incomplete')
-                result = read_json(restored / 'results.json'); results[stage] = result
+                result = read_results(restored / 'results.json'); results[stage] = result
                 if payload is not None: completed_scope(stage, manifest, result, payload)
                 require(before == sha(archive), 'original full CAS changed during offline validation')
                 row['all_record_validation'] = 'PASS'

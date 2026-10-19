@@ -13,7 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'scripts')); sys.path.insert(0, str(ROOT / 'benchmarks'))
 from kvm_pilot_common import require, read_json, write_json, payload_files, sha
 from kvm_pilot_guest import probe_identity, failed, attempt
-from kvm_reference_common import METHOD, STAGES, identity
+from kvm_reference_common import METHOD, STAGES, identity, strict_json
 from kvm_reference_budget import (VM_SECONDS, GUEST_SETUP_SECONDS, COLLECTION_SECONDS,
     GUEST_FINISH_SECONDS, PACKAGE_SECONDS)
 from kvm_reference_events import emit
@@ -23,10 +23,32 @@ from owned_process import LinuxOwnedChildren
 from reference_guest_owner import Coordinator
 import reference_measurement_barrier as barrier
 import reference_capture_export as exporter
+import kvm_reference_device as capture_device
 
 BASE = ROOT / '.local-runs/kvm-reference'
 INPUT = ROOT / '.local-runs/kvm-input/payload.json'
 MARKER = Path('/run/rillscope-owned-reference')
+
+
+def prepare_capture_device(payload, checked):
+    identity(payload['commit'], payload['source']['sha256'])
+    record = {'schema_version': 1, 'status': 'FAIL', 'commit': payload['commit'],
+        'source_sha256': payload['source']['sha256'], 'grant': {}}
+    try:
+        capture_device.grant(record['grant'])
+        raw = checked('capture-device-open', ['/usr/bin/setpriv', '--reuid=65534',
+            '--regid=65534', '--clear-groups', '--', '/usr/bin/python3',
+            str(ROOT / 'scripts/kvm_reference_device.py'), 'probe'], timeout=15, inputs=(INPUT,))
+        require(len(raw) <= 8192, 'bounded actual capture device probe required')
+        record['probe'] = strict_json(raw)
+        capture_device.validate_access(record['grant'], record['probe'])
+        record['status'] = 'VERIFIED'
+    except Exception as error:
+        record['error'] = type(error).__name__ + ': ' + str(error)[:1024]
+        raise
+    finally:
+        write_json(BASE / 'exports/device-access.json', record)
+    return record
 
 
 def configurations(payload, started_ns, now_ns, boot_id):
@@ -93,6 +115,9 @@ def collect(payload, ownership, started_ns):
     # root-owned ACK files/configuration cannot be replaced by that identity.
     os.chmod(BASE / 'control', 0o1777)
     os.chmod(BASE / 'exports', 0o1777)
+    # Fail before coordination or queries if the actual measurement identity
+    # cannot open the one named capture port. No protocol bytes are sent here.
+    prepare_capture_device(payload, checked)
     emit('setup-end')
     def ready(stage, request):
         data = barrier.bounded(barrier.CONTROL_ROOT / (stage + '-request.json'))
