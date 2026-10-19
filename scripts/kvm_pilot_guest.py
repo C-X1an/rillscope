@@ -68,27 +68,36 @@ def probe_identity(payload):
 class GuestObserver:
     def __init__(self):
         self.stop = threading.Event(); self.error = None; self.count = 0
+        self.final_sampled = False
         self.thread = threading.Thread(target=self.run, name='owned-guest-observer', daemon=True)
+
+    def observe(self):
+        require(self.count < 3000, 'guest observation count exceeds pilot bound')
+        started = time.monotonic_ns(); cpu = time.thread_time_ns()
+        row = snapshot('interval')
+        row['network'] = interfaces()
+        row.update(observer_wall_ns=time.monotonic_ns() - started,
+                   observer_cpu_ns=time.thread_time_ns() - cpu)
+        append_json(BASE / 'exports/guest-samples.jsonl', row)
+        self.count += 1
 
     def run(self):
         try:
             while not self.stop.is_set():
-                started = time.monotonic_ns(); cpu = time.thread_time_ns()
-                row = snapshot('interval')
-                row['network'] = interfaces()
-                row.update(observer_wall_ns=time.monotonic_ns() - started,
-                           observer_cpu_ns=time.thread_time_ns() - cpu)
-                append_json(BASE / 'exports/guest-samples.jsonl', row)
-                self.count += 1
-                require(self.count <= 3000, 'guest observation count exceeds pilot bound')
+                self.observe()
                 self.stop.wait(2)
+            # A snapshot already in flight when close requests a stop can have
+            # an earlier timestamp. Obtain a new real record after that request.
+            self.observe()
+            self.final_sampled = True
         except Exception as error:
-            self.error = type(error).__name__ + ': ' + str(error)
+            self.error = type(error).__name__ + ': ' + str(error)[:2048]
 
     def close(self):
         self.stop.set(); self.thread.join(timeout=5)
         require(not self.thread.is_alive(), 'guest observer failed to stop')
-        require(self.error is None and self.count > 0, 'guest observer failed: ' + str(self.error))
+        require(self.error is None and self.count > 0 and self.final_sampled,
+                'guest observer failed: ' + str(self.error))
 
 
 def failed(row, phase, error):

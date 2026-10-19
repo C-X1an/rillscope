@@ -678,5 +678,73 @@
   "console-reference-current": {
     "path": "verification/product/runs/console-reference-current.json",
     "sha256": "b6574f5a221d3099d49328340b783964e74408cbe8f19bc9d6f3a56e6e7db0e7"
+  },
+  "endpoint-pilot-download": {
+    "path": "verification/product/runs/endpoint-pilot-download.json",
+    "sha256": "a178f00cf68faa79f88760c80e5f0c77134bb37906cbc91732edd59a93b950fd"
+  },
+  "endpoint-pilot-extraction": {
+    "path": "verification/product/runs/endpoint-pilot-extraction.json",
+    "sha256": "d3a84758108af815658419ab1e48a97e10ca3d82602b264c269f5941dda58d8c"
+  },
+  "endpoint-pilot-failure-associations": {
+    "path": "verification/product/runs/endpoint-pilot-failure-associations.json",
+    "sha256": "e8163b2f1692bb359bc0a45e0b4496cda74d7c790968ae056fd454c110629219"
+  },
+  "endpoint-published-ci-status": {
+    "path": "verification/product/runs/endpoint-published-ci-status.json",
+    "sha256": "3451ece02edab84417aa152333bd552a8c72e50d400ac374754c000aeba1eac7"
+  },
+  "endpoint-original-byte-audit": {
+    "path": "verification/product/runs/endpoint-original-byte-audit.json",
+    "sha256": "5b1accafe9e446b8cfb4442a35cf507b01cbde2c28d447327fb6fcbbc84934e6"
+  },
+  "endpoint-original-all-record-fail": {
+    "path": "verification/product/runs/endpoint-original-all-record-fail.json",
+    "sha256": "b8a54f635c1b4dd7f0f704ad39def90b442aba98601dbb96af5f9ab6390b4c6d"
+  },
+  "endpoint-initial-fixture-fail": {
+    "path": "verification/product/runs/endpoint-initial-fixture-fail.json",
+    "sha256": "b3dcf197a2148c0fa0710903d0327cced1b9f34634cf6f7fc54178993a84e404"
+  },
+  "endpoint-corrected-before": {
+    "path": "verification/product/runs/endpoint-corrected-before.json",
+    "sha256": "10efc570fbeed58202e5eeb650693d01912d9dc737112dda32629bf812e609a1"
+  },
+  "endpoint-after": {
+    "path": "verification/product/runs/endpoint-after.json",
+    "sha256": "bf35b6df5578ba4ca16d66fd9fe891fefc5d153863774a4cde1b6c8714bf586c"
+  },
+  "endpoint-adjacent70": {
+    "path": "verification/product/runs/endpoint-adjacent70.json",
+    "sha256": "37b0f2e32f934425ee49252b749989613b9c6d3e5f76a186f63b9cc1052da367"
+  },
+  "endpoint-review-current70": {
+    "path": "verification/product/runs/endpoint-review-current70.json",
+    "sha256": "622140ba161a5d163387382113a96b0f3faa5a9fb6055aef72861941f68ac149"
+  },
+  "endpoint-review-adversarial5": {
+    "path": "verification/product/runs/endpoint-review-adversarial5.json",
+    "sha256": "324c9f0e099563bd724d1f1c1b339fe81e4a20a5d1ffc3e243c28e604f1b3488"
+  },
+  "endpoint-review-old-observer-negative": {
+    "path": "verification/product/runs/endpoint-review-old-observer-negative.json",
+    "sha256": "b34469be14b7f859def72fa03902f0770e6667fd7c001f44986cc2d3dd91e7f6"
+  },
+  "endpoint-review-restored5": {
+    "path": "verification/product/runs/endpoint-review-restored5.json",
+    "sha256": "3a8d124351c5f45dc902cd991e9ba8bd1c141e0f535ac6d5d51a7ac0adf491e6"
+  },
+  "endpoint-wording-current": {
+    "path": "verification/product/runs/endpoint-wording-current.json",
+    "sha256": "f36dba1b768b169b23d734f2f93dafca70974ea9e7da4b65eac414cedc116d31"
+  },
+  "endpoint-claims-current-audit": {
+    "path": "verification/product/runs/endpoint-claims-current-audit.json",
+    "sha256": "1d351703612a41948eadea36d731188689d53e70aa6bfa6463c06fcc5a5105f0"
+  },
+  "endpoint-reference-current": {
+    "path": "verification/product/runs/endpoint-reference-current.json",
+    "sha256": "90a378f55e808444dd95c36a285fa5911771ba1b246aefd1c3ee3a10ffa4908d"
   }
 }
