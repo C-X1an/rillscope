@@ -15,7 +15,7 @@ from kvm_pilot_common import PREFIX
 
 
 class HostCoverage(unittest.TestCase):
-    def fixture(self, base, fragment=False, false_labels=False):
+    def fixture(self, base, fragment=False, false_labels=False, active_console=False):
         artifact = base / 'artifact'; guest = artifact / 'guest'; guest.mkdir(parents=True)
         payload = {'commit': '1' * 40, 'source': {'sha256': '2' * 64}, 'bins': {}}
         phases = [('stage-start', 'setup'), ('ready', None), ('network-down', None)]
@@ -69,14 +69,17 @@ class HostCoverage(unittest.TestCase):
         checker.write_json(guest / 'guest-result.json', {'status': 'COLLECTED', 'campaigns': campaigns, 'cleanup': {'status': 'PASS'}})
         helpers = artifact / 'guest-helper-commands/gnu-time'; helpers.mkdir(parents=True)
         (helpers / 'stderr.txt').write_bytes(b'RILLTIME 0.0 0.0 123\n')
+        console = artifact / 'guest-helper-commands/serial-getty-state'; console.mkdir()
+        (console / 'stdout.txt').write_bytes(b'LoadState=loaded\nActiveState=active\n' if active_console
+                                            else b'LoadState=masked\nActiveState=inactive\n')
         checker.write_json(artifact / 'host-link-down.json', {'response': {'return': {}},
             'requested': {'monotonic_ns': 15_100_000_000}, 'finished_monotonic_ns': 15_200_000_000})
         return artifact, payload, guest
 
-    def exercise(self, fragment=False, false_labels=False):
+    def exercise(self, fragment=False, false_labels=False, active_console=False):
         (ROOT / '.local-runs').mkdir(exist_ok=True)
         with tempfile.TemporaryDirectory(prefix='kh-', dir=ROOT / '.local-runs') as temporary:
-            artifact, payload, guest = self.fixture(Path(temporary), fragment, false_labels)
+            artifact, payload, guest = self.fixture(Path(temporary), fragment, false_labels, active_console)
             with patch.object(checker, 'passing_receipt'):
                 return checker.continuity(artifact, payload, guest)
 
@@ -89,6 +92,9 @@ class HostCoverage(unittest.TestCase):
     def test_sample_interval_labels_must_match_received_lifecycle(self):
         # False labels must be rejected explicitly, independently of row count.
         with self.assertRaisesRegex(ValueError, 'label'): self.exercise(false_labels=True)
+
+    def test_an_active_guest_console_owner_is_rejected(self):
+        with self.assertRaisesRegex(ValueError, 'console policy'): self.exercise(active_console=True)
 
 
 if __name__ == '__main__': unittest.main()

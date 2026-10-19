@@ -131,8 +131,10 @@ def continuity(artifact, payload, guest):
         and guest_result['campaigns'] == campaigns and len(campaigns) == 3, 'original guest outcome differs')
     helpers = recovered_tree(artifact, 'guest-helper-commands', 'commands')
     nested = recovered_tree(artifact, 'guest-command-receipts', 'raw-receipts')
-    for name in ('apt-update', 'apt-install', 'stop-package-services', 'installed-tools', 'gnu-time', 'gdb-version'):
+    for name in ('apt-update', 'apt-install', 'stop-package-services', 'installed-tools', 'gnu-time', 'gdb-version', 'serial-getty-state'):
         passing_receipt(helpers / name, payload['source'])
+    require(set((helpers / 'serial-getty-state/stdout.txt').read_text(encoding='utf-8').splitlines())
+            == {'LoadState=masked', 'ActiveState=inactive'}, 'actual owned console policy differs')
     require(b'RILLTIME ' in (helpers / 'gnu-time/stderr.txt').read_bytes(), 'actual GNU time probe output missing')
     for recorded, (label, profile, seconds) in zip(campaigns, STAGES):
         require(recorded['stage'] == label and recorded['profile'] == profile

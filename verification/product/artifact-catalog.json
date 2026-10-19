@@ -590,5 +590,93 @@
   "kvm-repair-reference-current": {
     "path": "verification/product/runs/kvm-repair-reference-current.json",
     "sha256": "cd1be25b6402f7c23f42ea27090011e9d3defc1ec646b8517d52405200614ea8"
+  },
+  "console-pilot-download": {
+    "path": "verification/product/runs/console-pilot-download.json",
+    "sha256": "ad9f6b0eb5335b85228ca3c2ee6b96eaa547c03c3b9fb6b32f8201cb6a3f24d2"
+  },
+  "console-pilot-extraction": {
+    "path": "verification/product/runs/console-pilot-extraction.json",
+    "sha256": "b015d6fc9e8aa17ce909f6780c944da3249c6a8cb7865b37c696ba0126fd6a4f"
+  },
+  "console-pilot-original-byte-audit": {
+    "path": "verification/product/runs/console-pilot-original-byte-audit.json",
+    "sha256": "79369cf681c450e2a52654a50e60ff9c7792ff775b7bea724edec397d6eef627"
+  },
+  "console-pilot-failure-associations": {
+    "path": "verification/product/runs/console-pilot-failure-associations.json",
+    "sha256": "f1f7e2b980d9e9dd395541b6735d2bbf5c249499039fd21d95571a710f34da86"
+  },
+  "console-published-ci-status": {
+    "path": "verification/product/runs/console-published-ci-status.json",
+    "sha256": "1405d2d1c221c422c8282f15a80708810d04c348b426310c3462bc3c3d5b34e9"
+  },
+  "console-eio-initial-before": {
+    "path": "verification/product/runs/console-eio-initial-before.json",
+    "sha256": "b7649310e47fdc3d7ee6f539d1aa728c6a1f8878aebef674d10590a4d01572c4"
+  },
+  "console-eio-expanded-before": {
+    "path": "verification/product/runs/console-eio-expanded-before.json",
+    "sha256": "c3ef64ec7bd62a05e200e07177399fe481af1870b28943aadb7278748df8bebe"
+  },
+  "console-eio-after": {
+    "path": "verification/product/runs/console-eio-after.json",
+    "sha256": "a845441c06b9876941fee42a084deb8b8f5c04efe606caba9e44afd9a6491b28"
+  },
+  "console-adjacent-fixture-failed": {
+    "path": "verification/product/runs/console-adjacent-fixture-failed.json",
+    "sha256": "1bbd9891b58984c88ecb1ba694c30d40fb1b1340cc946479f3eb2a98920ffa43"
+  },
+  "console-adjacent64": {
+    "path": "verification/product/runs/console-adjacent64.json",
+    "sha256": "7f69a6a33c21e73961ea8a12f570432fd8b0d52c8a6a229cfea70350b65d1aa0"
+  },
+  "console-review-initial64": {
+    "path": "verification/product/runs/console-review-initial64.json",
+    "sha256": "d9651b61d5592bac379f8feb10c84c19e237b21ded1ff57d970fd7d611bbd9a8"
+  },
+  "console-review-shutdown-before": {
+    "path": "verification/product/runs/console-review-shutdown-before.json",
+    "sha256": "d2f772c643df9b438e753f975401720fa6331c2143f4c3d76f7cad1f4a8982e9"
+  },
+  "console-shutdown-before": {
+    "path": "verification/product/runs/console-shutdown-before.json",
+    "sha256": "b02ec316540751ae387058efac2259148c0b02e751ae0f820fa87387e0e6ee84"
+  },
+  "console-shutdown-after": {
+    "path": "verification/product/runs/console-shutdown-after.json",
+    "sha256": "9ba29835f38fa1966d421f86f1139e7a82e41ac33cf05bc654d2973a7941f948"
+  },
+  "console-review-current65": {
+    "path": "verification/product/runs/console-review-current65.json",
+    "sha256": "60a384094a8798478a48a12cb000661e4fa7b33f7426737428c19346c20527e2"
+  },
+  "console-review-one-shot-restored": {
+    "path": "verification/product/runs/console-review-one-shot-restored.json",
+    "sha256": "25d08dcbc9af26142ea6532bbd8cb286ca42aacbff339c1c04cbf04c1de23586"
+  },
+  "console-review-old-order-negative": {
+    "path": "verification/product/runs/console-review-old-order-negative.json",
+    "sha256": "cbcb288d50160a387a2ed9d592130aa0cee89dc9b99f82b709fb957195fe42bd"
+  },
+  "console-review-restored7": {
+    "path": "verification/product/runs/console-review-restored7.json",
+    "sha256": "9326fe63290a3bf7061928efd5bf5933651921f359fa97eb9f8a56e1953261f6"
+  },
+  "console-full-reference": {
+    "path": "verification/product/runs/console-full-reference.json",
+    "sha256": "deed5aebe92feb09bc8886b0d98e0f2c2ee26133c04c76eee328512b82e719b3"
+  },
+  "console-wording-current": {
+    "path": "verification/product/runs/console-wording-current.json",
+    "sha256": "885e9ffa0950ef9b95fae4f71b6371517946c61c6dc87d1c4ffb67ee1b2e02e1"
+  },
+  "console-claims-current-audit": {
+    "path": "verification/product/runs/console-claims-current-audit.json",
+    "sha256": "3cd5e3927c377e2e08c4b4bc626e7b044feeea9a9d569468d2996e08a579a6b7"
+  },
+  "console-reference-current": {
+    "path": "verification/product/runs/console-reference-current.json",
+    "sha256": "b6574f5a221d3099d49328340b783964e74408cbe8f19bc9d6f3a56e6e7db0e7"
   }
 }

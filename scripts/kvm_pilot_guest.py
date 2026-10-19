@@ -9,6 +9,7 @@ import subprocess
 import sys
 import threading
 import time
+import traceback
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'scripts')); sys.path.insert(0, str(ROOT / 'benchmarks'))
@@ -91,7 +92,8 @@ class GuestObserver:
 
 
 def failed(row, phase, error):
-    record = {'phase': phase, 'error': type(error).__name__, 'reason': str(error)[:2048]}
+    record = {'phase': phase, 'error': type(error).__name__, 'reason': str(error)[:2048],
+              'traceback': ''.join(traceback.format_exception(error, limit=8))[-8192:]}
     if isinstance(error, (TrialInterrupted, KeyboardInterrupt)): row['interrupted'] = True
     row['status'] = 'FAIL'; row.setdefault('first_error', record)
     failures = row.setdefault('failures', [])
@@ -192,6 +194,10 @@ def collect(payload, ownership):
     checked('gnu-time', ['/usr/bin/time', '-f', 'RILLTIME %U %S %M', '--',
                         '/usr/bin/python3', '-c', 'print("owned GNU-time probe")'], timeout=15)
     checked('gdb-version', ['/usr/bin/gdb', '--version'], timeout=15)
+    console = checked('serial-getty-state', ['/usr/bin/systemctl', 'show',
+        '--property=LoadState', '--property=ActiveState', 'serial-getty@ttyS0.service'], timeout=15)
+    require(set(console.decode('utf-8').splitlines()) == {'LoadState=masked', 'ActiveState=inactive'},
+            'owned guest serial getty must actually be runtime masked and inactive')
     require(payload_files(ROOT) == payload['files'], 'actual transferred checkout/build payload differs')
     identity = probe_identity(payload)
     # The existing nobody identity may write only its owned capture directories.
@@ -252,16 +258,23 @@ def main():
     try:
         result = collect(read_json(INPUT), ownership)
     except (Exception, KeyboardInterrupt) as error:
-        result.update(status='FAIL', error=type(error).__name__, reason=str(error))
-        emit('guest-failure', status='FAIL', error=type(error).__name__)
+        failed(result, 'collect', error)
+        # Save the original traceback before touching the possibly broken stream.
+        write_json(BASE / 'exports/guest-result.json', result)
+        attempt(result, 'guest-failure-event', lambda: emit('guest-failure', status='FAIL', error=type(error).__name__))
     finally:
         for number in (signal.SIGTERM, signal.SIGINT): signal.signal(number, signal.SIG_IGN)
-        cleanup = ownership.finish(None)
+        try: cleanup = ownership.finish(None)
+        except (Exception, KeyboardInterrupt) as error:
+            failed(result, 'cleanup', error)
+            cleanup = {'status': 'FAIL', 'reason': str(error)[:2048]}
         result['cleanup'] = cleanup
         if cleanup['status'] != 'PASS': result['status'] = 'FAIL'
         write_json(BASE / 'exports/guest-result.json', result)
-        os.sync()
-    emit('guest-exit', status=result['status'])
+        attempt(result, 'sync', os.sync)
+    attempt(result, 'guest-exit-event', lambda: emit('guest-exit', status=result['status']))
+    # A failed final event cannot leave a previous COLLECTED result on disk.
+    write_json(BASE / 'exports/guest-result.json', result)
     return 0 if result['status'] == 'COLLECTED' else 1
 
 

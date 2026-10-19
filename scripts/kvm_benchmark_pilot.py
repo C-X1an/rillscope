@@ -41,12 +41,31 @@ from kvm_boot_recovery import recover_boot_logs
 
 DISK_BYTES = 16 * 1024**3
 BOOT_PREFIX = 'RILLSCOPE_PILOT_BOOT_V1 '
-BOOTSTRAP = r'''import base64,json,os,pathlib,subprocess,time
-record={'worker_exit':None,'unmount_status':'NOT MOUNTED','reference_qualified':False}
+BOOTSTRAP = r'''import base64,json,os,pathlib,subprocess,time,traceback
+record={'worker_exit':None,'unmount_status':'NOT MOUNTED','reference_qualified':False,'console_errors':[]}
 mounted=False
+def trace(error):
+    return ''.join(traceback.format_exception(error,limit=8))[-8192:]
+def console_error(phase,error):
+    if len(record['console_errors'])<8:
+        record['console_errors'].append({'phase':phase,'error':type(error).__name__,
+            'reason':str(error)[:1024],'traceback':trace(error)[-2048:]})
 def stage(name):
-    print('RILLSCOPE_PILOT_BOOT_STAGE_V1 '+json.dumps({'stage':name,'utc_ns':time.time_ns(),
-        'monotonic_ns':time.monotonic_ns(),'reference_qualified':False},separators=(',',':')),flush=True)
+    try:
+        print('RILLSCOPE_PILOT_BOOT_STAGE_V1 '+json.dumps({'stage':name,'utc_ns':time.time_ns(),
+            'monotonic_ns':time.monotonic_ns(),'reference_qualified':False},separators=(',',':')),flush=True)
+    except BaseException as error: console_error(name,error)
+def persist():
+    path=pathlib.Path('/work/c/.local-runs/kvm-pilot/exports/boot-result.json')
+    path.parent.mkdir(parents=True,exist_ok=True)
+    data=json.dumps({**record,'scope':'actual worker/console state saved before unmount; final unmount is serial-only'},
+        separators=(',',':'),allow_nan=False).encode()
+    if len(data)>65536: raise ValueError('boot diagnostic record exceeds bound')
+    pending=path.with_name('boot-result.json.pending')
+    with pending.open('xb') as stream:
+        if stream.write(data)!=len(data): raise OSError('incomplete boot diagnostic write')
+        stream.flush();os.fsync(stream.fileno())
+    os.replace(pending,path)
 stage('bootstrap-enter')
 try:
     pathlib.Path('/work').mkdir(exist_ok=False)
@@ -54,30 +73,51 @@ try:
     subprocess.run(['/usr/bin/mount','-t','ext4','/dev/disk/by-id/virtio-rillwork','/work'],check=True,timeout=30)
     mounted=True
     stage('work-mount-complete')
+    if record['console_errors']: raise OSError(5,'owned serial control stream failed before worker start')
     pathlib.Path('/run/rillscope-owned-pilot').write_text('owned-ephemeral-kvm-pilot\n')
     stage('worker-start')
+    if record['console_errors']: raise OSError(5,'owned serial control stream failed at worker start')
     result=subprocess.run(['/usr/bin/env','PYTHONDONTWRITEBYTECODE=1','GIT_OPTIONAL_LOCKS=0',
         '/usr/bin/python3','/work/c/scripts/kvm_pilot_guest.py'],stdin=subprocess.DEVNULL)
     record['worker_exit']=result.returncode
     stage('worker-return')
 except BaseException as error:
-    record.update(error=type(error).__name__,reason=str(error)[:1024])
+    record.update(error=type(error).__name__,reason=str(error)[:1024],traceback=trace(error))
 finally:
     if mounted:
-        os.sync()
+        record['unmount_status']='PENDING'
+        stage('work-unmount-start')
         try:
-            stage('work-unmount-start')
+            persist()
+            os.sync()
+        except BaseException as error:
+            record.update(retention_error=type(error).__name__,retention_reason=str(error)[:1024])
+        # Console and disk-diagnostic failures cannot suppress actual unmount.
+        try:
             subprocess.run(['/usr/bin/umount','/work'],check=True,timeout=30,capture_output=True)
             record['unmount_status']='PASS'
             stage('work-unmount-complete')
         except BaseException as error:
             record.update(unmount_status='FAIL',unmount_error=type(error).__name__)
     record.update(utc_ns=time.time_ns(),monotonic_ns=time.monotonic_ns())
-    data=json.dumps(record,separators=(',',':')).encode()
-    print('RILLSCOPE_PILOT_BOOT_V1 '+base64.b64encode(data).decode('ascii'),flush=True)
     stage('shutdown-start')
+    try:
+        data=json.dumps(record,separators=(',',':')).encode()
+        if len(data)>65536: raise ValueError('boot serial result exceeds bound')
+        print('RILLSCOPE_PILOT_BOOT_V1 '+base64.b64encode(data).decode('ascii'),flush=True)
+    except BaseException as error: console_error('final-boot-result',error)
     subprocess.run(['/usr/sbin/shutdown','-h','now'],check=False,timeout=15)
 '''
+
+
+def cloud_config():
+    # Only the newly allocated guest's runtime unit is affected. Mask it before
+    # cloud-final opens ttyS0: serial-getty's TTYVHangup invalidates existing FDs.
+    return {'package_update': False, 'package_upgrade': False, 'ssh_pwauth': False, 'disable_root': True,
+        'users': [], 'bootcmd': [['/usr/bin/systemctl', 'mask', '--runtime', '--now', 'serial-getty@ttyS0.service']],
+        'write_files': [{'path': '/opt/rillscope-pilot-boot.py', 'permissions': '0644',
+            'encoding': 'b64', 'content': base64.b64encode(BOOTSTRAP.encode()).decode('ascii')}],
+        'runcmd': [['/bin/sh', '-c', '/usr/bin/python3 /opt/rillscope-pilot-boot.py > /dev/ttyS0 2>&1']]}
 
 
 def git(root, *arguments):
@@ -246,8 +286,10 @@ def parse_boot(serial):
     for line in serial.splitlines():
         if BOOT_PREFIX not in line: continue
         value = line.split(BOOT_PREFIX, 1)[1].strip()
-        require(len(value) <= 4096, 'boot result exceeds bound')
-        row = json.loads(base64.b64decode(value, validate=True))
+        require(len(value) <= 90000, 'boot result exceeds bound')
+        decoded = base64.b64decode(value, validate=True)
+        require(len(decoded) <= 65536, 'decoded boot result exceeds bound')
+        row = json.loads(decoded)
         require(isinstance(row, dict) and row.get('reference_qualified') is False, 'invalid boot result')
         rows.append(row)
     require(len(rows) <= 1, 'duplicate boot result')
@@ -498,6 +540,7 @@ def run_vm(out, command, port, payload, uid, ownership):
             and len(result['host_transfers']) == 3
             and receiver_exit == 0 and receiver_result.get('status') == 'PASS'
             and boot and boot.get('worker_exit') == 0 and boot.get('unmount_status') == 'PASS'
+            and boot.get('console_errors') == [] and 'retention_error' not in boot and 'error' not in boot
             and any(row['phase'] == 'guest-exit' and row.get('status') == 'COLLECTED' for row in events)):
         result['status'] = 'COLLECTED'
     write_json(artifact / 'vm-result.json', result)
@@ -535,10 +578,7 @@ def prepare_host(out, build_path, commit, run_as, ownership):
     # No host mount: mkfs populates the newly owned raw disk before QEMU opens it.
     with (out / 'work.raw').open('xb') as stream: stream.truncate(DISK_BYTES)
     checked('work-format', ['mkfs.ext4', '-F', '-m', '0', '-L', 'rillwork', '-d', str(stage), str(out / 'work.raw')], timeout=120)
-    config = {'package_update': False, 'package_upgrade': False, 'ssh_pwauth': False, 'disable_root': True,
-        'users': [], 'write_files': [{'path': '/opt/rillscope-pilot-boot.py', 'permissions': '0644',
-            'encoding': 'b64', 'content': base64.b64encode(BOOTSTRAP.encode()).decode('ascii')}],
-        'runcmd': [['/bin/sh', '-c', '/usr/bin/python3 /opt/rillscope-pilot-boot.py > /dev/ttyS0 2>&1']]}
+    config = cloud_config()
     (out / 'user-data').write_text('#cloud-config\n' + json.dumps(config) + '\n', encoding='utf-8')
     (out / 'meta-data').write_text('instance-id: rillscope-cost-pilot\nlocal-hostname: rillscope-cost-pilot\n', encoding='utf-8')
     checked('seed-create', ['cloud-localds', str(out / 'seed.iso'), str(out / 'user-data'), str(out / 'meta-data')],

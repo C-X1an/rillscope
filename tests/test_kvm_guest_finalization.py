@@ -41,6 +41,7 @@ class GuestFinalization(unittest.TestCase):
                     'ipv4_routes': 'retained actual route fixture', 'ipv6_routes': ''}
             def checked(name, command, **_):
                 nonlocal after
+                if name == 'serial-getty-state': return b'LoadState=masked\nActiveState=inactive\n'
                 if name.startswith('campaign-'):
                     label = name.removeprefix('campaign-'); calls.append(label)
                     if fault == 'no-raw': raise OSError('deliberate launch failure before raw creation')
