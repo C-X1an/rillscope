@@ -14,13 +14,21 @@ sys.path.insert(0, str(ROOT / 'scripts'))
 from run import environment
 from build import build_release
 import archive_capture
+import reference_capture_export
+import reference_measurement_barrier as measurement
 from verify_sequence import write_json
 
 
-def retain_capture(out,stage):
+def retain_capture(out,stage,*,export_stage=None):
     """Retain every available raw file before starting the lengthy validator."""
     try:
         result=archive_capture.pack(out/stage,out/('capture-'+stage))
+        if result['status']=='RECORDED':
+            exported=reference_capture_export.export_capture(out/('capture-'+stage)/'capture.zip',
+                stage if export_stage is None else export_stage)
+            result['host_export']=exported
+            if exported['status'] not in {'NOT REQUESTED','HOST ACKNOWLEDGED'}:
+                result.update(pack_status='RECORDED',status='FAIL')
     except (OSError,ValueError,TypeError,KeyError) as error:
         result={'status':'FAIL','error':type(error).__name__,'reason':str(error)}
     write_json(out/('retention-'+stage+'.json'),result)
@@ -90,13 +98,13 @@ def main():
     if reasons: return 77
     build = build_release(args.out / 'build')
     proof = args.out / 'build/build.json'
-    code = subprocess.call([sys.executable, str(ROOT / 'benchmarks/run.py'), '--binary', str(ROOT / build['bins']['rillscope-measure']['path']),
-                            '--build-receipt', str(proof), '--out', str(args.out / 'grid')], cwd=ROOT)
+    code = measurement.collect('grid', lambda: subprocess.call([sys.executable, str(ROOT / 'benchmarks/run.py'), '--binary', str(ROOT / build['bins']['rillscope-measure']['path']),
+                            '--build-receipt', str(proof), '--out', str(args.out / 'grid')], cwd=ROOT))
     retained=retain_capture(args.out,'grid')
     if code: return code
     if retained: return retained
-    code = subprocess.call([sys.executable, str(ROOT / 'benchmarks/cancellation.py'), '--binary', str(ROOT / build['bins']['rillscope']['path']),
-                            '--build-receipt', str(proof), '--out', str(args.out / 'cancel')], cwd=ROOT)
+    code = measurement.collect('cancel', lambda: subprocess.call([sys.executable, str(ROOT / 'benchmarks/cancellation.py'), '--binary', str(ROOT / build['bins']['rillscope']['path']),
+                            '--build-receipt', str(proof), '--out', str(args.out / 'cancel')], cwd=ROOT))
     retained=retain_capture(args.out,'cancel')
     if code: return code
     if retained: return retained

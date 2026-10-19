@@ -1,0 +1,102 @@
+{
+  "name": "Full KVM benchmark collection (fresh checkout remains separate)",
+  "on": {
+    "workflow_dispatch": {
+      "inputs": {
+        "expected_commit": {"description": "Exact audited public commit SHA", "required": true, "type": "string"}
+      }
+    }
+  },
+  "permissions": {"contents": "read"},
+  "concurrency": {"group": "kvm-full-${{ github.run_id }}", "cancel-in-progress": false},
+  "jobs": {
+    "collect": {
+      "runs-on": "ubuntu-24.04",
+      "timeout-minutes": 360,
+      "steps": [
+        {
+          "name": "Require the exact audited commit before checkout or execution",
+          "id": "source_guard", "timeout-minutes": 1,
+          "env": {"EXPECTED_COMMIT": "${{ inputs.expected_commit }}"},
+          "run": "python3 -c 'import os,re,sys; e=os.environ[\"EXPECTED_COMMIT\"]; sys.exit(0 if re.fullmatch(\"[0-9a-f]{40}\",e) and e == os.environ[\"GITHUB_SHA\"] else \"audited commit mismatch\")'"
+        },
+        {
+          "uses": "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "id": "checkout", "timeout-minutes": 2,
+          "with": {"persist-credentials": false}
+        },
+        {
+          "name": "Prepare tools and genuine pinned release build within one finite budget",
+          "timeout-minutes": 5,
+          "run": "mkdir -p .local-runs\nsudo -n python3 scripts/evidence.py --out .local-runs/kfull-provision-command --timeout 270 -- python3 scripts/prepare_kvm_reference.py --out .local-runs/kfull-provision-details --run-as \"$(id -un)\""
+        },
+        {
+          "name": "Collect all original full grid, cancellation and NULL-sort campaigns once",
+          "id": "collection", "timeout-minutes": 326,
+          "run": "sudo -n python3 scripts/evidence.py --out .local-runs/kfull-command --timeout 19500 --input .local-runs/kfull-build/build.json -- python3 scripts/kvm_reference_host.py --out .local-runs/kf --run-as \"$(id -un)\" --build-receipt .local-runs/kfull-build/build.json --commit \"$GITHUB_SHA\""
+        },
+        {
+          "name": "Preserve partial original bytes only after the original owner stopped",
+          "if": "${{ always() && steps.source_guard.outcome == 'success' && steps.checkout.outcome == 'success' }}",
+          "timeout-minutes": 10,
+          "run": "sudo -n python3 scripts/evidence.py --out .local-runs/kfull-recovery-command --timeout 540 -- python3 scripts/recover_kvm_reference.py --out .local-runs/kf --owner-receipt .local-runs/kfull-command/receipt.json"
+        },
+        {
+          "name": "Retain all available original packages, failed raw, proofs and diagnostics",
+          "if": "${{ always() && steps.source_guard.outcome == 'success' && steps.checkout.outcome == 'success' }}",
+          "timeout-minutes": 15,
+          "uses": "actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9",
+          "with": {
+            "name": "original-full-kvm-collection", "retention-days": 7,
+            "compression-level": 0, "include-hidden-files": true, "if-no-files-found": "error",
+            "path": ".local-runs/kfull-provision-command/\n.local-runs/kfull-provision-details/\n.local-runs/kfull-system/\n.local-runs/kfull-rust/\n.local-runs/kfull-build-command/\n.local-runs/kfull-build/\n.local-runs/kfull-lifecycle-command/\n.local-runs/kfull-lifecycle/\n.local-runs/kfull-command/\n.local-runs/kfull-recovery-command/\n.local-runs/kf/artifact/\n.local-runs/kf/commands/\n.local-runs/kf/SHA256SUMS\n.local-runs/kf/SHA256SUMS.gpg\n.local-runs/kf/ubuntu-cloud-image.asc"
+          }
+        }
+      ]
+    },
+    "validate-all-records": {
+      "if": "${{ always() }}", "needs": "collect", "runs-on": "ubuntu-24.04", "timeout-minutes": 360,
+      "steps": [
+        {
+          "name": "Require the same exact audited commit",
+          "id": "source_guard", "timeout-minutes": 1,
+          "env": {"EXPECTED_COMMIT": "${{ inputs.expected_commit }}"},
+          "run": "python3 -c 'import os,re,sys; e=os.environ[\"EXPECTED_COMMIT\"]; sys.exit(0 if re.fullmatch(\"[0-9a-f]{40}\",e) and e == os.environ[\"GITHUB_SHA\"] else \"audited commit mismatch\")'"
+        },
+        {
+          "uses": "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "id": "checkout", "timeout-minutes": 2, "with": {"persist-credentials": false}
+        },
+        {
+          "name": "Download this original attempt with strict artifact digest verification",
+          "timeout-minutes": 15,
+          "uses": "actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333",
+          "with": {"name": "original-full-kvm-collection", "path": ".local-runs/kfull-downloaded", "digest-mismatch": "error"}
+        },
+        {
+          "name": "Validate every available original record and retain upstream failures",
+          "timeout-minutes": 302,
+          "run": "python3 scripts/evidence.py --out .local-runs/kfull-validation-command --timeout 18000 --input .local-runs/kfull-downloaded/kfull-command/receipt.json --input .local-runs/kfull-downloaded/kf/artifact/configuration.json -- python3 scripts/verify_kvm_reference.py --artifact .local-runs/kfull-downloaded/kf/artifact --owner-receipt .local-runs/kfull-downloaded/kfull-command/receipt.json --out .local-runs/kfull-validation"
+        },
+        {
+          "name": "Keep an upstream collection failure in the final workflow result",
+          "if": "${{ always() && steps.source_guard.outcome == 'success' && steps.checkout.outcome == 'success' }}",
+          "env": {"ORIGINAL_COLLECTION_RESULT": "${{ needs.collect.result }}"},
+          "timeout-minutes": 1,
+          "run": "python3 -c 'import os,sys; sys.exit(0 if os.environ[\"ORIGINAL_COLLECTION_RESULT\"] == \"success\" else \"original collection failed; validation cannot repair it\")'"
+        },
+        {
+          "name": "Retain all actual validation outcomes without uploading another expanded raw copy",
+          "if": "${{ always() && steps.source_guard.outcome == 'success' && steps.checkout.outcome == 'success' }}",
+          "timeout-minutes": 15,
+          "uses": "actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9",
+          "with": {
+            "name": "original-full-kvm-all-record-validation", "retention-days": 7,
+            "include-hidden-files": true, "if-no-files-found": "error",
+            "path": ".local-runs/kfull-validation-command/\n.local-runs/kfull-validation/results.json\n.local-runs/kfull-validation/verified-grid.json\n.local-runs/kfull-validation/verified-cancel.json\n.local-runs/kfull-validation/verified-sort-null.json"
+          }
+        }
+      ]
+    }
+  }
+}

@@ -56,6 +56,12 @@ def send_archive(archive, stage, deadline, *, connection=None):
     value = header({'schema_version': 1, 'stage': stage, 'bytes': size,
         'sha256': sha(archive, archive_capture.MAX_ARCHIVE), 'reference_qualified': False}, stage)
     require(stage in [row[0] for row in STAGES], 'unknown capture stage')
+    return _send_frame(archive, value, deadline, connection=connection)
+
+
+def _send_frame(archive, value, deadline, *, connection=None):
+    """Byte transport shared by closed method-specific wrappers, never a CLI."""
+    size = value['bytes']
     owned = connection is None
     connection = Device() if owned else connection
     if hasattr(connection, 'setblocking'): connection.setblocking(False)
@@ -113,13 +119,16 @@ class Receiver:
         self.started = {'utc_ns': time.time_ns(), 'monotonic_ns': time.monotonic_ns()}
         self.stream = (target / 'capture.zip.pending').open('xb'); self.head.clear()
 
+    def inspect_capture(self, archive):
+        return archive_capture.inspect(archive)[1]
+
     def complete(self):
         row = self.current; target = self.out / row['stage']
         self.stream.flush(); os.fsync(self.stream.fileno()); self.stream.close(); self.stream = None
         require(self.received == row['bytes'] and self.digest.hexdigest() == row['sha256'],
                 'received capture byte count or digest differs')
         pending = target / 'capture.zip.pending'
-        _, metadata = archive_capture.inspect(pending)
+        metadata = self.inspect_capture(pending)
         os.replace(pending, target / 'capture.zip')
         record = {'status': 'VERIFIED HOST BYTES', **row, 'started': self.started,
             'finished': {'utc_ns': time.time_ns(), 'monotonic_ns': time.monotonic_ns()}, 'metadata': metadata}

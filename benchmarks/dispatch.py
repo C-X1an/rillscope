@@ -10,6 +10,8 @@ import time
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'benchmarks'))
 from build import build_release
+from reference_gate import retain_capture
+import reference_measurement_barrier as measurement
 
 
 def main():
@@ -35,8 +37,13 @@ def main():
     binary = ROOT / build['bins']['rillscope-measure']['path']
     command = [sys.executable, str(ROOT / 'benchmarks/run.py'), '--binary', str(binary),
                '--build-receipt', str(out / 'build/build.json'), '--profile', args.profile, '--out', str(out / 'grid')]
-    code = subprocess.call(command, cwd=ROOT)
+    stage = {'full': 'grid', 'sort-null-supplement': 'sort-null'}.get(args.profile)
+    code = measurement.collect(stage, lambda: subprocess.call(command, cwd=ROOT)) if stage else subprocess.call(command, cwd=ROOT)
+    # Export the original supplement (including a failed/partial collection)
+    # before validation. Its canonical validator remains mandatory on success.
+    retained = retain_capture(out, 'grid', export_stage='sort-null') if args.profile == 'sort-null-supplement' else 0
     if code: return code
+    if retained: return retained
     if args.capture_only: return 0
     return subprocess.call([sys.executable, str(ROOT / 'benchmarks/verify.py'), str(out / 'grid')], cwd=ROOT)
 
