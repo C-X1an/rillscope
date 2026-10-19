@@ -168,9 +168,10 @@ def distribution(values):
         return {'n': 0, 'status': 'NOT MEASURED'}
     ordered = sorted(values)
     percentile = lambda fraction: ordered[max(0, math.ceil(len(ordered) * fraction) - 1)]
-    return {'n': len(ordered), 'min': ordered[0], 'p50': statistics.median(ordered),
+    median = statistics.median(ordered)
+    return {'n': len(ordered), 'min': ordered[0], 'p50': median,
             'p95': percentile(.95), 'p99': percentile(.99), 'max': ordered[-1],
-            'median_absolute_deviation': statistics.median(abs(value - statistics.median(ordered)) for value in ordered)}
+            'median_absolute_deviation': statistics.median(abs(value - median) for value in ordered)}
 
 
 def command_for(mode, binary, case, measurement, description):
@@ -262,6 +263,12 @@ def summarize_case(records):
 
 def pair_verdict(triplet, spec):
     oracle = next(result for record, result in triplet if record['mode'] == 'sqlite')
+    canonical_values = {}
+    def canonical_once(result):
+        identity = id(result)
+        if identity not in canonical_values:
+            canonical_values[identity] = canonical(result, spec['ordered'])
+        return canonical_values[identity]
     modes = {}
     for record, result in triplet:
         problems = []
@@ -275,8 +282,8 @@ def pair_verdict(triplet, spec):
                 problems.append('predetermined independent baseline outcome mismatch')
         if result is not None and result['status'] == 'ok' and record['mode'] != 'sqlite':
             if oracle is None or oracle['status'] != 'ok': problems.append('successful Rust output has no successful independent oracle')
-            elif canonical(result, spec['ordered']) != canonical(oracle, spec['ordered']): problems.append('independent SQLite result mismatch')
-        exact = result is not None and result['status'] == 'ok' and oracle is not None and oracle['status'] == 'ok' and canonical(result, spec['ordered']) == canonical(oracle, spec['ordered'])
+            elif canonical_once(result) != canonical_once(oracle): problems.append('independent SQLite result mismatch')
+        exact = result is not None and result['status'] == 'ok' and oracle is not None and oracle['status'] == 'ok' and canonical_once(result) == canonical_once(oracle)
         modes[record['mode']] = {'problems': problems, 'oracle_comparison': 'EXACT' if exact else 'NO SUCCESSFUL RESULT TO COMPARE'}
     return {'phase': triplet[0][0]['phase'], 'repetition': triplet[0][0]['repetition'], 'modes': modes}
 

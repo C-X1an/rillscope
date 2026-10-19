@@ -37,33 +37,45 @@ from build import verify_build
 from run import environment
 import archive_capture
 from kvm_capture_channel import PORT_NAME, fsync_directory
+from kvm_boot_recovery import recover_boot_logs
 
 DISK_BYTES = 16 * 1024**3
 BOOT_PREFIX = 'RILLSCOPE_PILOT_BOOT_V1 '
 BOOTSTRAP = r'''import base64,json,os,pathlib,subprocess,time
 record={'worker_exit':None,'unmount_status':'NOT MOUNTED','reference_qualified':False}
 mounted=False
+def stage(name):
+    print('RILLSCOPE_PILOT_BOOT_STAGE_V1 '+json.dumps({'stage':name,'utc_ns':time.time_ns(),
+        'monotonic_ns':time.monotonic_ns(),'reference_qualified':False},separators=(',',':')),flush=True)
+stage('bootstrap-enter')
 try:
     pathlib.Path('/work').mkdir(exist_ok=False)
+    stage('work-mount-start')
     subprocess.run(['/usr/bin/mount','-t','ext4','/dev/disk/by-id/virtio-rillwork','/work'],check=True,timeout=30)
     mounted=True
+    stage('work-mount-complete')
     pathlib.Path('/run/rillscope-owned-pilot').write_text('owned-ephemeral-kvm-pilot\n')
+    stage('worker-start')
     result=subprocess.run(['/usr/bin/env','PYTHONDONTWRITEBYTECODE=1','GIT_OPTIONAL_LOCKS=0',
         '/usr/bin/python3','/work/c/scripts/kvm_pilot_guest.py'],stdin=subprocess.DEVNULL)
     record['worker_exit']=result.returncode
+    stage('worker-return')
 except BaseException as error:
     record.update(error=type(error).__name__,reason=str(error)[:1024])
 finally:
     if mounted:
         os.sync()
         try:
+            stage('work-unmount-start')
             subprocess.run(['/usr/bin/umount','/work'],check=True,timeout=30,capture_output=True)
             record['unmount_status']='PASS'
+            stage('work-unmount-complete')
         except BaseException as error:
             record.update(unmount_status='FAIL',unmount_error=type(error).__name__)
     record.update(utc_ns=time.time_ns(),monotonic_ns=time.monotonic_ns())
     data=json.dumps(record,separators=(',',':')).encode()
     print('RILLSCOPE_PILOT_BOOT_V1 '+base64.b64encode(data).decode('ascii'),flush=True)
+    stage('shutdown-start')
     subprocess.run(['/usr/sbin/shutdown','-h','now'],check=False,timeout=15)
 '''
 
@@ -73,28 +85,76 @@ def git(root, *arguments):
         'safe.directory=' + str(root), *arguments], cwd=root, timeout=30, stdin=subprocess.DEVNULL)
 
 
-def qmp(port, command, arguments=None):
-    require(command in ('set_link', 'system_powerdown', 'query-balloon', 'query-version'),
+def qmp(port, command, arguments=None, *, output=None, deadline=None):
+    require(type(port) is int and 0 < port < 65536, 'owned local QMP port required')
+    require(command in ('set_link', 'system_powerdown', 'query-balloon', 'query-version',
+                       'query-status', 'query-block', 'info-qtree', 'info-registers', 'screendump'),
             'closed pilot QMP command required')
     if command == 'set_link':
         require(arguments == {'name': 'pilot-nic', 'up': False}, 'only owned NIC link-down is permitted')
     else: require(arguments is None, 'unexpected QMP arguments')
+    request = {'execute': command}
+    if command in ('info-qtree', 'info-registers'):
+        request = {'execute': 'human-monitor-command', 'arguments': {
+            'command-line': 'info qtree' if command == 'info-qtree' else 'info registers'}}
+    elif command == 'screendump':
+        require(output is not None, 'owned screenshot output required')
+        destination = owned_output(output) / 'runtime/boot.ppm'
+        require(not destination.exists() and not destination.is_symlink(), 'preserve earlier framebuffer bytes')
+        request['arguments'] = {'filename': str(destination)}
+    elif arguments is not None: request['arguments'] = arguments
+    deadline = min(time.monotonic() + 6, deadline) if deadline is not None else time.monotonic() + 6
     with socket.create_connection(('127.0.0.1', port), timeout=2) as connection:
         handle = connection.makefile('rwb')
         def reply():
             for _ in range(50):
+                remaining = deadline - time.monotonic()
+                require(remaining > 0, 'QMP diagnostic/response deadline exhausted')
+                connection.settimeout(min(2, remaining))
                 line = handle.readline(1024**2 + 1)
                 require(line and len(line) <= 1024**2, 'invalid bounded QMP framing')
                 value = json.loads(line)
+                require(type(value) is dict, 'QMP response must be an object')
                 if 'event' not in value: return value
             raise ValueError('QMP event bound exceeded')
         require('QMP' in reply(), 'QMP greeting missing')
         handle.write(b'{"execute":"qmp_capabilities"}\n'); handle.flush()
         require('return' in reply(), 'QMP capabilities failed')
-        request = {'execute': command}
-        if arguments is not None: request['arguments'] = arguments
         handle.write(json.dumps(request).encode() + b'\n'); handle.flush()
         return reply()
+
+
+def collect_boot_diagnostics(out, port):
+    """Read the still-owned VM before shutdown; each failed diagnostic is retained."""
+    destination = out / 'artifact/boot-diagnostics'; destination.mkdir(exist_ok=False)
+    deadline = time.monotonic() + 30
+    report = {'status': 'PARTIAL', 'reference_qualified': False, 'observations': [],
+              'scope': 'actual pre-stop firmware/device diagnostics; no boot or benchmark success inferred'}
+    for command in ('query-status', 'query-block', 'info-qtree', 'info-registers', 'screendump'):
+        row = {'command': command, 'status': 'FAIL', 'utc_ns': time.time_ns(), 'monotonic_ns': time.monotonic_ns()}
+        try:
+            require(time.monotonic() < deadline, 'pre-stop diagnostic budget exhausted')
+            row['reply'] = qmp(port, command, output=out if command == 'screendump' else None, deadline=deadline)
+            require('return' in row['reply'], 'QMP diagnostic returned an error')
+            if command == 'screendump':
+                data = bounded_bytes(out / 'runtime/boot.ppm', 16 * 1024**2)
+                header = re.match(rb'P6\s+(\d{1,5})\s+(\d{1,5})\s+255\s', data[:128])
+                require(header is not None, 'unsupported framebuffer header')
+                width, height = int(header[1]), int(header[2])
+                require(0 < width <= 4096 and 0 < height <= 4096
+                        and len(data) == header.end() + width * height * 3, 'framebuffer dimensions or size differ')
+                path = destination / 'framebuffer.ppm'
+                with path.open('xb') as stream: require(stream.write(data) == len(data), 'framebuffer write incomplete')
+                row['framebuffer'] = {'file': path.name, 'bytes': len(data), 'sha256': hashlib.sha256(data).hexdigest(),
+                                      'width': width, 'height': height}
+            row['status'] = 'PASS'
+        except Exception as error:
+            row.update(error=type(error).__name__, reason=str(error)[:1024])
+        report['observations'].append(row)
+        write_json(destination / 'results.json', report)
+    if all(row['status'] == 'PASS' for row in report['observations']): report['status'] = 'COLLECTED'
+    write_json(destination / 'results.json', report)
+    return report
 
 
 def download_bounded(url, path, limit, deadline):
@@ -302,7 +362,9 @@ def qemu_command(out, image, run_as, port):
         '-chardev', 'socket,id=capture,path=' + str(out / 'runtime/capture.sock') + ',server=on,wait=off',
         '-device', 'virtserialport,chardev=capture,name=' + PORT_NAME,
         '-qmp', 'tcp:127.0.0.1:' + str(port) + ',server=on,wait=off',
-        '-drive', 'file=' + str(out / 'disk.qcow2') + ',if=virtio,format=qcow2',
+        '-boot', 'strict=on',
+        '-drive', 'file=' + str(out / 'disk.qcow2') + ',if=none,format=qcow2,id=rillboot-disk',
+        '-device', 'virtio-blk-pci,drive=rillboot-disk,bootindex=1',
         '-drive', 'file=' + str(out / 'work.raw') + ',if=none,format=raw,id=rillwork-disk',
         '-device', 'virtio-blk-pci,drive=rillwork-disk,serial=rillwork',
         '-drive', 'file=' + str(out / 'seed.iso') + ',media=cdrom,format=raw,readonly=on']
@@ -390,6 +452,12 @@ def run_vm(out, command, port, payload, uid, ownership):
         failure = {'error': type(error).__name__, 'reason': str(error)[:2048]}
     finally:
         if process is not None and process.poll() is None:
+            if failure is not None:
+                try: collect_boot_diagnostics(out, port)
+                except Exception as error:
+                    # Diagnostic/storage errors must never bypass owned stop.
+                    print(json.dumps({'boot_diagnostics_status': 'FAIL', 'error': type(error).__name__,
+                                      'reason': str(error)[:1024]}), file=sys.stderr, flush=True)
             try: qmp(port, 'system_powerdown'); process.wait(timeout=15)
             except (OSError, ValueError, subprocess.SubprocessError):
                 process.terminate()
@@ -460,7 +528,8 @@ def prepare_host(out, build_path, commit, run_as, ownership):
     qemu = Path(shutil.which('qemu-system-x86_64')).resolve()
     version = checked('qemu-version', [str(qemu), '--version'], inputs=(qemu,)).decode()
     help_text = checked('qemu-help', [str(qemu), '-help'], inputs=(qemu,))
-    require(b'-runas' in help_text, 'installed QEMU lacks explicit privilege drop')
+    require(b'-runas' in help_text and b'strict=on|off' in help_text,
+            'installed QEMU lacks explicit privilege drop or strict boot support')
     image = signed_image(out, checked, deadline)
     stage, payload = prepare_payload(out, build_path, commit, checked)
     # No host mount: mkfs populates the newly owned raw disk before QEMU opens it.
@@ -539,7 +608,14 @@ def main():
                 remaining = min(RECOVERY_SECONDS, TOTAL_SECONDS - CLEANUP_SECONDS - RESERVE_SECONDS
                     - (time.monotonic() - started))
                 require(remaining > 0, 'no recovery reserve remains')
-                result['recovery'] = recover(out, TrialCommands(out, ownership), time.monotonic() + remaining)
+                recovery_deadline = time.monotonic() + remaining
+                try:
+                    result['boot_recovery'] = recover_boot_logs(out, TrialCommands(out, ownership),
+                        min(recovery_deadline, time.monotonic() + 180))
+                except (Exception, KeyboardInterrupt) as error:
+                    result['boot_recovery'] = {'status': 'FAIL', 'error': type(error).__name__, 'reason': str(error)[:1024]}
+                # A diagnostic failure never suppresses original work-disk recovery.
+                result['recovery'] = recover(out, TrialCommands(out, ownership), recovery_deadline)
             except (Exception, KeyboardInterrupt) as error:
                 result['recovery'] = {'status': 'FAIL', 'error': type(error).__name__, 'reason': str(error)[:2048]}
         cleanup = ownership.finish(None) if ownership is not None else cleanup

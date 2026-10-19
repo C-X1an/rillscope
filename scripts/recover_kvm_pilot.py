@@ -11,6 +11,7 @@ import time
 from evidence import source_identity
 from kvm_pilot_common import RECOVERY_SECONDS, require, read_json, write_json
 from kvm_benchmark_pilot import ROOT, owned_output, recover
+from kvm_boot_recovery import recover_boot_logs
 from inspect_reference_guest import TrialCommands, interrupted
 from owned_process import LinuxOwnedChildren
 
@@ -47,7 +48,16 @@ def main():
             ownership = LinuxOwnedChildren()
             destination = out / 'artifact/after-owner-recovery'
             require(not destination.exists(), 'preserve earlier fallback recovery')
-            result = recover(out, TrialCommands(out / 'artifact', ownership), time.monotonic() + RECOVERY_SECONDS,
+            destination.mkdir()
+            deadline = time.monotonic() + RECOVERY_SECONDS
+            original_boot = out / 'artifact/root-boot-recovery.json'
+            if not original_boot.is_file() or read_json(original_boot).get('status') != 'COLLECTED':
+                try:
+                    report['boot_recovery'] = recover_boot_logs(out, TrialCommands(out / 'artifact', ownership),
+                        min(deadline, time.monotonic() + 180), artifact=destination)
+                except (Exception, KeyboardInterrupt) as error:
+                    report['boot_recovery'] = {'status': 'FAIL', 'error': type(error).__name__, 'reason': str(error)[:1024]}
+            result = recover(out, TrialCommands(out / 'artifact', ownership), deadline,
                              artifact=destination)
             report.update(status='RECORDED' if result['status'] == 'PASS' else 'FAIL', recovery=result)
     except (Exception, KeyboardInterrupt) as error:

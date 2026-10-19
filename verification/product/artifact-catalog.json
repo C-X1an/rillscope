@@ -502,5 +502,93 @@
   "kvm-guard-reference": {
     "path": "verification/product/runs/kvm-guard-reference.json",
     "sha256": "4c153370cad24002bae5be559f1e0066bfd0c44be466b9bdf43bae61efea20f0"
+  },
+  "kvm-repair-pairing-semantic-before": {
+    "path": "verification/product/runs/kvm-repair-pairing-semantic-before.json",
+    "sha256": "f054afd5fbd9202fc83fb1cc689c03e020d40097e7cbbe3ddbe110c0b4da57f6"
+  },
+  "kvm-repair-pairing-semantic-after": {
+    "path": "verification/product/runs/kvm-repair-pairing-semantic-after.json",
+    "sha256": "3084f712e8cbc3ad5089cbfefd4dbbef9583ed6e90404c9c275a0da7ac13e228"
+  },
+  "kvm-repair-pairing-cache-negative": {
+    "path": "verification/product/runs/kvm-repair-pairing-cache-negative.json",
+    "sha256": "8e4fabe5843d38c6667fef8b1de1de49d2b2209bbb9127561fb242789ff0101c"
+  },
+  "kvm-repair-pairing-cache-restored": {
+    "path": "verification/product/runs/kvm-repair-pairing-cache-restored.json",
+    "sha256": "43619f596c49d9234cd89ae44cd7bcc447f1ae029633eee8b78d0dce0532e694"
+  },
+  "kvm-repair-pairing-independent-current": {
+    "path": "verification/product/runs/kvm-repair-pairing-independent-current.json",
+    "sha256": "8cfe0415b22d1b74d49299d6ccf2e73568d6e4a979eea4204096134190936297"
+  },
+  "kvm-repair-lifetime-original-three-before": {
+    "path": "verification/product/runs/kvm-repair-lifetime-original-three-before.json",
+    "sha256": "bdc80380824c0b29f8b70502c24d5ba32f7cc21eb74827e7ab60db851b0292c9"
+  },
+  "kvm-repair-lifetime-original-three-after": {
+    "path": "verification/product/runs/kvm-repair-lifetime-original-three-after.json",
+    "sha256": "91a5bd484e17ac74aae085274eea72b6c7586f1e5803c1b1961276748233eb34"
+  },
+  "kvm-repair-lifetime-interruption-before": {
+    "path": "verification/product/runs/kvm-repair-lifetime-interruption-before.json",
+    "sha256": "a2e23568095f6ff089cc0dd2e579afad838a2dd709104144724710fa70ef7ab0"
+  },
+  "kvm-repair-lifetime-interruption-after": {
+    "path": "verification/product/runs/kvm-repair-lifetime-interruption-after.json",
+    "sha256": "1bbf54d50c6c37d26bbdf19479db072c63ed4a8dca5e0048e1ce04afdd5b8c7f"
+  },
+  "kvm-repair-lifetime-independent-current": {
+    "path": "verification/product/runs/kvm-repair-lifetime-independent-current.json",
+    "sha256": "beb8224a317d389ffb6bec46eb401dd3ee746428b80f8bc321906050e7a529b4"
+  },
+  "kvm-repair-boot-selection-before": {
+    "path": "verification/product/runs/kvm-repair-boot-selection-before.json",
+    "sha256": "14532b34b637d7839b63d54844bc165167d64347ef0dbb4b56b5c6159c553eab"
+  },
+  "kvm-repair-boot-selection-after": {
+    "path": "verification/product/runs/kvm-repair-boot-selection-after.json",
+    "sha256": "5e1266f8f8d747e009ac6b9f2f0fbfbfc059500d6c57358cedd8396e33ec87b7"
+  },
+  "kvm-repair-root-status-before": {
+    "path": "verification/product/runs/kvm-repair-root-status-before.json",
+    "sha256": "c4c905332bf407f4badcfd9181fe98027c1e396dc23dc143ba16ca693e48b98a"
+  },
+  "kvm-repair-root-status-after": {
+    "path": "verification/product/runs/kvm-repair-root-status-after.json",
+    "sha256": "cb12422dec05f4baf31ebe862fe83dfc2bd9b3842d288e7067ad0cd8de1b25e6"
+  },
+  "kvm-repair-root-status-negative": {
+    "path": "verification/product/runs/kvm-repair-root-status-negative.json",
+    "sha256": "4f614c159efe6a457495b217afdc209a625918fb5ef968d453320b722077f3db"
+  },
+  "kvm-repair-root-status-restored": {
+    "path": "verification/product/runs/kvm-repair-root-status-restored.json",
+    "sha256": "b29bf822198ad81f2f818743fdae3627f757deb7e49843c738200c789cf1b40e"
+  },
+  "kvm-repair-boot-root-independent-current": {
+    "path": "verification/product/runs/kvm-repair-boot-root-independent-current.json",
+    "sha256": "dd750cc576c057661a0cb6481f934a8e144fb00a4d7a7a8afc6ad2a285b11ef9"
+  },
+  "kvm-repair-root-independent-negative": {
+    "path": "verification/product/runs/kvm-repair-root-independent-negative.json",
+    "sha256": "8994edf28046f0511cfc01da1faa18c5f0705b8a3f70396ef9a5eda4bc0d65f4"
+  },
+  "kvm-repair-root-independent-restored": {
+    "path": "verification/product/runs/kvm-repair-root-independent-restored.json",
+    "sha256": "c1c0934be9fe7d207bacc457793765e1d9866b227d5b91bf04bfe61f92384d6e"
+  },
+  "kvm-repair-wording-current": {
+    "path": "verification/product/runs/kvm-repair-wording-current.json",
+    "sha256": "22634a7e7aabf678cf313e5167761412ca5ad5324b9ca6beeed807904e352f26"
+  },
+  "kvm-repair-claims-current-audit": {
+    "path": "verification/product/runs/kvm-repair-claims-current-audit.json",
+    "sha256": "0620a15f9c2944192ad9acc668727ad7ad614b4a0f35e3f82b99273137a2a28d"
+  },
+  "kvm-repair-reference-current": {
+    "path": "verification/product/runs/kvm-repair-reference-current.json",
+    "sha256": "cd1be25b6402f7c23f42ea27090011e9d3defc1ec646b8517d52405200614ea8"
   }
 }
