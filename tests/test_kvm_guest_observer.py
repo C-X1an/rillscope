@@ -13,17 +13,29 @@ sys.path.insert(0, str(ROOT / 'scripts'))
 import kvm_pilot_guest as guest
 
 
+def after_actual_clock(previous):
+    """Stage strict ordering with real readings, even on coarse host clocks."""
+    deadline = time.perf_counter_ns() + 1_000_000_000
+    for _ in range(1000):
+        current = time.monotonic_ns()
+        if current > previous: return current
+        if time.perf_counter_ns() >= deadline: break
+        time.sleep(.001)
+    raise TimeoutError('actual fixture clock did not advance within one second')
+
+
 class GuestObserverEndpoint(unittest.TestCase):
     def exercise(self, fault=None):
         (ROOT / '.local-runs').mkdir(exist_ok=True)
         with tempfile.TemporaryDirectory(prefix='ko-', dir=ROOT / '.local-runs') as temporary:
             base = Path(temporary); (base / 'exports').mkdir()
             ready = threading.Event(); release = threading.Event()
-            original_append = guest.append_json; snapshots = 0; networks = 0
+            original_append = guest.append_json; snapshots = 0; networks = 0; last_clock = 0
             def snapshot(phase):
-                nonlocal snapshots
+                nonlocal snapshots, last_clock
                 snapshots += 1
-                row = {'phase': phase, 'utc_ns': time.time_ns(), 'monotonic_ns': time.monotonic_ns(),
+                last_clock = after_actual_clock(last_clock)
+                row = {'phase': phase, 'utc_ns': time.time_ns(), 'monotonic_ns': last_clock,
                     'boot_id': 'explicit-unit-boot', 'environment': {'unit_fixture': True}}
                 if fault == 'in-flight' and snapshots == 1:
                     ready.set()
@@ -45,7 +57,7 @@ class GuestObserverEndpoint(unittest.TestCase):
                 observer.thread.start()
                 try:
                     self.assertTrue(ready.wait(2), 'first real thread record must be obtained')
-                    boundary = time.monotonic_ns()
+                    boundary = after_actual_clock(last_clock)
                     if fault == 'in-flight': observer.stop.set(); release.set()
                     if fault in {'resource', 'network', 'bound'}:
                         with self.assertRaisesRegex(ValueError, 'guest observer failed'):

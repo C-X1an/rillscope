@@ -54,6 +54,16 @@ class HostContract(unittest.TestCase):
                 '--build-receipt', '.local-runs/build/build.json', '--commit', '1' * 40]), 77)
         prepare.assert_not_called()
 
+    def test_receiver_inherits_the_exact_pre_qemu_vm_start_without_new_time(self):
+        payload = {'commit': '1' * 40, 'source': {'sha256': '2' * 64}}
+        command = host.receiver_command(Path('/owned'), payload, 123456789)
+        self.assertEqual(command, [sys.executable, str(ROOT / 'scripts/kvm_reference_receiver.py'),
+            '--socket', str(Path('/owned/runtime/capture.sock')), '--out', str(Path('/owned/artifact/packages')),
+            '--timeout', '18000', '--vm-started-monotonic-ns', '123456789',
+            '--commit', '1' * 40, '--source-sha256', '2' * 64])
+        for start in [True, 0, -1, 1.5]:
+            with self.assertRaises(ValueError): host.receiver_command(Path('/owned'), payload, start)
+
     def test_diagnostic_or_shutdown_error_cannot_suppress_owned_descendant_stop(self):
         process = Mock(); process.pid = 1234; process.poll.return_value = None
         process.wait.side_effect = OSError('shutdown wait failed')

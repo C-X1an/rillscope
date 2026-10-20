@@ -1,6 +1,7 @@
 //! Exact types, three-valued expressions, and owned columns with validity bitmaps.
 use crate::error::{ErrorCode as E, Result};
 use serde::{Deserialize, Serialize};
+use std::borrow::Cow;
 use std::cmp::Ordering;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -285,22 +286,36 @@ impl Column {
         values: &[Value],
         checkpoint: &mut impl FnMut() -> Result<()>,
     ) -> Result<Self> {
-        let mut validity = Validity::new(values.len())?;
+        Self::from_value_iter_checked(
+            dtype,
+            values.iter().map(|value| Ok(Cow::Borrowed(value))),
+            checkpoint,
+        )
+    }
+    fn from_value_iter_checked<'a>(
+        dtype: DataType,
+        values: impl ExactSizeIterator<Item = Result<Cow<'a, Value>>>,
+        checkpoint: &mut impl FnMut() -> Result<()>,
+    ) -> Result<Self> {
+        let len = values.len();
+        let mut validity = Validity::new(len)?;
         let mut ints = Vec::new();
         let mut bools = Vec::new();
         let mut offsets = Vec::new();
         let mut bytes = Vec::new();
         match dtype {
-            DataType::I64 => ints.try_reserve_exact(values.len()),
-            DataType::Bool => bools.try_reserve_exact(values.len()),
-            DataType::Text => offsets.try_reserve_exact(values.len() + 1),
+            DataType::I64 => ints.try_reserve_exact(len),
+            DataType::Bool => bools.try_reserve_exact(len),
+            DataType::Text => offsets.try_reserve_exact(len + 1),
         }
         .map_err(|_| E::Budget)?;
         if dtype == DataType::Text {
             offsets.push(0);
         }
-        for (i, value) in values.iter().enumerate() {
+        for (i, value) in values.enumerate() {
             checkpoint()?;
+            let value = value?;
+            let value = value.as_ref();
             if value.data_type() != dtype {
                 return Err(E::Type.into());
             }
@@ -415,22 +430,46 @@ impl Batch {
             .map_err(|_| E::Budget)?;
         for (i, field) in fields.iter().enumerate() {
             checkpoint()?;
-            let mut values = Vec::new();
-            values
-                .try_reserve_exact(rows.len())
-                .map_err(|_| E::Budget)?;
             for row in rows {
                 checkpoint()?;
                 let value = row.get(i).ok_or(E::Plan)?;
                 if !field.nullable && value.is_null() {
                     return Err(E::Type.into());
                 }
-                values.push(value.clone());
             }
-            columns.push(Column::from_values_checked(
+            columns.push(Column::from_value_iter_checked(
                 field.data_type,
-                &values,
+                rows.iter()
+                    .map(|row| row.get(i).map(Cow::Borrowed).ok_or_else(|| E::Plan.into())),
                 checkpoint,
+            )?);
+        }
+        Ok(Self {
+            fields,
+            columns,
+            len: rows.len(),
+        })
+    }
+    pub(crate) fn from_json_rows(
+        fields: Vec<Field>,
+        rows: &[Vec<serde_json::Value>],
+    ) -> Result<Self> {
+        if fields.len() > 256 || rows.iter().any(|row| row.len() != fields.len()) {
+            return Err(E::Plan.into());
+        }
+        let mut columns = Vec::new();
+        columns
+            .try_reserve_exact(fields.len())
+            .map_err(|_| E::Budget)?;
+        for (i, field) in fields.iter().enumerate() {
+            let values = rows.iter().map(|row| {
+                let value = row.get(i).ok_or(E::Plan)?;
+                Value::from_json(value, field.data_type, field.nullable).map(Cow::Owned)
+            });
+            columns.push(Column::from_value_iter_checked(
+                field.data_type,
+                values,
+                &mut || Ok(()),
             )?);
         }
         Ok(Self {
@@ -529,6 +568,128 @@ mod tests {
             assert_eq!(&col.cell(i)?, v);
         }
         assert_eq!(col.cell(3).map_err(|e| e.code), Err(E::Plan));
+        Ok(())
+    }
+    fn ingestion_fields() -> Vec<Field> {
+        [
+            ("n", DataType::I64),
+            ("b", DataType::Bool),
+            ("s", DataType::Text),
+        ]
+        .into_iter()
+        .map(|(name, data_type)| Field {
+            name: name.into(),
+            data_type,
+            nullable: true,
+        })
+        .collect()
+    }
+    #[test]
+    fn json_ingestion_preserves_exact_values_typed_nulls_and_duplicate_rows() -> Result<()> {
+        let rows = vec![
+            vec![serde_json::json!(i64::MIN), true.into(), "é\0🙂".into()],
+            vec![serde_json::Value::Null; 3],
+            vec![serde_json::json!(i64::MAX), false.into(), "".into()],
+            vec![serde_json::json!(i64::MIN), true.into(), "é\0🙂".into()],
+        ];
+        let expected = [
+            vec![
+                Value::I64(i64::MIN),
+                Value::Bool(true),
+                Value::Text("é\0🙂".into()),
+            ],
+            vec![
+                Value::Null(DataType::I64),
+                Value::Null(DataType::Bool),
+                Value::Null(DataType::Text),
+            ],
+            vec![
+                Value::I64(i64::MAX),
+                Value::Bool(false),
+                Value::Text("".into()),
+            ],
+            vec![
+                Value::I64(i64::MIN),
+                Value::Bool(true),
+                Value::Text("é\0🙂".into()),
+            ],
+        ];
+        let fields = ingestion_fields();
+        let batch = Batch::from_json_rows(fields.clone(), &rows)?;
+        assert_eq!(batch.fields(), &fields);
+        assert_eq!(batch.len(), 4);
+        for (i, row) in expected.iter().enumerate() {
+            assert_eq!(&batch.row(i)?, row);
+        }
+        let ordinary = Batch::from_rows(fields, &expected)?;
+        for (i, row) in expected.iter().enumerate() {
+            assert_eq!(&ordinary.row(i)?, row);
+        }
+        Ok(())
+    }
+    #[test]
+    fn json_ingestion_rejects_shape_coercions_and_nullable_violation() {
+        let field = |data_type, nullable| Field {
+            name: "x".into(),
+            data_type,
+            nullable,
+        };
+        for (data_type, value) in [
+            (DataType::I64, serde_json::json!(true)),
+            (DataType::I64, serde_json::json!(1.0)),
+            (DataType::I64, serde_json::json!(1u64 << 63)),
+            (DataType::Bool, serde_json::json!(1)),
+            (DataType::Text, serde_json::json!("x".repeat(4097))),
+        ] {
+            assert_eq!(
+                Batch::from_json_rows(vec![field(data_type, true)], &[vec![value]])
+                    .err()
+                    .map(|error| error.code),
+                Some(E::Type)
+            );
+        }
+        assert_eq!(
+            Batch::from_json_rows(
+                vec![field(DataType::I64, false)],
+                &[vec![serde_json::Value::Null]]
+            )
+            .err()
+            .map(|error| error.code),
+            Some(E::Type)
+        );
+        assert_eq!(
+            Batch::from_json_rows(vec![field(DataType::I64, true)], &[vec![]])
+                .err()
+                .map(|error| error.code),
+            Some(E::Plan)
+        );
+        assert_eq!(
+            Batch::from_json_rows(
+                vec![field(DataType::I64, true)],
+                &[vec![1.into(), 2.into()]]
+            )
+            .err()
+            .map(|error| error.code),
+            Some(E::Plan)
+        );
+        assert_eq!(
+            Batch::from_json_rows(vec![field(DataType::I64, true); 257], &[])
+                .err()
+                .map(|error| error.code),
+            Some(E::Plan)
+        );
+    }
+    #[test]
+    fn json_ingestion_keeps_empty_schema_columns_and_text_byte_limit() -> Result<()> {
+        let fields = ingestion_fields();
+        let empty = Batch::from_json_rows(fields.clone(), &[])?;
+        assert_eq!(empty.fields(), &fields);
+        assert_eq!(empty.len(), 0);
+        assert_eq!(empty.cell(0, 0).map_err(|error| error.code), Err(E::Plan));
+        let exact = "é".repeat(2048);
+        let batch =
+            Batch::from_json_rows(fields, &[vec![1.into(), true.into(), exact.clone().into()]])?;
+        assert_eq!(batch.cell(0, 2)?, Value::Text(exact));
         Ok(())
     }
     #[test]

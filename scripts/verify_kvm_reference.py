@@ -21,7 +21,7 @@ from kvm_reference_channel import inspected_manifest, header
 from kvm_reference_events import parse as parse_events, MAX_EVENTS
 from kvm_reference_host import check_sample, parse_boot
 from kvm_reference_budget import (MAX_HOST_SAMPLES, MAX_GUEST_SAMPLES, MAX_SAMPLE_BYTES,
-    MAX_HOST_LOG_BYTES, MAX_GUEST_LOG_BYTES, MAX_GAP_NS, declaration)
+    MAX_HOST_LOG_BYTES, MAX_GUEST_LOG_BYTES, MAX_GAP_NS, GUEST_SETUP_SECONDS, declaration)
 from verify_kvm_pilot import passing_receipt, recovered_tree, sampling, down
 from verify import verify
 from cancellation import verify_cancellation
@@ -29,6 +29,7 @@ from feasibility_profile import exact
 from reference_guest_observer import GuestObserver
 import reference_measurement_barrier as barrier
 import kvm_reference_device as capture_device
+import kvm_reference_lifetime as lifetime
 
 COUNTS = {'grid': (410, 43050), 'cancel': (5, 175), 'sort-null': (40, 4200)}
 # A genuine410-case report exceeds4MiB. Results were already inspected under
@@ -254,6 +255,48 @@ def guest_controls(artifact, payload, guest, events):
     return boundaries
 
 
+def lifetime_bounds(artifact, payload, guest, config, vm, events, first_measurement_ns, host_ready_ns):
+    host = read_json(artifact / 'host-lifetime.json', 16384)
+    record = read_json(guest / 'guest-lifetime.json', 16384)
+    original_vm = read_json(artifact / 'vm-lifetime.json', 8192)
+    bound = lifetime.validate_records(host, record, original_vm, commit=payload['commit'],
+        source_sha256=payload['source']['sha256'], boot_id=events[0]['boot_id'])
+    measure = read_json(artifact / 'guest-config/measurement-config.json', 8192)
+    require(type(measure.get('deadline_monotonic_ns')) is int
+        and measure['deadline_monotonic_ns'] == bound['deadline_monotonic_ns'],
+        'original measurement cutoff differs from the host-bound lifetime')
+    require(all(type(vm.get(key)) is int and vm[key] == original_vm[key]
+        for key in ['started_monotonic_ns', 'deadline_monotonic_ns']),
+        'original VM result differs from its pre-QEMU lifetime')
+    command = vm.get('receiver_command')
+    require(type(command) is list and len(command) == 14
+        and all(type(value) is str and len(value) <= 4096 for value in command)
+        and command[2::2] == ['--socket', '--out', '--timeout', '--vm-started-monotonic-ns',
+            '--commit', '--source-sha256'], 'closed original lifetime receiver command required')
+    root = PurePosixPath(config['original_root']); out = native_path(config['original_output'], root)
+    require(native_path(command[0], root).is_absolute()
+        and native_path(command[1], root) == root / 'scripts/kvm_reference_receiver.py'
+        and native_path(command[3], root) == out / 'runtime/capture.sock'
+        and native_path(command[5], root) == out / 'artifact/packages'
+        and command[7] == '18000' and command[9] == str(original_vm['started_monotonic_ns'])
+        and command[11] == payload['commit'] and command[13] == payload['source']['sha256'],
+        'original receiver changed its source, VM origin or lifetime')
+    receiver = read_json(artifact / 'reference-receiver-result.json')
+    require(receiver.get('status') == 'PASS' and receiver.get('lifetime_exchange') == host
+        and receiver.get('source_before') == receiver.get('source_after') == payload['source'],
+        'original receiver lifetime exchange/source record differs')
+    device = read_json(guest / 'device-access.json', 8192)
+    setup_end = next(row for row in events if row['phase'] == 'setup-end')['monotonic_ns']
+    require(record['guest_started_monotonic_ns'] <= events[0]['monotonic_ns']
+        <= device['probe']['closed_monotonic_ns'] <= record['request']['guest_request_monotonic_ns']
+        <= record['guest_configured_monotonic_ns'] <= setup_end <= first_measurement_ns,
+        'original device/lifetime setup must precede every measurement')
+    require(type(host_ready_ns) is int and host['host_reply_sent_monotonic_ns'] <= host_ready_ns
+        < original_vm['started_monotonic_ns'] + GUEST_SETUP_SECONDS * 10**9,
+        'original host lifetime exchange did not precede timely guest readiness')
+    return bound
+
+
 def continuity(artifact, payload, config, guest):
     vm = read_json(artifact / 'vm-result.json')
     serial = barrier.bounded(artifact / 'serial.txt', 4 * 1024**2).decode('utf-8', errors='replace')
@@ -280,6 +323,8 @@ def continuity(artifact, payload, config, guest):
         'actual received full lifecycle differs')
     ready = next(row for row in received if row['guest']['phase'] == 'ready')['received_monotonic_ns']
     exit_at = received[-1]['received_monotonic_ns']
+    lifetime_bound = lifetime_bounds(artifact, payload, guest, config, vm, events,
+        boundaries['grid-start']['sample']['monotonic_ns'], ready)
     hosts = json_lines(artifact / 'host-samples.jsonl', MAX_HOST_SAMPLES, MAX_HOST_LOG_BYTES)
     require(len(hosts) == vm['host_samples'], 'retained full host sample count differs')
     required = [row for row in hosts if row.get('required_interval') is True]
@@ -341,7 +386,7 @@ def continuity(artifact, payload, config, guest):
                         'full boundary allocation differs from actual initial guest sample')
     guest_summary['steal_ticks_delta'] = int(guests[-1]['cpu_stat'].split()[8]) - int(guests[0]['cpu_stat'].split()[8])
     guest_summary['append_and_final_fsync'] = observed
-    return {'status': 'PASS', 'host': host_summary, 'guest': guest_summary,
+    return {'status': 'PASS', 'host': host_summary, 'guest': guest_summary, 'lifetime': lifetime_bound,
         'scope': 'Actual sampled allocation and correlated owned lifecycle only; physical exclusivity/uninterrupted residency unproven. Virtual reference eligibility requires independent review.'}
 
 

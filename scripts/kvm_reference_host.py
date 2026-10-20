@@ -197,9 +197,24 @@ def stop_vm(out, process, receiver, receiver_captures, port, ownership, failure)
     return record
 
 
+def receiver_command(out, payload, started_ns):
+    require(type(started_ns) is int and started_ns > 0, 'exact original VM clock required for receiver')
+    return [sys.executable, str(ROOT / 'scripts/kvm_reference_receiver.py'),
+        '--socket', str(out / 'runtime/capture.sock'), '--out', str(out / 'artifact/packages'),
+        '--timeout', str(VM_SECONDS), '--vm-started-monotonic-ns', str(started_ns),
+        '--commit', payload['commit'], '--source-sha256', payload['source']['sha256']]
+
+
 def run_vm(out, command, port, payload, uid, ownership):
-    artifact = out / 'artifact'; started = time.monotonic(); process = None; captures = []
+    artifact = out / 'artifact'; started_ns = time.monotonic_ns(); started = started_ns / 10**9
+    deadline_ns = started_ns + VM_SECONDS * 10**9
+    write_json(artifact / 'vm-lifetime.json', {'schema_version': 1, 'method': METHOD,
+        'commit': payload['commit'], 'source_sha256': payload['source']['sha256'],
+        'started_monotonic_ns': started_ns, 'deadline_monotonic_ns': deadline_ns,
+        'reference_qualified': False})
+    process = None; captures = []
     receiver = None; receiver_captures = []; events = []; ready_at = None; exit_at = None; final_observed = False
+    receiver_argv = None
     count = 0; last_required = None; failure = None; link_ack = None
     append_cost = {'calls': 0, 'wall_ns': 0, 'cpu_ns': 0, 'maximum_wall_ns': 0}
     def observe(required):
@@ -237,14 +252,13 @@ def run_vm(out, command, port, payload, uid, ownership):
         captures = [BoundedCapture(process.stdout, artifact / 'serial.txt', SERIAL_LIMIT),
                     BoundedCapture(process.stderr, artifact / 'qemu.stderr', 256 * 1024)]
         while process.poll() is None:
-            require(time.monotonic() - started < VM_SECONDS, 'full VM deadline exhausted; available partial bytes retained')
+            require(time.monotonic_ns() < deadline_ns, 'full VM deadline exhausted; available partial bytes retained')
             for capture in captures + receiver_captures: capture.drain()
             if receiver is None and (out / 'runtime/capture.sock').exists():
                 path = out / 'runtime/capture.sock'; require(stat.S_ISSOCK(path.lstat().st_mode), 'owned capture socket differs')
                 os.chmod(path, 0o600)
-                receiver = subprocess.Popen([sys.executable, str(ROOT / 'scripts/kvm_reference_receiver.py'),
-                    '--socket', str(path), '--out', str(artifact / 'packages'), '--timeout', str(VM_SECONDS),
-                    '--commit', payload['commit'], '--source-sha256', payload['source']['sha256']], cwd=ROOT,
+                receiver_argv = receiver_command(out, payload, started_ns)
+                receiver = subprocess.Popen(receiver_argv, cwd=ROOT,
                     stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                     bufsize=0, start_new_session=True)
                 receiver_captures = [BoundedCapture(receiver.stdout, artifact / 'receiver.stdout', 4 * 1024**2),
@@ -327,6 +341,8 @@ def run_vm(out, command, port, payload, uid, ownership):
             'received_monotonic_ns': time.monotonic_ns(), 'terminal_capture': True, 'guest': row})
     received = read_json(artifact / 'reference-receiver-result.json') if (artifact / 'reference-receiver-result.json').is_file() else {}
     result = {'status': 'FAIL', 'method': METHOD, 'events': final_events, 'boot_result': boot,
+        'started_monotonic_ns': started_ns, 'deadline_monotonic_ns': deadline_ns,
+        'receiver_command': receiver_argv,
         'host_samples': count, 'host_append_cost': append_cost, 'host_final_fsync_ns': fsync_ns,
         'final_host_observed': final_observed,
         'host_transfers': received.get('transfers', []), 'receiver_exit': stopped['receiver_exit_observed_before_stop'],

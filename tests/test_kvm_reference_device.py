@@ -91,7 +91,7 @@ class DescriptorOwnership(unittest.TestCase):
              patch.object(device.os, 'O_CLOEXEC', 0x80000, create=True), \
              patch.object(device.os, 'open', return_value=23) as opened, \
              patch.object(device.os, 'fchown', create=True) as chown, \
-             patch.object(device.os, 'fchmod') as chmod, patch.object(device.os, 'close') as closed:
+             patch.object(device.os, 'fchmod', create=True) as chmod, patch.object(device.os, 'close') as closed:
             device.grant(record)
         chown.assert_called_once_with(23, 65534, 65534)
         chmod.assert_called_once_with(23, 0o600); closed.assert_called_once_with(23)
@@ -123,7 +123,7 @@ class DescriptorOwnership(unittest.TestCase):
              patch.object(device.os, 'O_CLOEXEC', 0x80000, create=True), \
              patch.object(device.os, 'open', return_value=23), \
              patch.object(device.os, 'fchown', create=True), \
-             patch.object(device.os, 'fchmod', side_effect=PermissionError('original chmod error')), \
+             patch.object(device.os, 'fchmod', side_effect=PermissionError('original chmod error'), create=True), \
              patch.object(device.os, 'close') as close:
             with self.assertRaisesRegex(PermissionError, 'original chmod error'): device.grant(report)
         close.assert_called_once_with(23)

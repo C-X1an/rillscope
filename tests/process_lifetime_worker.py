@@ -12,7 +12,7 @@ ROOT = Path(sys.argv[1]).resolve()
 PREFIX = Path(sys.argv[2]).resolve()
 MODE = sys.argv[3]
 if MODE not in ('held-pipe', 'closed-pipe', 'delayed-launch', 'interrupt-capture',
-                'exit-capture', 'interrupt-setup') or not PREFIX.is_relative_to(ROOT / '.local-runs'):
+                'exit-capture', 'interrupt-setup', 'missing-marker') or not PREFIX.is_relative_to(ROOT / '.local-runs'):
     raise ValueError('owned process fixture required')
 sys.path[:0] = [str(ROOT / 'benchmarks'), str(ROOT / 'scripts')]
 import process_metrics as subject
@@ -94,6 +94,15 @@ elif MODE == 'delayed-launch':
         usage, out, err = subject.measured_child([sys.executable, '-c', 'print("quick-child")'],
             cwd=ROOT, prefix=PREFIX, timeout=.2)
     report = {'mode': MODE, 'usage': usage, 'stdout_hex': out.hex(), 'stderr_hex': err.hex()}
+elif MODE == 'missing-marker':
+    # This deliberately emits bytes without the fixture prerequisite. It must
+    # retain the real returned capture and fail, rather than fabricate readiness.
+    usage, out, err = subject.measured_child([sys.executable, '-u', '-c',
+        'print("actual-without-marker",flush=True)'], cwd=ROOT, prefix=PREFIX, timeout=.75)
+    present = PREFIX.with_suffix('.child-pid').is_file()
+    report = {'mode': MODE, 'usage': usage, 'stdout_hex': out.hex(), 'stderr_hex': err.hex(),
+        'fixture_prerequisites': {'child_pid_marker_present': present},
+        'child_alive_at_return': None}
 else:
     marker = PREFIX.with_suffix('.child-pid')
     child = 'import os,sys,time;from pathlib import Path;Path(sys.argv[1]).write_text(str(os.getpid()));print("child-ready",flush=True);time.sleep(5)'
@@ -107,12 +116,16 @@ else:
         'print("root-ready",flush=True)')
     usage, out, err = subject.measured_child([sys.executable, '-c', parent, str(marker), MODE],
         cwd=ROOT, prefix=PREFIX, timeout=.75)
-    pid = int(marker.read_text())
+    present = marker.is_file()
+    pid = int(marker.read_text()) if present else None
     report = {'mode': MODE, 'usage': usage, 'stdout_hex': out.hex(), 'stderr_hex': err.hex(),
-              'child_alive_at_return': alive(pid)}
+              'fixture_prerequisites': {'child_pid_marker_present': present},
+              'child_alive_at_return': alive(pid) if present else None}
     # Older defective implementations can leave this finite fixture alive. Let
     # it exit naturally; never signal a process by an unheld numeric PID.
     end = time.monotonic() + 6
-    while alive(pid) and time.monotonic() < end: time.sleep(.02)
-    if alive(pid): raise RuntimeError('finite owned fixture did not exit')
-print(json.dumps(report, separators=(',', ':')))
+    while present and alive(pid) and time.monotonic() < end: time.sleep(.02)
+    if present and alive(pid): raise RuntimeError('finite owned fixture did not exit')
+print(json.dumps(report, separators=(',', ':')), flush=True)
+if report.get('fixture_prerequisites', {}).get('child_pid_marker_present') is False:
+    raise SystemExit(1)

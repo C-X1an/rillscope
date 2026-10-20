@@ -6,7 +6,7 @@ import hashlib
 import json
 from pathlib import Path
 import re
-from evidence_coverage import coverage, license_sources, required_sources
+from evidence_coverage import coverage, license_sources, required_sources, performance_dependency_path
 
 ROOT = Path(__file__).resolve().parents[1]
 STATUSES = {'PASS', 'FAIL', 'BLOCKED', 'NOT RUN', 'NOT YET MEASURED'}
@@ -137,6 +137,29 @@ def audit(index, require_all=False):
                             [source,current_sources[source]] in data['source_files'] for source in dependencies)
                             for data in candidates):
                         stale_requirements.append(identifier + ': no single current ' + subject + ' run matches its complete dependency set')
+            if identifier in {'AC-021', 'AC-022', 'AC-023', 'AC-025'}:
+                def complete_current(data):
+                    if not all(current_sources.get(source) is not None
+                            and [source, current_sources[source]] in data['source_files'] for source in needed):
+                        return False
+                    # A removed executable must not disappear from an older
+                    # proof's dependency set merely because discovery is live.
+                    for source, expected in data['source_files']:
+                        if (performance_dependency_path(source) or identifier == 'AC-025'
+                                and source.startswith('tests/') and source.endswith('.py')):
+                            file = public_file(source, allow_missing=True)
+                            if not file.is_file() or digest(file) != expected: return False
+                    return True
+                subjects = (('FULL-GRID-CAPTURE', 'FULL-GRID-VALIDATION', 'NULL-SORT-VALIDATION')
+                    if identifier == 'AC-021' else ('STATIC-CHECKS', 'MALFORMED-CORPUS')
+                    if identifier == 'AC-025' else (identifier,))
+                for subject in subjects:
+                    candidates = [data for data in selected if
+                        ({'fmt', 'lint', 'check', 'test'} <= set(data.get('executed_targets', []))
+                         if subject == 'STATIC-CHECKS' else subject in coverage(data, ROOT))]
+                    if not any(complete_current(data) for data in candidates):
+                        stale_requirements.append(identifier + ': no single current ' + subject
+                            + ' run matches its complete dependency set')
     referenced = {name for row in index['criteria'].values() if row['status'] == 'PASS' for name in row['runs']}
     if require_all:
         errors += ['unproved required criterion: ' + value for value in unproved]

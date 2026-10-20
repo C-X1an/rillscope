@@ -190,4 +190,69 @@ class FullResultsMetadata(unittest.TestCase):
                 with self.subTest(raw=raw), self.assertRaises(ValueError): check.read_results(path)
 
 
+class OriginalLifetimeBinding(unittest.TestCase):
+    def fixture(self, base):
+        # Literal setup records from the independent epoch/latency unit fixture.
+        # These are checker inputs, never a claim of a collected VM experiment.
+        from test_kvm_reference_lifetime import original_records, COMMIT, SOURCE, BOOT, NS
+        host, guest_record, original_vm = original_records()
+        artifact = base / 'artifact'; guest = base / 'guest'
+        (artifact / 'guest-config').mkdir(parents=True); guest.mkdir()
+        payload = {'commit': COMMIT, 'source': {'sha256': SOURCE, 'files': [['Cargo.toml', 'a' * 64]]}}
+        config = {'original_root': '/original/public', 'original_output': '.local-runs/kf'}
+        command = ['/usr/bin/python3', '/original/public/scripts/kvm_reference_receiver.py',
+            '--socket', '/original/public/.local-runs/kf/runtime/capture.sock',
+            '--out', '/original/public/.local-runs/kf/artifact/packages', '--timeout', '18000',
+            '--vm-started-monotonic-ns', str(1000 * NS), '--commit', COMMIT, '--source-sha256', SOURCE]
+        vm = {'started_monotonic_ns': 1000 * NS, 'deadline_monotonic_ns': 19000 * NS,
+            'receiver_command': command}
+        rows = [(artifact / 'host-lifetime.json', host), (guest / 'guest-lifetime.json', guest_record),
+            (artifact / 'vm-lifetime.json', original_vm),
+            (artifact / 'guest-config/measurement-config.json', {'deadline_monotonic_ns': 24756 * NS}),
+            (guest / 'device-access.json', {'probe': {'closed_monotonic_ns': 7001 * NS}}),
+            (artifact / 'reference-receiver-result.json', {'status': 'PASS', 'lifetime_exchange': host,
+                'source_before': payload['source'], 'source_after': payload['source']})]
+        for path, row in rows: path.write_text(json.dumps(row), encoding='utf-8')
+        events = [{'phase': 'setup-start', 'boot_id': BOOT, 'monotonic_ns': 7000 * NS},
+            {'phase': 'setup-end', 'boot_id': BOOT, 'monotonic_ns': 7009 * NS}]
+        return artifact, payload, guest, config, vm, events, 7010 * NS, 1127 * NS
+
+    def test_original_vm_source_messages_cutoff_and_prequery_order_are_required(self):
+        with tempfile.TemporaryDirectory(dir=ROOT / '.local-runs') as temp:
+            args = self.fixture(Path(temp)); result = check.lifetime_bounds(*args)
+            self.assertEqual(result['status'], 'BOUND')
+            self.assertEqual(result['deadline_monotonic_ns'], 24756 * 10**9)
+            self.assertFalse(result['reference_qualified'])
+            (args[0] / 'host-lifetime.json').unlink()
+            with self.assertRaises(ValueError): check.lifetime_bounds(*args)
+
+    def test_receiver_cannot_restart_its_clock_or_increase_the_vm_limit(self):
+        with tempfile.TemporaryDirectory(dir=ROOT / '.local-runs') as temp:
+            args = self.fixture(Path(temp))
+            for index, value in [(7, '18001'), (9, str(1001 * 10**9)),
+                                 (11, '3' * 40), (13, '4' * 64)]:
+                changed = copy.deepcopy(args[4]); changed['receiver_command'][index] = value
+                with self.subTest(index=index), self.assertRaises(ValueError):
+                    check.lifetime_bounds(*args[:4], changed, *args[5:])
+            changed = dict(args[4], started_monotonic_ns=1001 * 10**9)
+            with self.assertRaises(ValueError): check.lifetime_bounds(*args[:4], changed, *args[5:])
+
+    def test_changed_config_or_discarded_receiver_record_never_qualifies_lifetime(self):
+        for name, changed in [('guest-config/measurement-config.json', {'deadline_monotonic_ns': 24762 * 10**9}),
+            ('reference-receiver-result.json', {'status': 'FAIL'})]:
+            with tempfile.TemporaryDirectory(dir=ROOT / '.local-runs') as temp:
+                args = self.fixture(Path(temp))
+                (args[0] / name).write_text(json.dumps(changed), encoding='utf-8')
+                with self.subTest(name=name), self.assertRaises(ValueError): check.lifetime_bounds(*args)
+
+    def test_late_device_probe_or_host_readiness_cannot_authorize_prior_measurements(self):
+        with tempfile.TemporaryDirectory(dir=ROOT / '.local-runs') as temp:
+            args = self.fixture(Path(temp))
+            for ready in [1125 * 10**9, 3400 * 10**9]:
+                with self.assertRaises(ValueError): check.lifetime_bounds(*args[:-1], ready)
+            (args[2] / 'device-access.json').write_text(json.dumps(
+                {'probe': {'closed_monotonic_ns': 7011 * 10**9}}), encoding='utf-8')
+            with self.assertRaises(ValueError): check.lifetime_bounds(*args)
+
+
 if __name__ == '__main__': unittest.main()

@@ -1,7 +1,7 @@
 //! Validated immutable operator inputs; no query-accessible path or mutation API.
 use crate::decode::strict_json;
 use crate::error::{ErrorCode as E, Result};
-use crate::types::{Batch, DataType, Field, Row, Value, identifier};
+use crate::types::{Batch, DataType, Field, identifier};
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
@@ -63,24 +63,8 @@ impl Catalog {
                     return Err(E::Catalog.into());
                 }
             }
-            let mut rows: Vec<Row> = Vec::new();
-            rows.try_reserve_exact(table.rows.len())
+            let data = Batch::from_json_rows(table.columns.clone(), &table.rows)
                 .map_err(|_| E::Catalog)?;
-            for row in table.rows {
-                if row.len() != table.columns.len() {
-                    return Err(E::Catalog.into());
-                }
-                rows.push(
-                    row.iter()
-                        .zip(&table.columns)
-                        .map(|(v, f)| {
-                            Value::from_json(v, f.data_type, f.nullable)
-                                .map_err(|_| E::Catalog.into())
-                        })
-                        .collect::<Result<_>>()?,
-                );
-            }
-            let data = Batch::from_rows(table.columns.clone(), &rows).map_err(|_| E::Catalog)?;
             tables.push(Table {
                 name,
                 columns: table.columns,
@@ -210,6 +194,25 @@ mod tests {
         ] {
             assert_eq!(
                 Catalog::from_bytes(bad.as_bytes()).err().map(|e| e.code),
+                Some(E::Catalog)
+            );
+        }
+    }
+    #[test]
+    fn column_ingestion_keeps_catalog_structure_and_scalar_rejections() {
+        let input = std::str::from_utf8(CATALOG).unwrap_or("");
+        for bad in [
+            input.replace("\"rows\":", "\"extra\":0,\"rows\":"),
+            input.replace("\"type\":\"text\"", "\"type\":\"text\",\"type\":\"text\""),
+            input.replace("[\"alpha\",1]", "[null,1]"),
+            input.replace("[\"alpha\",1]", "[\"alpha\",1.0]"),
+            input.replace("[\"alpha\",1]", "[\"alpha\",9223372036854775808]"),
+            input.replace("[\"alpha\",1]", "[\"alpha\",1,2]"),
+        ] {
+            assert_eq!(
+                Catalog::from_bytes(bad.as_bytes())
+                    .err()
+                    .map(|error| error.code),
                 Some(E::Catalog)
             );
         }

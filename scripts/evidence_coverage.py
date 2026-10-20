@@ -200,6 +200,34 @@ def license_sources(root):
         path.relative_to(root).as_posix() for path in (root / 'licenses').rglob('*') if path.is_file()}
 
 
+def performance_dependency_path(name):
+    if name in {'Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml', 'Makefile', 'deny.toml'}: return True
+    return ((name.startswith('src/') and name.endswith('.rs'))
+        or (name.startswith(('scripts/', 'benchmarks/', 'tools/')) and name.endswith('.py'))
+        or (name.startswith('.github/') and name.endswith(('.yml', '.yaml'))))
+
+
+def performance_sources(root):
+    # Dynamic subprocess routes and shared import helpers make a narrow manual
+    # list unsafe. Bind public executable/recipe inputs, excluding unrelated
+    # prose and static assets. These method entrypoints stay required if removed.
+    entrypoints = {'scripts/' + name + '.py' for name in (
+        'prepare_kvm_reference', 'recover_kvm_reference', 'verify_kvm_reference',
+        'kvm_reference_budget', 'kvm_reference_common', 'kvm_reference_channel',
+        'kvm_reference_device', 'kvm_reference_events', 'kvm_reference_guest',
+        'kvm_reference_host', 'kvm_reference_lifetime', 'kvm_reference_receiver',
+        'kvm_reference_recovery', 'reference_collection', 'reference_capture_export',
+        'reference_guest_observer', 'reference_guest_owner', 'reference_measurement_barrier',
+        'guest_resource_probe', 'kvm_benchmark_pilot', 'kvm_capture_channel',
+        'kvm_boot_recovery', 'kvm_pilot_common', 'kvm_pilot_guest', 'inspect_reference_guest',
+        'verify_kvm_pilot', 'owned_process', 'evidence', 'product_build',
+        'evidence_coverage', 'release_audit')}
+    entrypoints |= {'Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml', 'Makefile',
+        'deny.toml', '.github/workflows/kvm-full-capture.yml', 'src/bin/rillscope-measure.rs'}
+    return entrypoints | {name for name, _ in source_identity(root)['files']
+                          if performance_dependency_path(name)}
+
+
 def required_sources(identifier, root):
     if identifier in {'AC-016'}: return {'scripts/export_policy.py', 'tests/security/test_export.py','scripts/verify_ci_observations.py'}
     if identifier == 'AC-026': return {'scripts/evidence.py','scripts/owned_process.py', 'tests/test_evidence.py','tests/test_review_427.py','tests/test_review_e7.py','scripts/verify_ci_observations.py'}
@@ -225,7 +253,13 @@ def required_sources(identifier, root):
                  'tests/acceptance_locked/product_helpers.py'}
         if identifier == 'AC-008': core.add('scripts/verify_demo_evidence.py')
     if identifier in {'AC-021', 'AC-022', 'AC-023'}:
-        core |= {file.relative_to(root).as_posix() for file in (root / 'benchmarks').glob('*.py')}
-        core |= {'scripts/archive_capture.py','scripts/verify_sequence.py'}
-        core.add('src/bin/rillscope-measure.rs')
+        core |= performance_sources(root)
+    if identifier == 'AC-025':
+        # The static check parses every public Python source and compiles all
+        # Rust targets, including cfg(test) seed code and the measurement bin.
+        # Bind its recipe/checker inputs and the real corpus/Client route too.
+        core |= performance_sources(root)
+        core |= {'tests/security/malformed.py', 'tests/acceptance_locked/product_helpers.py'}
+        core |= {name for name, _ in source_identity(root)['files']
+                 if name.startswith('tests/') and name.endswith('.py')}
     return core

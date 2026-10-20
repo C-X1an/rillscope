@@ -11,6 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'scripts'))
 import kvm_reference_guest as guest
 from kvm_reference_common import METHOD
+import kvm_reference_lifetime as lifetime
 
 
 class GuestConfiguration(unittest.TestCase):
@@ -19,36 +20,91 @@ class GuestConfiguration(unittest.TestCase):
             'bins': {'rillscope': {}, 'rillscope-measure': {}}, 'reference_qualified': False}
         self.boot = '12345678-1234-1234-1234-123456789abc'
 
+    def lifetime(self, started=10**9, ready=101 * 10**9, pre_entry_seconds=10):
+        # Independently specified synthetic host/guest epochs and setup events.
+        request = {'schema_version': 1, 'method': METHOD, 'kind': lifetime.REQUEST_KIND,
+            'commit': '1' * 40, 'source_sha256': '2' * 64, 'nonce': 'a' * 32,
+            'boot_id': self.boot, 'guest_request_monotonic_ns': ready, 'reference_qualified': False}
+        elapsed = pre_entry_seconds * 10**9 + ready - started
+        response = dict(request, kind=lifetime.RESPONSE_KIND, request_sha256=lifetime.digest(request),
+            host_vm_started_monotonic_ns=5000 * 10**9,
+            host_vm_deadline_monotonic_ns=23000 * 10**9,
+            host_reply_monotonic_ns=5000 * 10**9 + elapsed,
+            host_remaining_ns=18000 * 10**9 - elapsed)
+        return {'schema_version': 1, 'method': METHOD, 'status': 'BOUND', 'reference_qualified': False,
+            'request': request, 'response': response, 'request_sha256': lifetime.digest(request),
+            'response_sha256': lifetime.digest(response), 'guest_started_monotonic_ns': started,
+            'guest_received_monotonic_ns': ready, 'guest_configured_monotonic_ns': ready,
+            'deadline_monotonic_ns': started + (17880 - pre_entry_seconds) * 10**9}
+
     def test_source_bound_configs_have_finite_shared_end_and_separate_collection_reserve(self):
-        measure, export = guest.configurations(self.payload, 1_000_000_000, 101_000_000_000, self.boot)
+        measure, export = guest.configurations(self.payload, 1_000_000_000, 101_000_000_000, self.boot, self.lifetime())
         self.assertEqual(measure['method'], METHOD)
         self.assertEqual(measure['source_sha256'], '2' * 64)
         self.assertEqual(measure['boot_id'], self.boot)
         self.assertEqual(measure['deadline_monotonic_ns'], export['deadline_monotonic_ns'])
-        self.assertEqual(measure['deadline_monotonic_ns'] - 101_000_000_000, 15600 * 10**9)
+        self.assertEqual(measure['deadline_monotonic_ns'] - 1_000_000_000, 17870 * 10**9)
+        self.assertEqual(measure['deadline_monotonic_ns'] - 101_000_000_000, 17770 * 10**9)
         self.assertEqual(export['transfer_seconds'], 180)
         self.assertFalse(measure['reference_qualified'])
 
     def test_setup_may_not_borrow_collection_and_shutdown_reserves(self):
         with self.assertRaisesRegex(ValueError, 'setup'):
-            guest.configurations(self.payload, 1_000_000_000, 2301_000_000_000, self.boot)
+            guest.configurations(self.payload, 1_000_000_000, 2301_000_000_000, self.boot, self.lifetime())
+
+    def test_unused_setup_time_is_reclaimed_only_before_the_fixed_vm_cutoff(self):
+        started = 1_000_000_000
+        early, _ = guest.configurations(self.payload, started, 101_000_000_000, self.boot, self.lifetime())
+        late, _ = guest.configurations(self.payload, started, 2271_000_000_000, self.boot,
+            self.lifetime(ready=2271 * 10**9))
+        self.assertEqual(early['deadline_monotonic_ns'], started + 17870 * 10**9)
+        self.assertEqual(late['deadline_monotonic_ns'], early['deadline_monotonic_ns'])
+        # The collection child still leaves the existing600-second finish
+        # reserve inside this cutoff; setup cannot extend the18,000-second VM.
+        self.assertEqual((early['deadline_monotonic_ns'] - 600 * 10**9
+            - 101_000_000_000) // 10**9, 17170)
+        self.assertEqual((late['deadline_monotonic_ns'] - 600 * 10**9
+            - 2271_000_000_000) // 10**9, 15000)
+
+    def test_missing_replayed_or_changed_lifetime_cannot_configure_a_measurement(self):
+        for changed in [None, {}, dict(self.lifetime(), deadline_monotonic_ns=17881 * 10**9),
+                        dict(self.lifetime(), guest_started_monotonic_ns=2 * 10**9)]:
+            with self.subTest(changed=changed), self.assertRaises(ValueError):
+                guest.configurations(self.payload, 10**9, 101 * 10**9, self.boot, changed)
 
     def test_pilot_payload_cannot_silently_become_a_full_collection(self):
         self.payload['mode'] = 'unqualified-kvm-feasibility-pilot'
         with self.assertRaisesRegex(ValueError, 'payload'):
-            guest.configurations(self.payload, 1_000_000_000, 101_000_000_000, self.boot)
+            guest.configurations(self.payload, 1_000_000_000, 101_000_000_000, self.boot, self.lifetime())
 
     def test_boolean_qualification_and_closed_binaries_are_required(self):
         self.payload['reference_qualified'] = 0
-        with self.assertRaises(ValueError): guest.configurations(self.payload, 1, 2, self.boot)
+        with self.assertRaises(ValueError): guest.configurations(self.payload, 1, 2, self.boot, self.lifetime())
         self.payload['reference_qualified'] = False
         self.payload['bins']['unexpected'] = {}
-        with self.assertRaises(ValueError): guest.configurations(self.payload, 1, 2, self.boot)
+        with self.assertRaises(ValueError): guest.configurations(self.payload, 1, 2, self.boot, self.lifetime())
 
     def test_non_guest_entry_never_installs_packages_or_runs_a_query(self):
         with patch.object(guest.platform, 'system', return_value='Windows'), patch.object(guest, 'collect') as operation:
             self.assertEqual(guest.main(), 77)
         operation.assert_not_called()
+
+
+class GuestLifetimeSetup(unittest.TestCase):
+    def test_original_lifetime_failure_is_retained_even_when_port_close_also_fails(self):
+        payload = {'commit': '1' * 40, 'source': {'sha256': '2' * 64}}
+        with tempfile.TemporaryDirectory(dir=ROOT / '.local-runs') as temp:
+            base = Path(temp); (base / 'exports').mkdir()
+            connection = Mock(); connection.close.side_effect = OSError('close failed')
+            with patch.object(guest, 'BASE', base), patch.object(guest, 'Device', return_value=connection) as opened, \
+                 patch.object(guest.lifetime, 'guest_exchange', side_effect=TimeoutError('original exchange deadline')) as exchange:
+                with self.assertRaisesRegex(TimeoutError, 'original exchange deadline'):
+                    guest.prepare_lifetime(payload, time.monotonic_ns(), '12345678-1234-1234-1234-123456789abc')
+            report = json.loads((base / 'exports/guest-lifetime.json').read_bytes())
+        opened.assert_called_once(); exchange.assert_called_once(); connection.close.assert_called_once()
+        self.assertEqual(report['status'], 'FAIL'); self.assertEqual(report['error'], 'TimeoutError')
+        self.assertIn('original exchange deadline', report['reason'])
+        self.assertEqual(report['close_error'], 'OSError')
 
 
 class GuestDevicePreflight(unittest.TestCase):

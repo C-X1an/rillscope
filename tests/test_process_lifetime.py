@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class ProcessLifetime(unittest.TestCase):
-    def run_fixture(self, mode):
+    def run_fixture(self, mode, expected_exit=0):
         local = ROOT / '.local-runs'; local.mkdir(exist_ok=True)
         with tempfile.TemporaryDirectory(prefix='pl-', dir=local) as temporary:
             self.assertTrue(Path(temporary).resolve().is_relative_to(local.resolve()))
@@ -19,7 +19,9 @@ class ProcessLifetime(unittest.TestCase):
             try:
                 result = subprocess.run([sys.executable, str(ROOT / 'tests/process_lifetime_worker.py'),
                     str(ROOT), str(Path(temporary) / 'm'), mode], capture_output=True, timeout=15)
-                self.assertEqual(result.returncode, 0, result.stderr.decode(errors='replace'))
+                self.assertEqual(result.returncode, expected_exit,
+                    'worker stdout: ' + result.stdout.decode(errors='replace')
+                    + '\nworker stderr: ' + result.stderr.decode(errors='replace'))
                 report = json.loads(result.stdout)
                 print(json.dumps(report, separators=(',', ':')))
                 self.assertIsNone(sentinel.poll(), 'capture must leave a separate owned sentinel running')
@@ -50,6 +52,17 @@ class ProcessLifetime(unittest.TestCase):
         self.assertTrue(usage['timed_out'])
         self.assertEqual(usage['process_outcome'], 'TIMEOUT')
         self.assertGreaterEqual(usage['wall_ns'], 300_000_000)
+
+    def test_missing_fixture_marker_retains_actual_capture_and_fails(self):
+        report = self.run_fixture('missing-marker', expected_exit=1)
+        self.assertEqual(report['fixture_prerequisites'], {'child_pid_marker_present': False})
+        self.assertIsNone(report['child_alive_at_return'], 'absent prerequisite cannot prove a child state')
+        self.assertEqual(report['usage']['process_outcome'], 'EXECUTED')
+        self.assertEqual(report['usage']['process_cleanup']['status'], 'PASS')
+        self.assertEqual(report['usage']['process_cleanup']['remaining_active_processes'], 0)
+        self.assertTrue(report['usage']['capture_complete'])
+        self.assertIn(b'actual-without-marker', bytes.fromhex(report['stdout_hex']))
+        self.assertEqual(bytes.fromhex(report['stderr_hex']), b'')
 
     def assert_interrupted_capture(self, mode, kind):
         report = self.run_fixture(mode)

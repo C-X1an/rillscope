@@ -12,16 +12,28 @@ sys.path.insert(0, str(ROOT / 'scripts'))
 import reference_guest_observer as module
 
 
+def after_actual_clock(previous):
+    """Wait for an actual tick; never invent or accept equal timestamps."""
+    deadline = time.perf_counter_ns() + 1_000_000_000
+    for _ in range(1000):
+        current = time.monotonic_ns()
+        if current > previous: return current
+        if time.perf_counter_ns() >= deadline: break
+        time.sleep(.001)
+    raise TimeoutError('actual fixture clock did not advance within one second')
+
+
 class FullGuestObserver(unittest.TestCase):
     def exercise(self, fault=None):
         (ROOT / '.local-runs').mkdir(exist_ok=True)
         with tempfile.TemporaryDirectory(prefix='go-', dir=ROOT / '.local-runs') as temporary:
             path = Path(temporary) / 'samples.jsonl'; entered = threading.Event(); release = threading.Event()
-            calls = 0; original_append = module.append_json; appends = 0
+            calls = 0; original_append = module.append_json; appends = 0; last_clock = 0
             def snapshot(phase):
-                nonlocal calls
+                nonlocal calls, last_clock
                 calls += 1
-                row = {'phase': phase, 'utc_ns': time.time_ns(), 'monotonic_ns': time.monotonic_ns(),
+                last_clock = after_actual_clock(last_clock)
+                row = {'phase': phase, 'utc_ns': time.time_ns(), 'monotonic_ns': last_clock,
                     'boot_id': '11111111-2222-3333-4444-555555555555',
                     'clock_source': 'kvm-clock', 'clock_properties': {'monotonic': True, 'adjustable': False},
                     'vmstat': {'status': 'MEASURED', 'values': {'pswpin': 0, 'pswpout': 0}},
@@ -49,10 +61,10 @@ class FullGuestObserver(unittest.TestCase):
                 observer.thread.start()
                 try:
                     if fault == 'in-flight':
-                        self.assertTrue(entered.wait(2)); boundary = time.monotonic_ns()
+                        self.assertTrue(entered.wait(2)); boundary = after_actual_clock(last_clock)
                         observer.stop.set(); release.set()
                     elif fault != 'oversize':
-                        self.assertTrue(observer.ready.wait(2)); boundary = time.monotonic_ns()
+                        self.assertTrue(observer.ready.wait(2)); boundary = after_actual_clock(last_clock)
                     else:
                         boundary = time.monotonic_ns()
                     if fault == 'network': network['interfaces'][0].update(carrier='1', operstate='up')

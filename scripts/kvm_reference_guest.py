@@ -14,8 +14,9 @@ sys.path.insert(0, str(ROOT / 'scripts')); sys.path.insert(0, str(ROOT / 'benchm
 from kvm_pilot_common import require, read_json, write_json, payload_files, sha
 from kvm_pilot_guest import probe_identity, failed, attempt
 from kvm_reference_common import METHOD, STAGES, identity, strict_json
-from kvm_reference_budget import (VM_SECONDS, GUEST_SETUP_SECONDS, COLLECTION_SECONDS,
-    GUEST_FINISH_SECONDS, PACKAGE_SECONDS)
+from kvm_reference_budget import GUEST_SETUP_SECONDS, PACKAGE_SECONDS, VM_TAIL_SECONDS
+from kvm_reference_channel import Device
+import kvm_reference_lifetime as lifetime
 from kvm_reference_events import emit
 from guest_resource_probe import snapshot
 from inspect_reference_guest import TrialCommands, interrupted
@@ -51,18 +52,37 @@ def prepare_capture_device(payload, checked):
     return record
 
 
-def configurations(payload, started_ns, now_ns, boot_id):
+def prepare_lifetime(payload, started_ns, boot_id):
+    record = {}; connection = None; original_error = None
+    try:
+        connection = Device()
+        return lifetime.guest_exchange(connection, record, started_ns=started_ns,
+            setup_deadline_ns=started_ns + (GUEST_SETUP_SECONDS - VM_TAIL_SECONDS) * 10**9,
+            commit=payload['commit'], source_sha256=payload['source']['sha256'], boot_id=boot_id)
+    except (Exception, KeyboardInterrupt) as error:
+        original_error = error
+        record.update(status='FAIL', error=type(error).__name__, reason=str(error)[:1024])
+        raise
+    finally:
+        try:
+            if connection is not None: connection.close()
+        except (Exception, KeyboardInterrupt) as error:
+            record.update(status='FAIL', close_error=type(error).__name__)
+            if original_error is None: raise
+        finally:
+            write_json(BASE / 'exports/guest-lifetime.json', record)
+
+
+def configurations(payload, started_ns, now_ns, boot_id, lifetime_record):
     require(type(payload) is dict and payload.get('mode') == METHOD
         and payload.get('reference_qualified') is False and type(payload.get('bins')) is dict
         and set(payload['bins']) == {'rillscope', 'rillscope-measure'}, 'closed full collection payload required')
     identity(payload['commit'], payload['source']['sha256'])
     require(isinstance(boot_id, str) and re.fullmatch('[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}', boot_id),
             'actual guest boot identity required')
-    require(type(started_ns) is int and type(now_ns) is int and 0 < started_ns <= now_ns
-        and now_ns - started_ns < (GUEST_SETUP_SECONDS - 120) * 10**9,
-        'guest setup consumed its boot/setup reserve')
-    deadline = min(started_ns + (VM_SECONDS - 120) * 10**9,
-                   now_ns + (COLLECTION_SECONDS + GUEST_FINISH_SECONDS) * 10**9)
+    deadline = lifetime.validate_guest_record(lifetime_record, commit=payload['commit'],
+        source_sha256=payload['source']['sha256'], boot_id=boot_id,
+        started_ns=started_ns, ready_ns=now_ns)
     common = {'schema_version': 1, 'method': METHOD, 'commit': payload['commit'],
         'source_sha256': payload['source']['sha256'], 'deadline_monotonic_ns': deadline}
     measure = {**common, 'boot_id': boot_id, 'session': secrets.token_hex(16),
@@ -101,7 +121,11 @@ def collect(payload, ownership, started_ns):
         'host_build_environment': payload['host_build_environment'], 'execution_identity': observed_identity,
         'canonical_fresh': 'NOT RUN', 'reference_qualified': False,
         'scope': 'Source-bound host compilation and distinct guest execution; no native guest build/fresh claim'})
-    measure, export = configurations(payload, started_ns, time.monotonic_ns(), actual['boot_id'])
+    # The real descriptor preflight and one-shot setup exchange both precede
+    # configs, coordination and every query. Guest and host epochs are unrelated.
+    prepare_capture_device(payload, checked)
+    lifetime_record = prepare_lifetime(payload, started_ns, actual['boot_id'])
+    measure, export = configurations(payload, started_ns, time.monotonic_ns(), actual['boot_id'], lifetime_record)
     for name, value, key, digest_key in [('measurement-config.json', measure, barrier.CONFIG_PATH, barrier.CONFIG_DIGEST),
         ('export-config.json', export, exporter.CONFIG_PATH, exporter.CONFIG_DIGEST)]:
         path = BASE / name; write_json(path, value); os.chmod(path, 0o644)
@@ -115,9 +139,6 @@ def collect(payload, ownership, started_ns):
     # root-owned ACK files/configuration cannot be replaced by that identity.
     os.chmod(BASE / 'control', 0o1777)
     os.chmod(BASE / 'exports', 0o1777)
-    # Fail before coordination or queries if the actual measurement identity
-    # cannot open the one named capture port. No protocol bytes are sent here.
-    prepare_capture_device(payload, checked)
     emit('setup-end')
     def ready(stage, request):
         data = barrier.bounded(barrier.CONTROL_ROOT / (stage + '-request.json'))

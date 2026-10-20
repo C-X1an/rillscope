@@ -4,14 +4,16 @@
     "AC-001": {
       "status": "PASS",
       "runs": [
-        "review-d8-native-fixed"
+        "review-d8-native-fixed",
+        "catalog-current-native-products"
       ],
       "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
     },
     "AC-002": {
       "status": "PASS",
       "runs": [
-        "review-d8-native-fixed"
+        "review-d8-native-fixed",
+        "catalog-current-native-products"
       ],
       "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
     },
@@ -19,35 +21,39 @@
       "status": "PASS",
       "runs": [
         "review-d8-native-fixed",
-        "ambiguous-zero-scan"
+        "ambiguous-zero-scan",
+        "catalog-current-native-products"
       ],
       "scope": "Unknown, type-mismatched and ambiguous columns denied before actual scan counters advance"
     },
     "AC-004": {
       "status": "PASS",
       "runs": [
-        "review-d8-native-fixed"
+        "review-d8-native-fixed",
+        "catalog-current-native-products"
       ],
       "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
     },
     "AC-005": {
       "status": "PASS",
       "runs": [
-        "review-d8-native-fixed"
+        "review-d8-native-fixed",
+        "catalog-current-native-products"
       ],
       "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
     },
     "AC-006": {
       "status": "PASS",
       "runs": [
-        "review-followup-differential"
+        "catalog-current-property"
       ],
       "scope": "1000 deterministic small-catalog cases, JSON/SQL on/off against physically scoped SQLite; all verdicts retained"
     },
     "AC-007": {
       "status": "PASS",
       "runs": [
-        "review-d8-native-fixed"
+        "review-d8-native-fixed",
+        "catalog-current-native-products"
       ],
       "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
     },
@@ -61,21 +67,24 @@
     "AC-009": {
       "status": "PASS",
       "runs": [
-        "review-d8-native-fixed"
+        "review-d8-native-fixed",
+        "catalog-current-native-products"
       ],
       "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
     },
     "AC-010": {
       "status": "PASS",
       "runs": [
-        "review-d8-native-fixed"
+        "review-d8-native-fixed",
+        "catalog-current-native-products"
       ],
       "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
     },
     "AC-011": {
       "status": "PASS",
       "runs": [
-        "review-d8-native-fixed"
+        "review-d8-native-fixed",
+        "catalog-current-native-products"
       ],
       "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
     },
@@ -83,21 +92,24 @@
       "status": "PASS",
       "runs": [
         "review-d8-native-fixed",
-        "eight-rust-controls"
+        "eight-rust-controls",
+        "catalog-current-native-products"
       ],
       "scope": "Known-bad physical plans and selected real PASS-FAIL-PASS controls; source revisions are recorded"
     },
     "AC-013": {
       "status": "PASS",
       "runs": [
-        "review-d8-native-fixed"
+        "review-d8-native-fixed",
+        "catalog-current-native-products"
       ],
       "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
     },
     "AC-014": {
       "status": "PASS",
       "runs": [
-        "review-d8-native-fixed"
+        "review-d8-native-fixed",
+        "catalog-current-native-products"
       ],
       "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
     },
@@ -106,7 +118,8 @@
       "runs": [
         "review-d8-native-fixed",
         "eight-rust-controls",
-        "source-bound-pilot-v2"
+        "source-bound-pilot-v2",
+        "catalog-current-native-products"
       ],
       "scope": "Finite input/work/output regression cases and actual tightened work control; no OS memory containment claim"
     },
@@ -120,7 +133,8 @@
     "AC-017": {
       "status": "PASS",
       "runs": [
-        "review-d8-native-fixed"
+        "review-d8-native-fixed",
+        "catalog-current-native-products"
       ],
       "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
     },
@@ -128,21 +142,24 @@
       "status": "PASS",
       "runs": [
         "review-d8-native-fixed",
-        "final-cancellation-records-qualified"
+        "final-cancellation-records-qualified",
+        "catalog-current-native-products"
       ],
       "scope": "Current ordinary cancellation/output caps plus actual Linux no-signal and both-signal before/after decision records, behavioral PASS-FAIL-PASS and explicit independently assessed clarification; no atomic transport or last-byte guarantee"
     },
     "AC-019": {
       "status": "PASS",
       "runs": [
-        "review-d8-native-fixed"
+        "review-d8-native-fixed",
+        "catalog-current-native-products"
       ],
       "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
     },
     "AC-020": {
       "status": "PASS",
       "runs": [
-        "review-d8-native-fixed"
+        "review-d8-native-fixed",
+        "catalog-current-native-products"
       ],
       "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
     },
@@ -177,8 +194,7 @@
     "AC-025": {
       "status": "PASS",
       "runs": [
-        "review-d8-native-fixed",
-        "review-followup-malformed"
+        "catalog-static-malformed-current"
       ],
       "scope": "Static forbid-unsafe/lint and 2000 finite malformed JSON/SQL cases; no libFuzzer-duration claim"
     },
@@ -193,7 +209,7 @@
     "AC-027": {
       "status": "PASS",
       "runs": [
-        "endpoint-claims-current-audit"
+        "catalog-current-claim-links"
       ],
       "scope": "Actual current status/link/digest/source audit; benchmark/reference/fresh release remain incomplete"
     },
@@ -201,7 +217,8 @@
       "status": "PASS",
       "runs": [
         "review-d8-native-fixed",
-        "rust-demo"
+        "rust-demo",
+        "catalog-current-native-products"
       ],
       "scope": "Actual fixed-scope Rust adapter/report runs with minimal OS environment, no required model/cloud keys"
     },
@@ -210,7 +227,8 @@
       "runs": [
         "review-d8-native-fixed",
         "rust-demo",
-        "review-427-html-controls"
+        "review-427-html-controls",
+        "catalog-current-native-products"
       ],
       "scope": "Actual escaped Rust text and fresh source-bound HTML PASS-FAIL-PASS control; renderer/adapter/tests now explicitly bound; no user study"
     },
@@ -218,7 +236,7 @@
       "status": "PASS",
       "runs": [
         "current-notice-components",
-        "endpoint-wording-current"
+        "catalog-independent-wording-current"
       ],
       "scope": "Current45path wording map and BENCHMARKS repair delta independently inspected; unchanged images hash-compared only; existing license proof preserved; no guest/reference/release qualification"
     }
@@ -971,6 +989,90 @@
     "endpoint-reference-current": {
       "path": "verification/product/runs/endpoint-reference-current.json",
       "sha256": "90a378f55e808444dd95c36a285fa5911771ba1b246aefd1c3ee3a10ffa4908d"
+    },
+    "catalog-host-90": {
+      "path": "verification/product/runs/catalog-host-90.json",
+      "sha256": "74dc52911c4c43c3f1ac0e782add08afb96c99d9cd47962f31a18efb4594786f"
+    },
+    "catalog-native-40": {
+      "path": "verification/product/runs/catalog-native-40.json",
+      "sha256": "ff8bd417e14356e12e940666ee557c8c8611ede8bffed68b2b859f4a82bd0dd9"
+    },
+    "catalog-lifetime-controls": {
+      "path": "verification/product/runs/catalog-lifetime-controls.json",
+      "sha256": "ed0eeae6d2b37ffe2b9e3173e7a0575f9cb52d259c18cdf797ee6385ab5dea1b"
+    },
+    "catalog-reference-old-store-fail": {
+      "path": "verification/product/runs/catalog-reference-old-store-fail.json",
+      "sha256": "8cb87b594ea94c2afdd848e10860658f873fb87c9a5f6e3873d6fae6fe7b546f"
+    },
+    "catalog-reference-old-bundled-fail": {
+      "path": "verification/product/runs/catalog-reference-old-bundled-fail.json",
+      "sha256": "8fba5382051e20e4e1baf52662093eac6b0b182ef802544e719eb20e59db516d"
+    },
+    "catalog-local-baseline315": {
+      "path": "verification/product/runs/catalog-local-baseline315.json",
+      "sha256": "cccd433d6787edf80bb399f1ea361581f5379ccc8a29a00ca424dcae5863129c"
+    },
+    "catalog-local-current315": {
+      "path": "verification/product/runs/catalog-local-current315.json",
+      "sha256": "abb45587a63494600c4b7f58b7857e87a2ab02461dc122b2fdf00e44489caa2d"
+    },
+    "catalog-local-current-raw315": {
+      "path": "verification/product/runs/catalog-local-current-raw315.json",
+      "sha256": "88d3167a09898f7082e0b71365ad53272f82dfe66bdfe36bf415c2c300c297f0"
+    },
+    "catalog-evidence-freshness-before": {
+      "path": "verification/product/runs/catalog-evidence-freshness-before.json",
+      "sha256": "7221c475c015c29717344750ceba873687a406818f4dc8d0bd828df8ccf88fa6"
+    },
+    "catalog-evidence-freshness-after": {
+      "path": "verification/product/runs/catalog-evidence-freshness-after.json",
+      "sha256": "bd7d478ecde4b3234c76bd7b09af4cde6464269b166a8e3c0c14c9f27a2ad888"
+    },
+    "catalog-evidence-freshness-controls": {
+      "path": "verification/product/runs/catalog-evidence-freshness-controls.json",
+      "sha256": "32514fa8cd23d281664038d88b2e96a917d95dd7c119bb6fde3f8804c56626ae"
+    },
+    "catalog-independent-host90": {
+      "path": "verification/product/runs/catalog-independent-host90.json",
+      "sha256": "055e751eb4cfc7f3d058b04be83df4e0b7d274238a8c824fc9f15f8a9d47387f"
+    },
+    "catalog-independent-wording-current": {
+      "path": "verification/product/runs/catalog-independent-wording-current.json",
+      "sha256": "98b60a50917654ab6499cdb69ed53519ac9b32cdf518d120e71e04ec57f6426e"
+    },
+    "catalog-static-malformed-current": {
+      "path": "verification/product/runs/catalog-static-malformed-current.json",
+      "sha256": "87b6e0ac568442b130078f517ce63b1534df77043a103bce23e43d6ff9227e5d"
+    },
+    "catalog-current-property": {
+      "path": "verification/product/runs/catalog-current-property.json",
+      "sha256": "cb98f6f7a30690a0a3f0a5f9230d879458d9d48954f9b6c5a2a22d2d7a817af0"
+    },
+    "catalog-current-native-products": {
+      "path": "verification/product/runs/catalog-current-native-products.json",
+      "sha256": "be7885871621d64b8c6c2614b8d5a4153b557d3a0c53f354790bd6bbb627db0a"
+    },
+    "catalog-current-reference": {
+      "path": "verification/product/runs/catalog-current-reference.json",
+      "sha256": "7a25ed5edb86cd179de47217070f7078c597f9db7129a7a6e26c081ea6701350"
+    },
+    "catalog-static-before": {
+      "path": "verification/product/runs/catalog-static-before.json",
+      "sha256": "01cb9267466aa54d5ad4016b942baeab8ea8a550837db05bebf136ebf4b68219"
+    },
+    "catalog-static-controls": {
+      "path": "verification/product/runs/catalog-static-controls.json",
+      "sha256": "d3ff11913d34e7add28ae515dfe7f27be97872a34dbf1459a918f57140e89336"
+    },
+    "catalog-mutation-dirty-refusal": {
+      "path": "verification/product/runs/catalog-mutation-dirty-refusal.json",
+      "sha256": "46015a7a1804d2abe07ccea9a24151f43daa7af34ddc11771bccb9c7dfef14c7"
+    },
+    "catalog-current-claim-links": {
+      "path": "verification/product/runs/catalog-current-claim-links.json",
+      "sha256": "dd6b6f71fd657d318c31e44f84ead7873339112e24ba4a372ad3bdcebaebc7e7"
     }
   },
   "release_status": "INCOMPLETE",
