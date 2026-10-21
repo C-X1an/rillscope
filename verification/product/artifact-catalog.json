@@ -830,5 +830,45 @@
   "catalog-current-claim-links": {
     "path": "verification/product/runs/catalog-current-claim-links.json",
     "sha256": "dd6b6f71fd657d318c31e44f84ead7873339112e24ba4a372ad3bdcebaebc7e7"
+  },
+  "streaming-before-eight": {
+    "path": "verification/product/runs/streaming-before-eight.json",
+    "sha256": "cd7710620f30f0798dabd3deff3c2eb14da9058e9e702fa0c4f98d1be98a58e9"
+  },
+  "streaming-first-rust47": {
+    "path": "verification/product/runs/streaming-first-rust47.json",
+    "sha256": "a2de3afe9b842fb794de5f4a2bcb1eca3d645e1a9c7954be79a5b6603659f6d4"
+  },
+  "streaming-format-mutation": {
+    "path": "verification/product/runs/streaming-format-mutation.json",
+    "sha256": "137e59394ff0a646476b20e4745acbba8caa5655ce1aeff719bd2b6804ecf538"
+  },
+  "streaming-initial-lint-failure": {
+    "path": "verification/product/runs/streaming-initial-lint-failure.json",
+    "sha256": "ad89a133fb415e209865bd3da56b77ea72ef9f249daae33334f868663dcce329"
+  },
+  "streaming-native-current": {
+    "path": "verification/product/runs/streaming-native-current.json",
+    "sha256": "bf3b0b7ada63733255753ef356594e90a26743cbc562cdf2a0da4211ed5edd06"
+  },
+  "streaming-property-current": {
+    "path": "verification/product/runs/streaming-property-current.json",
+    "sha256": "da711b9434e5cd203bf324bef35e86a91809d9770eea1b39e81a8ab89013386d"
+  },
+  "streaming-malformed-current": {
+    "path": "verification/product/runs/streaming-malformed-current.json",
+    "sha256": "3929537c21c013b49e38e540ce0f2a2d8d81e27df457a87ec22e3aabef019609"
+  },
+  "streaming-demo-current": {
+    "path": "verification/product/runs/streaming-demo-current.json",
+    "sha256": "b8495ecd425cded952386b7103d026242fd166c7da20a4fa62cb7675060a5f9f"
+  },
+  "streaming-reference-claims-before": {
+    "path": "verification/product/runs/streaming-reference-claims-before.json",
+    "sha256": "ed753053706009add0990beb30e1972d8e410ccdde444d19f25134d7725cc9d2"
+  },
+  "streaming-security-windows-failed": {
+    "path": "verification/product/runs/streaming-security-windows-failed.json",
+    "sha256": "9ca406bd94ceb6db37dcd5443c8f406824a2e5d4ee6383b8846e2381427cd529"
   }
 }

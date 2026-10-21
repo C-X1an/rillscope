@@ -1,25 +1,78 @@
 //! Validated immutable operator inputs; no query-accessible path or mutation API.
-use crate::decode::strict_json;
+use crate::decode::{preflight, strict_json};
 use crate::error::{ErrorCode as E, Result};
 use crate::types::{Batch, DataType, Field, identifier};
-use serde::Deserialize;
+use serde::de::{self, DeserializeSeed, MapAccess, SeqAccess, Visitor};
+use serde::{Deserialize, Deserializer};
+use serde_json::value::RawValue;
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
+use std::fmt;
 use std::sync::Arc;
 
 pub const MAX_CATALOG_BYTES: usize = 256 * 1024 * 1024;
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
-struct CatalogInput {
+struct CatalogInput<'a> {
     version: u32,
     snapshot: String,
-    tables: BTreeMap<String, TableInput>,
+    #[serde(borrow)]
+    tables: &'a RawValue,
 }
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
-struct TableInput {
+struct TableInput<'a> {
+    #[serde(deserialize_with = "catalog_columns")]
     columns: Vec<Field>,
-    rows: Vec<Vec<serde_json::Value>>,
+    #[serde(borrow)]
+    rows: &'a RawValue,
+}
+
+// Only metadata is materialized here. Borrowing rows allows either JSON member
+// order; their scalars are validated once the authoritative schema is known.
+fn catalog_columns<'de, D: Deserializer<'de>>(
+    deserializer: D,
+) -> std::result::Result<Vec<Field>, D::Error> {
+    struct Columns;
+    struct NextField(usize);
+    impl<'de> DeserializeSeed<'de> for NextField {
+        type Value = Field;
+        fn deserialize<X: Deserializer<'de>>(
+            self,
+            deserializer: X,
+        ) -> std::result::Result<Field, X::Error> {
+            if self.0 >= 64 {
+                return Err(de::Error::custom("catalog column limit"));
+            }
+            Field::deserialize(deserializer)
+        }
+    }
+    impl<'de> Visitor<'de> for Columns {
+        type Value = Vec<Field>;
+        fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+            formatter.write_str("bounded catalog columns")
+        }
+        fn visit_seq<A: SeqAccess<'de>>(
+            self,
+            mut seq: A,
+        ) -> std::result::Result<Self::Value, A::Error> {
+            let mut fields: Vec<Field> = Vec::new();
+            while let Some(field) = seq.next_element_seed(NextField(fields.len()))? {
+                if !identifier(&field.name) || fields.iter().any(|prior| prior.name == field.name) {
+                    return Err(de::Error::custom("invalid catalog column"));
+                }
+                fields
+                    .try_reserve(1)
+                    .map_err(|_| de::Error::custom("catalog allocation limit"))?;
+                fields.push(field);
+            }
+            if fields.is_empty() {
+                return Err(de::Error::custom("empty catalog schema"));
+            }
+            Ok(fields)
+        }
+    }
+    deserializer.deserialize_seq(Columns)
 }
 
 #[derive(Debug)]
@@ -28,6 +81,49 @@ pub(crate) struct Table {
     pub columns: Vec<Field>,
     pub data: Batch,
 }
+
+struct CatalogTables(Vec<Table>);
+impl<'de> Deserialize<'de> for CatalogTables {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> std::result::Result<Self, D::Error> {
+        struct Tables;
+        impl<'de> Visitor<'de> for Tables {
+            type Value = CatalogTables;
+            fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+                formatter.write_str("bounded unique catalog tables")
+            }
+            fn visit_map<A: MapAccess<'de>>(
+                self,
+                mut map: A,
+            ) -> std::result::Result<Self::Value, A::Error> {
+                let mut tables: Vec<Table> = Vec::new();
+                while let Some(name) = map.next_key::<String>()? {
+                    if tables.len() >= 256
+                        || !identifier(&name)
+                        || tables.iter().any(|prior| prior.name == name)
+                    {
+                        return Err(de::Error::custom("invalid or duplicate catalog table"));
+                    }
+                    let input: TableInput<'de> = map.next_value()?;
+                    let data = Batch::from_catalog_rows(input.columns.clone(), input.rows)
+                        .map_err(|_| de::Error::custom("invalid catalog rows"))?;
+                    tables
+                        .try_reserve(1)
+                        .map_err(|_| de::Error::custom("catalog allocation limit"))?;
+                    tables.push(Table {
+                        name,
+                        columns: input.columns,
+                        data,
+                    });
+                }
+                // Preserve the previous BTreeMap table identity ordering.
+                tables.sort_by(|left, right| left.name.cmp(&right.name));
+                Ok(CatalogTables(tables))
+            }
+        }
+        deserializer.deserialize_map(Tables)
+    }
+}
+
 #[derive(Debug)]
 pub struct Catalog {
     pub(crate) tables: Vec<Table>,
@@ -36,41 +132,13 @@ pub struct Catalog {
 }
 impl Catalog {
     pub fn from_bytes(bytes: &[u8]) -> Result<Arc<Self>> {
-        let json = strict_json(bytes, MAX_CATALOG_BYTES, 64).map_err(|_| E::Catalog)?;
-        let input: CatalogInput = serde_json::from_value(json).map_err(|_| E::Catalog)?;
-        if input.version != 1
-            || input.snapshot.is_empty()
-            || input.snapshot.len() > 128
-            || input.tables.len() > 256
-        {
+        preflight(bytes, MAX_CATALOG_BYTES, 64).map_err(|_| E::Catalog)?;
+        let input: CatalogInput<'_> = serde_json::from_slice(bytes).map_err(|_| E::Catalog)?;
+        if input.version != 1 || input.snapshot.is_empty() || input.snapshot.len() > 128 {
             return Err(E::Catalog.into());
         }
-        let mut tables = Vec::new();
-        tables
-            .try_reserve_exact(input.tables.len())
-            .map_err(|_| E::Catalog)?;
-        for (name, table) in input.tables {
-            if !identifier(&name)
-                || table.columns.is_empty()
-                || table.columns.len() > 64
-                || table.rows.len() > 1_000_000
-            {
-                return Err(E::Catalog.into());
-            }
-            let mut names = BTreeSet::new();
-            for field in &table.columns {
-                if !identifier(&field.name) || !names.insert(field.name.clone()) {
-                    return Err(E::Catalog.into());
-                }
-            }
-            let data = Batch::from_json_rows(table.columns.clone(), &table.rows)
-                .map_err(|_| E::Catalog)?;
-            tables.push(Table {
-                name,
-                columns: table.columns,
-                data,
-            });
-        }
+        let CatalogTables(tables) =
+            serde_json::from_str(input.tables.get()).map_err(|_| E::Catalog)?;
         Ok(Arc::new(Self {
             tables,
             digest: format!("{:x}", Sha256::digest(bytes)),
@@ -178,6 +246,10 @@ impl Context {
         &self.digest
     }
 }
+
+#[cfg(test)]
+#[path = "catalog_ingestion_tests.rs"]
+mod ingestion_tests;
 
 #[cfg(test)]
 mod tests {

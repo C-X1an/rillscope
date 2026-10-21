@@ -20,6 +20,9 @@ CONTROLS = [
     ('retained_schema_reservation', 'src/execute.rs', 'let schema_reservation = budget.reserve(schema_bytes(plan.root())?)?;', 'let schema_reservation = budget.reserve(0)?;', 'execute::tests::empty_result_schema_is_reserved_and_retained'),
     ('batch_conversion_checkpoint', 'src/operators/stream.rs', 'budget.observe("batch_conversion_chunk")?;', '/* Intentionally removed conversion checkpoint. */', 'operators::stream::review_tests::batch_conversion_observes_mid_column_cancellation'),
     ('repeated_join_probe_keys', 'src/operators/blocking.rs', 'let _key_temporary = budget.reserve(key_bytes)?;', 'let _key_temporary = budget.reserve(0)?;', 'execute::tests::repeated_text_join_probe_keys_reserve_every_copy'),
+    ('catalog_duplicate_tables', 'src/catalog.rs', '|| tables.iter().any(|prior| prior.name == name)', '|| false', 'catalog::ingestion_tests::decoded_duplicate_keys_and_unknown_fields_always_reject'),
+    ('catalog_row_limit', 'src/catalog_rows.rs', 'if self.0.len >= 1_000_000 {', 'if false {', 'catalog::ingestion_tests::million_row_cap_is_exact_and_does_not_publish_a_partial_catalog'),
+    ('catalog_text_byte_limit', 'src/catalog_rows.rs', '(Scalar::Text(text), DataType::Text) if text.len() <= 4096 => {}', '(Scalar::Text(_), DataType::Text) => {}', 'catalog::ingestion_tests::text_cap_counts_decoded_utf8_bytes'),
 ]
 
 def run(command, cwd, out, env):

@@ -4,6 +4,9 @@ use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::cmp::Ordering;
 
+#[path = "catalog_rows.rs"]
+mod catalog_rows;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum DataType {
@@ -450,6 +453,8 @@ impl Batch {
             len: rows.len(),
         })
     }
+    // Materialized-row comparison oracle retained with the original tests.
+    #[cfg(test)]
     pub(crate) fn from_json_rows(
         fields: Vec<Field>,
         rows: &[Vec<serde_json::Value>],
