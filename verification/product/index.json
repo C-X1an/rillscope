@@ -210,8 +210,8 @@
     "AC-025": {
       "status": "PASS",
       "runs": [
-        "streaming-native-current",
-        "streaming-malformed-current"
+        "sqlite-complete-static-native",
+        "sqlite-corrected-malformed"
       ],
       "scope": "Static forbid-unsafe/lint and 2000 finite malformed JSON/SQL cases; no libFuzzer-duration claim"
     },
@@ -254,9 +254,9 @@
       "status": "PASS",
       "runs": [
         "current-notice-components",
-        "catalog-independent-wording-current"
+        "sqlite-independent-wording"
       ],
-      "scope": "Current45path wording map and BENCHMARKS repair delta independently inspected; unchanged images hash-compared only; existing license proof preserved; no guest/reference/release qualification"
+      "scope": "Actual45path wording map and corrected benchmark-loader cleanup explanation independently inspected; unchanged images hash-compared only; complete existing license proof preserved. Dated failed full and pre-correction315 evidence do not establish current performance, reference, fresh or release qualification."
     }
   },
   "artifacts": {
@@ -1143,6 +1143,26 @@
     "streaming-final-current-association": {
       "path": "verification/product/runs/streaming-final-current-association.json",
       "sha256": "ff98861d16722112108dad89ec12624069a132a713ef3a442caba879ca344cd7"
+    },
+    "sqlite-public-gc-before": {
+      "path": "verification/product/runs/sqlite-public-gc-before.json",
+      "sha256": "10c82c319088483278678fc8cf2c07940e6d8ee36962ff02aeba914b69b0ea78"
+    },
+    "sqlite-public13-corrected": {
+      "path": "verification/product/runs/sqlite-public13-corrected.json",
+      "sha256": "9646927434066ff5c5a1a35607dafc4c967b22741c24f11276fccd8001f4d335"
+    },
+    "sqlite-complete-static-native": {
+      "path": "verification/product/runs/sqlite-complete-static-native.json",
+      "sha256": "869d5df8dba20a769cb1aaf1745b68df117613252d6c7aaed8a06053304f19a7"
+    },
+    "sqlite-corrected-malformed": {
+      "path": "verification/product/runs/sqlite-corrected-malformed.json",
+      "sha256": "e0ef22294cd09870a06f44fdceff3d57a6ccd10714cf7e9019bdaf83a64f4d9f"
+    },
+    "sqlite-independent-wording": {
+      "path": "verification/product/runs/sqlite-independent-wording.json",
+      "sha256": "6997a7fc72bffa9918602b3f00adcac54e04bc8d09baff57b9193bbcdb359ccb"
     }
   },
   "release_status": "INCOMPLETE",
