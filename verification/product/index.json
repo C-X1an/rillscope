@@ -140,9 +140,9 @@
     "AC-016": {
       "status": "PASS",
       "runs": [
-        "review-e7-linux-export-observed"
+        "streaming-linux-original-observations"
       ],
-      "scope": "Actual successful public Ubuntu rust-product job executed all four exporter controls including symbolic-link rejection; selected source bytes still match, no local Windows privilege claim"
+      "scope": "Actual current-source Ubuntu rust-product job executed all four export controls including symbolic-link rejection; saved observations and selected Git source bytes match. Local Windows privilege failure remains separate."
     },
     "AC-017": {
       "status": "PASS",
@@ -154,14 +154,12 @@
       "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
     },
     "AC-018": {
-      "status": "BLOCKED",
+      "status": "PASS",
       "runs": [
-        "review-d8-native-fixed",
-        "final-cancellation-records-qualified",
-        "catalog-current-native-products",
-        "streaming-native-current"
+        "streaming-native-current",
+        "streaming-final-current-association"
       ],
-      "scope": "Current ordinary output/cancel caps passed. Final-decision instruction evidence belongs to older Rust source; new decoder Linux instruction/source association remains unexecuted and unqualified."
+      "scope": "Current ordinary cancellation/output caps and current-source original instruction/handler/envelope/source-fault record validation support the unchanged final atomic successful-response cancellation decision. No atomic-delivery or last-byte cancellation guarantee; full/reference/fresh/release remain separate."
     },
     "AC-019": {
       "status": "PASS",
@@ -220,10 +218,9 @@
     "AC-026": {
       "status": "PASS",
       "runs": [
-        "review-d8-native-fixed",
-        "review-72-linux-owned-controls"
+        "streaming-linux-original-observations"
       ],
-      "scope": "Current local runner controls and actual successful Ubuntu reference-job descendant/input/output controls, including new-session worker cleanup; selected remote source bytes match; whole-workflow status is separate"
+      "scope": "Actual current Ubuntu rust-product job executed the named descendant, input, output and receipt controls, including detached/new-session worker cleanup. Captured named results and selected source blobs match; whole-project qualification remains separate."
     },
     "AC-027": {
       "status": "PASS",
@@ -1134,6 +1131,18 @@
     "streaming-security-windows-failed": {
       "path": "verification/product/runs/streaming-security-windows-failed.json",
       "sha256": "9ca406bd94ceb6db37dcd5443c8f406824a2e5d4ee6383b8846e2381427cd529"
+    },
+    "streaming-final-original-records": {
+      "path": "verification/product/runs/streaming-final-original-records.json",
+      "sha256": "7ad773102449f03ad9803ea188a6d22adf41dafac4f3fec52c693bded7fa1452"
+    },
+    "streaming-linux-original-observations": {
+      "path": "verification/product/runs/streaming-linux-original-observations.json",
+      "sha256": "d6b45cf79ebdd55581c6fdefb3306b5795010074c359231c58bcb3ccb25c6908"
+    },
+    "streaming-final-current-association": {
+      "path": "verification/product/runs/streaming-final-current-association.json",
+      "sha256": "ff98861d16722112108dad89ec12624069a132a713ef3a442caba879ca344cd7"
     }
   },
   "release_status": "INCOMPLETE",

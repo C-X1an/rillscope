@@ -8,23 +8,25 @@
   "clarification_sha256": "25e86857ec62635b31b86a3fe3d03616bc5679993bc6768789410cebd62e14f0",
   "contract_lock_sha256": "d93b88379c57f4282ff70bc216577f1a675e4521607fe0c5300796bed989d5cf",
   "remote_repository": "C-X1an/rillscope",
-  "remote_commit": "d8e1312c5c9a9d43715c45e0314c9064ca125bab",
-  "remote_run_id": 39020186943,
-  "remote_job_id": 117360281667,
-  "remote_artifact_id": 12096800477,
-  "remote_artifact_sha256": "185a2175240e31b04541e613c23a3adc9e7c5578f447751bf3a5ef82298c182d",
+  "remote_commit": "82761605fb0771a8eff181503a321b224af69dc0",
+  "remote_run_id": 39572422703,
+  "remote_job_id": 119129634689,
+  "remote_artifact_id": 12332343247,
+  "remote_artifact_sha256": "15c4fd6d5eda1d1548fb79ccb805e82b7c456269639495cb81968198d16b94f5",
   "independent_assessment": {
     "status": "RECOMMENDED",
     "kind": "source and actual recorded instruction/handler/envelope/control inspection",
     "independent_runtime_execution": false,
     "instruction_disassembly_sha256": {
-      "no-signal": "58c61a8677f45ae04802fdb2ac576eee0e4c6b594e8d671944918d0dbd9a0145",
-      "before-commit-sigint": "b07fee6e89f2d22acd16d7ff69e648652352603195b770086c0cfa3d0246b945",
-      "before-commit-sigterm": "c1eeafcc8ec2140695ddf78ed17208cac8a079b2dee3f8f40be49878752a50f7",
-      "after-commit-before-write-sigint": "242e5b17b6116839c49f55ddf17189adc72c78f522f465691195b5c5846941ed",
-      "after-commit-before-write-sigterm": "3ad3bda115b81d67fed983982548053b066c3ca462d7257fbc41f98e769aaf64"
+      "no-signal": "b25e8cbf6bc2325b219a298fc1b698c597bd2406908b51872b71109054394eb8",
+      "before-commit-sigint": "c3572e5d7f59257dfe32b010c199e84f3aa365f49c24e56f23f582f35c88f088",
+      "before-commit-sigterm": "bfc0fcd9d5c431d839fd2aba1808bef4472872b7d97a6c1bcf77fbfacfc4dfed",
+      "after-commit-before-write-sigint": "933741fa415b3da8454acaf51832dca8759712b91cf637ed4987becbdfc430c7",
+      "after-commit-before-write-sigterm": "85dadd79cf87822d2042d13edcaf703e7adebd85b2570b8877efea22bc51751f"
     },
-    "scope": "recorded build hashes inspected; executables not independently run or rehashed; remote origin supported by supplied job/artifact association"
+    "scope": "Current source, all original artifact members, recorded Cargo/compiler/profile/raw associations, actual instruction placement, both handled signals, exact authorized/error envelopes and source-fault PASS-FAIL-PASS records independently inspected. Executable bytes and new runtime execution are absent.",
+    "source_and_instruction_review_sha256": "26b92bca9c7989ee4a5a6234a45b1da542cb1cbe8d214346a5c527cf389d03f4",
+    "bindings_sha256": "6be36fe075e432775440b391f4b1dfb57a5335482280daae12d58f398976d13b"
   },
   "ordinary_execution_evidence": "current native actual cancellation, row/byte output caps and framing tests passed separately",
   "limitations": [
@@ -32,5 +34,7 @@
     "Exit0 does not acknowledge reader parsing/persistence",
     "Closed output can truncate or omit an envelope and returns exit6",
     "No final release or fresh-checkout qualification follows"
-  ]
+  ],
+  "factual_association_prepared_utc": "2026-10-21T09:41:02.436250+00:00",
+  "factual_association_refreshed_utc": "2026-10-21T10:14:03.972233+00:00"
 }

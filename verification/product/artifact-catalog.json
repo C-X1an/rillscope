@@ -870,5 +870,17 @@
   "streaming-security-windows-failed": {
     "path": "verification/product/runs/streaming-security-windows-failed.json",
     "sha256": "9ca406bd94ceb6db37dcd5443c8f406824a2e5d4ee6383b8846e2381427cd529"
+  },
+  "streaming-final-original-records": {
+    "path": "verification/product/runs/streaming-final-original-records.json",
+    "sha256": "7ad773102449f03ad9803ea188a6d22adf41dafac4f3fec52c693bded7fa1452"
+  },
+  "streaming-linux-original-observations": {
+    "path": "verification/product/runs/streaming-linux-original-observations.json",
+    "sha256": "d6b45cf79ebdd55581c6fdefb3306b5795010074c359231c58bcb3ccb25c6908"
+  },
+  "streaming-final-current-association": {
+    "path": "verification/product/runs/streaming-final-current-association.json",
+    "sha256": "ff98861d16722112108dad89ec12624069a132a713ef3a442caba879ca344cd7"
   }
 }
