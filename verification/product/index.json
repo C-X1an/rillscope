@@ -186,9 +186,10 @@
         "full-grid-windows-strong-failed",
         "full-linux-retention-failed",
         "nullable-sort-current",
-        "full-linux-79e-incomplete"
+        "full-linux-79e-incomplete",
+        "sqlite651-full-grid-timeout"
       ],
-      "scope": "All43050 Windows records retained and strongly revalidated:3timeouts, FAIL. Separate Linux run cancelled while packaging with no capture artifact; count unknown. New complete qualifying capture remains required"
+      "scope": "Original full Windows capture retains three timeouts. Subsequent Linux failures remain dated; original651 timed out with35226/43050 observations,335 complete/1partial/74absent; cancellation and deciding-NULL absent, full semantic validation not run. New bounded-loader source requires a genuinely complete new capture."
     },
     "AC-022": {
       "status": "BLOCKED",
@@ -210,10 +211,10 @@
     "AC-025": {
       "status": "PASS",
       "runs": [
-        "sqlite-complete-static-native",
-        "sqlite-corrected-malformed"
+        "sqlite-batch-static-native",
+        "sqlite-batch-malformed"
       ],
-      "scope": "Static forbid-unsafe/lint and 2000 finite malformed JSON/SQL cases; no libFuzzer-duration claim"
+      "scope": "Current complete Rust formatting, Clippy, all-target compilation, 47 library plus one CLI unit test and 144-file Python syntax/whitespace checks PASS. Actual finite 2000-case JSON/SQL malformed corpus PASS; libFuzzer NOT RUN."
     },
     "AC-026": {
       "status": "PASS",
@@ -254,9 +255,9 @@
       "status": "PASS",
       "runs": [
         "current-notice-components",
-        "sqlite-independent-wording"
+        "sqlite-batch-public-wording"
       ],
-      "scope": "Actual45path wording map and corrected benchmark-loader cleanup explanation independently inspected; unchanged images hash-compared only; complete existing license proof preserved. Dated failed full and pre-correction315 evidence do not establish current performance, reference, fresh or release qualification."
+      "scope": "Actual current 45-path wording and public independent-test provenance inspected separately; unchanged images hash-compared only. Preserved license notices. Failed partial experiments and Windows diagnostics establish no complete performance, reference, canonical fresh or release qualification."
     }
   },
   "artifacts": {
@@ -1163,6 +1164,26 @@
     "sqlite-independent-wording": {
       "path": "verification/product/runs/sqlite-independent-wording.json",
       "sha256": "6997a7fc72bffa9918602b3f00adcac54e04bc8d09baff57b9193bbcdb359ccb"
+    },
+    "sqlite-batch-static-native": {
+      "path": "verification/product/runs/sqlite-batch-static-native.json",
+      "sha256": "e3472095cdab8212b69f2fea0503331083bcfcbaa8516dffa5d0defcbdf9958b"
+    },
+    "sqlite-batch-malformed": {
+      "path": "verification/product/runs/sqlite-batch-malformed.json",
+      "sha256": "28e89ddddf6bd2e3d19921ec9604f456c32580f04ce0668b05e1e3b4c396636c"
+    },
+    "sqlite-batch-public-wording": {
+      "path": "verification/product/runs/sqlite-batch-public-wording.json",
+      "sha256": "a33bcfcd4b99e7db28c1ec3d49c405775e8675e5bc16e4a5dcfd1f8794336584"
+    },
+    "sqlite-batch-reference-timeout": {
+      "path": "verification/product/runs/sqlite-batch-reference-timeout.json",
+      "sha256": "24cd0b8edca1b4769104fe4a6b9a9103ca531c176cc7a1ba5f5e9d8deb8841b5"
+    },
+    "sqlite651-full-grid-timeout": {
+      "path": "verification/product/runs/sqlite651-full-grid-timeout.json",
+      "sha256": "ea3d56655c7d9a661556a93688b9a6114f193d28de7d660537ab07f85025381e"
     }
   },
   "release_status": "INCOMPLETE",

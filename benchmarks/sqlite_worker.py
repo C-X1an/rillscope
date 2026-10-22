@@ -5,9 +5,45 @@ import gc
 import hashlib
 import json
 from operator import itemgetter
+from itertools import chain, islice
 from pathlib import Path
 import sqlite3
 import time
+
+def insert_authorized_rows(database, name, names, values):
+    """Bind bounded groups of already authorized rows into a fresh table."""
+    values = iter(values)
+    row_sql = '(' + ','.join('?' for _ in names) + ')'
+    prefix = 'INSERT INTO ' + name + ' VALUES '
+    single_sql = prefix + row_sql
+    width = len(names)
+    variables = database.getlimit(sqlite3.SQLITE_LIMIT_VARIABLE_NUMBER)
+    sql_bytes = database.getlimit(sqlite3.SQLITE_LIMIT_SQL_LENGTH)
+    if not width or variables < width or sql_bytes < len(single_sql.encode('utf-8')):
+        # Keep SQLite's original prepare-time rejection, including no rows.
+        database.executemany(single_sql, values)
+        return
+    bind_rows = variables // width
+    sql_rows = (sql_bytes - len(prefix.encode('utf-8')) + 1) // (len(row_sql) + 1)
+    batch_rows = min(128, bind_rows, sql_rows)
+    statement = prefix + ','.join([row_sql] * batch_rows)
+    # An empty parameter sequence prepares this exact INSERT without binding
+    # or stepping any data rows. Do not retry errors from actual insertion.
+    transaction = database.in_transaction
+    try:
+        prepared = database.executemany(statement, ())
+    except MemoryError:
+        # A lost prior transaction must escape to the owning loader's close.
+        if transaction and not database.in_transaction:
+            raise
+        database.executemany(single_sql, values)
+        return
+    else:
+        prepared.close()
+    while chunk := tuple(islice(values, batch_rows)):
+        current = statement if len(chunk) == batch_rows else prefix + ','.join([row_sql] * len(chunk))
+        database.execute(current, tuple(chain.from_iterable(chunk)))
+
 
 def materialize_catalog(database, catalog, context):
     for name, table in catalog['tables'].items():
@@ -29,7 +65,7 @@ def materialize_catalog(database, catalog, context):
         else:
             values = map(itemgetter(*indices), authorized)
         # No tenant predicate is injected into SQL. Only physically authorized cells enter SQLite.
-        database.executemany('INSERT INTO ' + name + ' VALUES (' + ','.join('?' for _ in names) + ')', values)
+        insert_authorized_rows(database, name, names, values)
 
 
 def load_authorized_database(case):
