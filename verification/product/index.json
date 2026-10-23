@@ -209,12 +209,12 @@
       "scope": "Complete ec4 fresh Windows recipe executed all twelve targets: Win1314 security/verify and GNU long-path release build failed; reference benchmark blocked. New full Linux fresh reproduction remains pending"
     },
     "AC-025": {
-      "status": "PASS",
+      "status": "BLOCKED",
       "runs": [
         "sqlite-batch-static-native",
         "sqlite-batch-malformed"
       ],
-      "scope": "Current complete Rust formatting, Clippy, all-target compilation, 47 library plus one CLI unit test and 144-file Python syntax/whitespace checks PASS. Actual finite 2000-case JSON/SQL malformed corpus PASS; libFuzzer NOT RUN."
+      "scope": "New candidate source requires current static checks and malformed-corpus evidence."
     },
     "AC-026": {
       "status": "PASS",
@@ -252,12 +252,12 @@
       "scope": "Actual escaped Rust text and fresh source-bound HTML PASS-FAIL-PASS control; renderer/adapter/tests now explicitly bound; no user study"
     },
     "AC-030": {
-      "status": "PASS",
+      "status": "BLOCKED",
       "runs": [
         "current-notice-components",
         "sqlite-batch-public-wording"
       ],
-      "scope": "Actual current 45-path wording and public independent-test provenance inspected separately; unchanged images hash-compared only. Preserved license notices. Failed partial experiments and Windows diagnostics establish no complete performance, reference, canonical fresh or release qualification."
+      "scope": "Added reference-allocation documentation awaits independent current public-wording review."
     }
   },
   "artifacts": {
