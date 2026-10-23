@@ -55,5 +55,11 @@ AC-024 recipe remains a fresh committed `make bootstrap`, `make verify`,
 canonical fresh recipe on the actually allocated host with the private receipt
 available through the same environment variable, and preserve every failure.
 
+The gate checks a structured receipt again before building and at experiment
+completion. A changed source, another boot, changed effective resources or an
+expired lease blocks qualification. Original operator receipts retain their
+existing hardware/allocation checks. A structured receipt with malformed or
+missing binding fields cannot use that legacy path.
+
 Synthetic unit documents test rejection and binding logic only. They are not
 allocation evidence and must never be used for an actual benchmark claim.

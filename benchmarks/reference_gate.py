@@ -61,6 +61,18 @@ def host_reasons(actual, receipt):
     return reasons
 
 
+def allocation_binding_errors(actual, receipt):
+    # Existing operator receipts retain their documented hardware checks.
+    # New structured receipts must also satisfy their current identity/lease.
+    structured = {'method', 'operator_allocation', 'actual_environment', 'actual_source',
+        'actual_boot_id', 'preflight_monotonic_ns', 'operator_document_sha256',
+        'allocation_evidence_sha256', 'allocation_evidence_bytes', 'inputs_and_source_stable'}
+    if type(receipt) is not dict or not (structured & set(receipt)):
+        return []
+    from reference_allocation import binding_errors
+    return binding_errors(receipt, actual)
+
+
 def experiment_environment_errors(preflight, receipt, observations):
     expected = {'grid-start','grid-end','cancellation-start','cancellation-end','wrapper-end'}
     errors = []
@@ -76,6 +88,8 @@ def experiment_environment_errors(preflight, receipt, observations):
         errors.extend(name + ': ' + reason for reason in host_reasons(actual,receipt))
         if any(actual.get(key) != preflight.get(key) for key in fields):
             errors.append('actual experiment allocation differs from preflight: ' + name)
+    if isinstance(observations.get('wrapper-end'), dict):
+        errors.extend(allocation_binding_errors(observations['wrapper-end'], receipt))
     return errors
 
 
@@ -84,10 +98,19 @@ def main():
     parser.add_argument('--host-receipt', type=Path)
     args = parser.parse_args()
     actual = environment()
-    receipt_bytes = None if args.host_receipt is None else args.host_receipt.read_bytes()
-    if receipt_bytes is not None and len(receipt_bytes) > 65536: raise ValueError('allocation receipt too large')
-    receipt = None if receipt_bytes is None else json.loads(receipt_bytes)
-    reasons = host_reasons(actual, receipt)
+    receipt_bytes = receipt = None
+    parse_errors = []
+    if args.host_receipt is not None:
+        from reference_allocation import read_bounded, decode_document, DOCUMENT_LIMIT
+        try:
+            receipt_bytes = read_bounded(args.host_receipt, DOCUMENT_LIMIT)
+            receipt = decode_document(receipt_bytes)
+            if type(receipt) is not dict:
+                raise ValueError('allocation receipt must be an object')
+        except (OSError, ValueError, UnicodeError) as error:
+            receipt = None
+            parse_errors.append('invalid allocation receipt: ' + type(error).__name__ + ': ' + str(error)[:1024])
+    reasons = host_reasons(actual, receipt) + parse_errors + allocation_binding_errors(actual, receipt)
     args.out.mkdir(parents=True, exist_ok=False)
     record = {'gate': 'benchmark', 'status': 'BLOCKED' if reasons else 'READY', 'actual_environment': actual,
               'allocation_receipt_sha256': None if receipt_bytes is None else hashlib.sha256(receipt_bytes).hexdigest(),

@@ -33,6 +33,11 @@ FIELDS = {'schema_version', 'source', 'dedicated', 'operator', 'allocation_id',
 STABLE_ENVIRONMENT = ('system', 'machine', 'logical_processors', 'cpu_model',
     'physical_memory_bytes', 'resource_inspection_status', 'effective_cpu_capacity',
     'process_affinity_cpu_count', 'cgroup_memory_limit_bytes', 'cgroup_memory_high_bytes')
+RECEIPT_FIELDS = {'method', 'status', 'reference_qualified', 'source', 'dedicated',
+    'logical_processors', 'machine', 'cpu_model', 'operator_allocation', 'actual_environment',
+    'actual_source', 'actual_boot_id', 'preflight_monotonic_ns', 'scope',
+    'operator_document_sha256', 'allocation_evidence_sha256', 'allocation_evidence_bytes',
+    'inputs_and_source_stable'}
 
 
 def require(condition, reason):
@@ -215,6 +220,43 @@ def capture(allocation, supporting_evidence, output):
     with output.open('xb') as stream:
         stream.write(encoded)
     return result
+
+
+def binding_errors(receipt, actual):
+    """Recheck a structured receipt at consumption and at experiment completion."""
+    try:
+        require(type(receipt) is dict and set(receipt) == RECEIPT_FIELDS,
+                'closed structured allocation receipt required')
+        require(receipt['method'] == METHOD and receipt['status'] == 'RECORDED'
+            and receipt['reference_qualified'] is False and receipt['inputs_and_source_stable'] is True
+            and receipt['dedicated'] is True and type(receipt['logical_processors']) is int,
+            'structured allocation receipt status or types differ')
+        require(hex_value(receipt['operator_document_sha256'], 64)
+            and hex_value(receipt['allocation_evidence_sha256'], 64)
+            and type(receipt['allocation_evidence_bytes']) is int
+            and 0 < receipt['allocation_evidence_bytes'] <= EVIDENCE_LIMIT,
+            'original structured allocation evidence binding is missing')
+        identity, boot_id, now_ns = repository_identity(), observed_boot_id(), time.monotonic_ns()
+        require(type(receipt['preflight_monotonic_ns']) is int
+            and 0 < receipt['preflight_monotonic_ns'] <= now_ns,
+            'structured allocation preflight clock differs')
+        previous = validate(receipt['operator_allocation'], receipt['actual_environment'],
+            receipt['actual_source'], receipt['actual_boot_id'], receipt['preflight_monotonic_ns'],
+            receipt['allocation_evidence_sha256'])
+        current = validate(receipt['operator_allocation'], actual, identity, boot_id, now_ns,
+                           receipt['allocation_evidence_sha256'])
+        for name in ('method', 'status', 'reference_qualified', 'source', 'dedicated',
+                     'logical_processors', 'machine', 'cpu_model', 'scope'):
+            require(receipt[name] == previous[name] == current[name],
+                    'structured allocation projection differs: ' + name)
+        require(receipt['actual_source'] == identity and receipt['actual_boot_id'] == boot_id,
+                'structured allocation current source or boot differs')
+        require(all(receipt['actual_environment'][name] == actual[name] for name in STABLE_ENVIRONMENT),
+                'structured allocation current resources differ')
+    except (OSError, ValueError, KeyError, TypeError, AttributeError, UnicodeError,
+            subprocess.SubprocessError) as error:
+        return ['structured allocation binding invalid: ' + type(error).__name__ + ': ' + str(error)[:1024]]
+    return []
 
 
 def main(argv=None):
