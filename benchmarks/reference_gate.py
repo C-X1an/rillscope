@@ -57,7 +57,9 @@ def host_reasons(actual, receipt):
     if memory is None or not 7.5 * 1024**3 <= memory <= 8.5 * 1024**3:
         reasons.append('actual/reference memory is not the documented 8-GiB configuration')
     if receipt.get('cpu_model') != actual.get('cpu_model'): reasons.append('reference receipt does not match actual CPU')
-    if receipt.get('machine', '').lower() != actual['machine'].lower(): reasons.append('reference receipt architecture differs from actual host')
+    receipt_machine = receipt.get('machine')
+    if type(receipt_machine) is not str or receipt_machine.lower() != actual['machine'].lower():
+        reasons.append('reference receipt architecture differs from actual host')
     return reasons
 
 
