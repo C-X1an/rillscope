@@ -154,12 +154,12 @@
       "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
     },
     "AC-018": {
-      "status": "PASS",
+      "status": "BLOCKED",
       "runs": [
         "streaming-native-current",
         "streaming-final-current-association"
       ],
-      "scope": "Current ordinary cancellation/output caps and current-source original instruction/handler/envelope/source-fault record validation support the unchanged final atomic successful-response cancellation decision. No atomic-delivery or last-byte cancellation guarantee; full/reference/fresh/release remain separate."
+      "scope": "The PR checkout identity verifier changed. Historical links remain dated; current source-bound final-cancellation validation and independent assessment are pending. No full/reference/fresh/release qualification."
     },
     "AC-019": {
       "status": "PASS",
