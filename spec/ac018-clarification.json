@@ -8,25 +8,25 @@
   "clarification_sha256": "25e86857ec62635b31b86a3fe3d03616bc5679993bc6768789410cebd62e14f0",
   "contract_lock_sha256": "d93b88379c57f4282ff70bc216577f1a675e4521607fe0c5300796bed989d5cf",
   "remote_repository": "C-X1an/rillscope",
-  "remote_commit": "82761605fb0771a8eff181503a321b224af69dc0",
-  "remote_run_id": 39572422703,
-  "remote_job_id": 119129634689,
-  "remote_artifact_id": 12332343247,
-  "remote_artifact_sha256": "15c4fd6d5eda1d1548fb79ccb805e82b7c456269639495cb81968198d16b94f5",
+  "remote_commit": "f70718b4cd8d3b69e1d73ce4fc253fb6885927c8",
+  "remote_run_id": 40000779514,
+  "remote_job_id": 120575966988,
+  "remote_artifact_id": 12520979406,
+  "remote_artifact_sha256": "71c6dbc99123f46c0861c88ea5daf532d1ce226ec5a01c78eefc0bf6286b7041",
   "independent_assessment": {
     "status": "RECOMMENDED",
-    "kind": "source and actual recorded instruction/handler/envelope/control inspection",
+    "kind": "independent current source and actual recorded instruction/handler/terminal/control inspection",
     "independent_runtime_execution": false,
     "instruction_disassembly_sha256": {
-      "no-signal": "b25e8cbf6bc2325b219a298fc1b698c597bd2406908b51872b71109054394eb8",
-      "before-commit-sigint": "c3572e5d7f59257dfe32b010c199e84f3aa365f49c24e56f23f582f35c88f088",
-      "before-commit-sigterm": "bfc0fcd9d5c431d839fd2aba1808bef4472872b7d97a6c1bcf77fbfacfc4dfed",
-      "after-commit-before-write-sigint": "933741fa415b3da8454acaf51832dca8759712b91cf637ed4987becbdfc430c7",
-      "after-commit-before-write-sigterm": "85dadd79cf87822d2042d13edcaf703e7adebd85b2570b8877efea22bc51751f"
+      "no-signal": "31a43dc587aad9b1c7a6f7f8b9cbf04d71b5cd91a4608229380db0a24821af1f",
+      "before-commit-sigint": "d3f996b525cfde8dd3376528ae86b6cd2ed8bb3d42374c651038fdcd9d1a8aa8",
+      "before-commit-sigterm": "b32a101a103611613eeb08d0cd6e8e1344f8ccf757225c0497161ac1d6cd6b2c",
+      "after-commit-before-write-sigint": "74315e706d231807743381cfd9b600e7db7ffc95e3cd823bd96761c9a9c59e32",
+      "after-commit-before-write-sigterm": "8c5380f6fca3b8fb713e3ad8c8c57005918c7a3e8c8d0bbcf69c0f498820dff3"
     },
-    "scope": "Current source, all original artifact members, recorded Cargo/compiler/profile/raw associations, actual instruction placement, both handled signals, exact authorized/error envelopes and source-fault PASS-FAIL-PASS records independently inspected. Executable bytes and new runtime execution are absent.",
-    "source_and_instruction_review_sha256": "26b92bca9c7989ee4a5a6234a45b1da542cb1cbe8d214346a5c527cf389d03f4",
-    "bindings_sha256": "6be36fe075e432775440b391f4b1dfb57a5335482280daae12d58f398976d13b"
+    "scope": "Before stops closure+43 precede AtomicBool.load+120 and test/jne+135/+137; after stops main+371 follow Result.and_then+364 before terminal response dispatch and stdout writes. Both handled signals retain rt_sigreturn syscall-entry15 and empty stdout at controlled stops. Exact predecision E_CANCELLED/4 and authorized[[7]]/0 later/no-signal envelopes and targeted behavioral PASS-FAIL-PASS lineage independently rechecked. Executable bytes and new Rust execution absent.",
+    "source_and_instruction_review_sha256": "809384fc4babbd7a2713b4b373fb1144ff16e98057a8f2a15a1c2bcc27d0d2dd",
+    "bindings_sha256": "0d90fac4b5693e97365e0b4b8c586c9c67ada41b6fa31de88b9f3619727e17d9"
   },
   "ordinary_execution_evidence": "current native actual cancellation, row/byte output caps and framing tests passed separately",
   "limitations": [
@@ -36,5 +36,13 @@
     "No final release or fresh-checkout qualification follows"
   ],
   "factual_association_prepared_utc": "2026-10-21T09:41:02.436250+00:00",
-  "factual_association_refreshed_utc": "2026-10-21T10:14:03.972233+00:00"
+  "factual_association_refreshed_utc": "2026-10-24T06:47:15.601006+00:00",
+  "workflow_head_commit": "f70718b4cd8d3b69e1d73ce4fc253fb6885927c8",
+  "recorded_checkout_commit": "1f0b5a59640a129d737fde313b428ac8fa559d96",
+  "recorded_checkout_tree": "32962b00b60cc7057f191bacaf5e9222e77e9df5",
+  "recorded_checkout_parents": [
+    "70cf2b3474c90772bfbbe5b8fcca2dcf816ef32b",
+    "f70718b4cd8d3b69e1d73ce4fc253fb6885927c8"
+  ],
+  "source_commit_binding": "same-tree-pull-request-merge"
 }

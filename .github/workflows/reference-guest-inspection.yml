@@ -1,6 +1,17 @@
 name: Actual KVM guest resource inspection (not reference qualification)
 on:
   workflow_dispatch:
+    inputs:
+      native_setup_diagnostic:
+        description: Measure native setup only; no canonical or reference qualification
+        required: false
+        default: false
+        type: boolean
+      expected_commit:
+        description: Exact audited commit required for native setup diagnostic
+        required: false
+        default: ''
+        type: string
 permissions:
   contents: read
 concurrency:
@@ -8,6 +19,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   inspect-guest:
+    if: ${{ !inputs.native_setup_diagnostic }}
     runs-on: ubuntu-24.04
     timeout-minutes: 27
     steps:
@@ -56,3 +68,44 @@ jobs:
             .local-runs/reference-guest/SHA256SUMS
             .local-runs/reference-guest/SHA256SUMS.gpg
             .local-runs/reference-guest/ubuntu-cloud-image.asc
+  native-setup-diagnostic:
+    if: ${{ inputs.native_setup_diagnostic }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - name: Require exact audited source before native diagnostic checkout or execution
+        id: source_guard
+        timeout-minutes: 1
+        env:
+          EXPECTED_COMMIT: ${{ inputs.expected_commit }}
+        run: python3 -c 'import os,re,sys; e=os.environ["EXPECTED_COMMIT"]; sys.exit(0 if re.fullmatch("[0-9a-f]{40}",e) and e == os.environ["GITHUB_SHA"] else "audited commit mismatch")'
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        id: checkout
+        timeout-minutes: 2
+        with:
+          ref: ${{ inputs.expected_commit }}
+          persist-credentials: false
+      - name: Native setup observation only; no allocation or canonical command
+        timeout-minutes: 104
+        run: |
+          mkdir -p .local-runs
+          sudo -n env GITHUB_REPOSITORY="$GITHUB_REPOSITORY" GITHUB_RUN_ID="$GITHUB_RUN_ID" GITHUB_RUN_ATTEMPT="$GITHUB_RUN_ATTEMPT" GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=safe.directory GIT_CONFIG_VALUE_0="$PWD" GIT_OPTIONAL_LOCKS=0 /usr/bin/python3 scripts/evidence.py --out .local-runs/cnd-command --timeout 6060 -- /usr/bin/python3 scripts/canonical_reference_diagnostic.py --out .local-runs/cnd --run-as "$(id -un)"
+      - name: Retain original available metadata after actual enclosing owner cleanup
+        if: ${{ always() && steps.source_guard.outcome == 'success' && steps.checkout.outcome == 'success' }}
+        timeout-minutes: 6
+        run: |
+          sudo -n env GITHUB_REPOSITORY="$GITHUB_REPOSITORY" GITHUB_RUN_ID="$GITHUB_RUN_ID" GITHUB_RUN_ATTEMPT="$GITHUB_RUN_ATTEMPT" GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=safe.directory GIT_CONFIG_VALUE_0="$PWD" GIT_OPTIONAL_LOCKS=0 /usr/bin/python3 scripts/evidence.py --out .local-runs/cnd-retention-command --timeout 330 -- /usr/bin/python3 scripts/retain_canonical_diagnostic.py --source .local-runs/cnd --owner-receipt .local-runs/cnd-command/receipt.json --out .local-runs/cnd-retained.zip --budget-seconds 300
+      - name: Keep original diagnostic bytes and upstream failures; exclude VM disks and tool caches
+        if: ${{ always() && steps.source_guard.outcome == 'success' && steps.checkout.outcome == 'success' }}
+        timeout-minutes: 6
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: native-setup-diagnostic-only
+          retention-days: 7
+          include-hidden-files: true
+          if-no-files-found: error
+          path: |
+            .local-runs/cnd-retained.zip
+            .local-runs/cnd-retained.json
+            .local-runs/cnd-command/
+            .local-runs/cnd-retention-command/
