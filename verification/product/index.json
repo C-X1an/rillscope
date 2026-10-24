@@ -213,13 +213,13 @@
       "scope": "Complete ec4 fresh Windows recipe executed all twelve targets: Win1314 security/verify and GNU long-path release build failed; reference benchmark blocked. New full Linux fresh reproduction remains pending"
     },
     "AC-025": {
-      "status": "PASS",
+      "status": "BLOCKED",
       "runs": [
         "sqlite-batch-static-native",
         "sqlite-batch-malformed",
         "ri-current-native"
       ],
-      "scope": "Actual current pinned Rust format/lint/check/unit gates and 2000 bounded malformed CLI cases, 1000 JSON and 1000 SQL, with all outcomes retained; no libFuzzer claim."
+      "scope": "Actual current pinned Rust format/lint/check/unit gates and 2000 bounded malformed CLI cases, 1000 JSON and 1000 SQL, with all outcomes retained; no libFuzzer claim. New canonical allocation/owner Python files require fresh complete current-source static and malformed-corpus evidence; prior proof links remain historical for this development checkout."
     },
     "AC-026": {
       "status": "PASS",
