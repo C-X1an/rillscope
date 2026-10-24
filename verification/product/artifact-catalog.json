@@ -922,5 +922,49 @@
   "sqlite651-full-grid-timeout": {
     "path": "verification/product/runs/sqlite651-full-grid-timeout.json",
     "sha256": "ea3d56655c7d9a661556a93688b9a6114f193d28de7d660537ab07f85025381e"
+  },
+  "f707-identity-before": {
+    "path": "verification/product/runs/f707-identity-before.json",
+    "sha256": "1176cf28059cc7cfc9d7083156a6f235acc826638452e60755f498f67eff2e3c"
+  },
+  "f707-identity-positive": {
+    "path": "verification/product/runs/f707-identity-positive.json",
+    "sha256": "a8a0254d2455f47c35fba5005a542d59d474917a0e758cc8772efdcfa26c9340"
+  },
+  "f707-head-routing-negative": {
+    "path": "verification/product/runs/f707-head-routing-negative.json",
+    "sha256": "28ae37371b83c3642b077ae9325f21e2ee2fa41a54ba4f84dffc2120aea23b7e"
+  },
+  "f707-tree-negative": {
+    "path": "verification/product/runs/f707-tree-negative.json",
+    "sha256": "021db919562679cde18859c8391b4b7344743d9aaf5d9ec8c39043366f3a20da"
+  },
+  "f707-reference-restored": {
+    "path": "verification/product/runs/f707-reference-restored.json",
+    "sha256": "68dd7471cddc8bf5e7abcebea7bf69900453bbfd4db3c88715d63a7b44c486f6"
+  },
+  "f707-current-final-decision": {
+    "path": "verification/product/runs/f707-current-final-decision.json",
+    "sha256": "be8607e886d3a1e4c382d17ec14282891af50a87d886bf5d4cef8e377b8bafab"
+  },
+  "f707-linux-reference": {
+    "path": "verification/product/runs/f707-linux-reference.json",
+    "sha256": "81c886da6f63194c916aeebcb4f2787c22a0cf0572a9485e037d34b3e358f880"
+  },
+  "f707-linux-product": {
+    "path": "verification/product/runs/f707-linux-product.json",
+    "sha256": "8a3f6854c4231cccf978e592bd1a41605cd44dd130850308f3c78d731eb7dbaa"
+  },
+  "f707-static-syntax": {
+    "path": "verification/product/runs/f707-static-syntax.json",
+    "sha256": "d0e7210f41671d62e5db5039cf06c44edef021b25874e5f60b10a89e4c8f5c91"
+  },
+  "f707-required-closure": {
+    "path": "verification/product/runs/f707-required-closure.json",
+    "sha256": "31834644c98aa45c2e52083fe4f91510ddd28e357e7a8015941b0998bbe57b44"
+  },
+  "f707-fresh-timeout": {
+    "path": "verification/product/runs/f707-fresh-timeout.json",
+    "sha256": "f0567fd0b6f4731f707ce68f219e233a668333a5c232884f9fcd29b515afb3e8"
   }
 }
