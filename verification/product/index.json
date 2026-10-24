@@ -67,7 +67,9 @@
       "status": "BLOCKED",
       "runs": [
         "fresh-rust-demo-manifest-bound",
-        "streaming-demo-current"
+        "streaming-demo-current",
+        "ri-fresh-demo-only",
+        "ri-visual-unfilled"
       ],
       "scope": "Current actual three-case Rust CLI demo matches its oracle. Current fresh/rendered visual/keyboard proof is unqualified under HA006; old fresh/browser evidence stays dated."
     },
@@ -154,12 +156,14 @@
       "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
     },
     "AC-018": {
-      "status": "BLOCKED",
+      "status": "PASS",
       "runs": [
         "streaming-native-current",
-        "streaming-final-current-association"
+        "streaming-final-current-association",
+        "ri-current-native",
+        "ri-current-final-decision"
       ],
-      "scope": "The PR checkout identity verifier changed. Historical links remain dated; current source-bound final-cancellation validation and independent assessment are pending. No full/reference/fresh/release qualification."
+      "scope": "Actual current ordinary cancellation/output-cap tests and source-bound verification of the original f707 instruction capture, with finalized independent assessment and the explicitly applied final success-path cancellation decision. No last-byte or atomic-transport guarantee."
     },
     "AC-019": {
       "status": "PASS",
@@ -209,12 +213,13 @@
       "scope": "Complete ec4 fresh Windows recipe executed all twelve targets: Win1314 security/verify and GNU long-path release build failed; reference benchmark blocked. New full Linux fresh reproduction remains pending"
     },
     "AC-025": {
-      "status": "BLOCKED",
+      "status": "PASS",
       "runs": [
         "sqlite-batch-static-native",
-        "sqlite-batch-malformed"
+        "sqlite-batch-malformed",
+        "ri-current-native"
       ],
-      "scope": "New candidate source requires current static checks and malformed-corpus evidence."
+      "scope": "Actual current pinned Rust format/lint/check/unit gates and 2000 bounded malformed CLI cases, 1000 JSON and 1000 SQL, with all outcomes retained; no libFuzzer claim."
     },
     "AC-026": {
       "status": "PASS",
@@ -252,12 +257,14 @@
       "scope": "Actual escaped Rust text and fresh source-bound HTML PASS-FAIL-PASS control; renderer/adapter/tests now explicitly bound; no user study"
     },
     "AC-030": {
-      "status": "BLOCKED",
+      "status": "PASS",
       "runs": [
         "current-notice-components",
-        "sqlite-batch-public-wording"
+        "sqlite-batch-public-wording",
+        "ri-current-license",
+        "ri-current-wording"
       ],
-      "scope": "Added reference-allocation documentation awaits independent current public-wording review."
+      "scope": "Actual current MIT/dependency-notice audit and exact revalidation of the finalized independent 46-entry normalized public-wording map. Canonical claim status/link cells are audited live; no release-maturity or runtime qualification inferred."
     }
   },
   "artifacts": {
@@ -1228,6 +1235,46 @@
     "f707-fresh-timeout": {
       "path": "verification/product/runs/f707-fresh-timeout.json",
       "sha256": "f0567fd0b6f4731f707ce68f219e233a668333a5c232884f9fcd29b515afb3e8"
+    },
+    "ri-current-native": {
+      "path": "verification/product/runs/ri-current-native.json",
+      "sha256": "6ac74c9901007458198809c091fbb7e08f55ff372be2ba5784547862c7105cee"
+    },
+    "ri-current-final-decision": {
+      "path": "verification/product/runs/ri-current-final-decision.json",
+      "sha256": "e3b8fc3a5c66b1e564cd8ba4972ef9a39a38db057b026ca968d6addfde057714"
+    },
+    "ri-current-wording": {
+      "path": "verification/product/runs/ri-current-wording.json",
+      "sha256": "281947db03305e9319268d4b5c8c25f3b79e5b703268c751410db2c49eb54df9"
+    },
+    "ri-current-license": {
+      "path": "verification/product/runs/ri-current-license.json",
+      "sha256": "66fade9eafca6af497f506e8d250eae5facf09f2c281cabb1c7b2c40d14197ca"
+    },
+    "ri-disposition-before": {
+      "path": "verification/product/runs/ri-disposition-before.json",
+      "sha256": "f0709d79c3cada66ef0af7b5fc56c91c67c7cc92297e1db7574ce24300a9a41f"
+    },
+    "ri-disposition-fixed": {
+      "path": "verification/product/runs/ri-disposition-fixed.json",
+      "sha256": "9658168fe1c36192217f183f57a1b4c212e99e278cfdc2fb852a8e3ff8374f17"
+    },
+    "ri-disposition-negative": {
+      "path": "verification/product/runs/ri-disposition-negative.json",
+      "sha256": "af191c61b573b84d7bbd57b0ad29e27c4198406c6d9b841d031ca36984e289e3"
+    },
+    "ri-disposition-restored": {
+      "path": "verification/product/runs/ri-disposition-restored.json",
+      "sha256": "d92ec57120452b2bb5c8db4b9b7c4d48dbeba196b63b600f3108386d015974da"
+    },
+    "ri-fresh-demo-only": {
+      "path": "verification/product/runs/ri-fresh-demo-only.json",
+      "sha256": "4367f3b62f886d47820a24ea4fa7abaafb1ed036ee8da0105d6c88fc1a1d329a"
+    },
+    "ri-visual-unfilled": {
+      "path": "verification/product/runs/ri-visual-unfilled.json",
+      "sha256": "df3ddeebaaab55167c3a3d0117424c2daf25e974e7570e11b16c95f87d7013a2"
     }
   },
   "release_status": "INCOMPLETE",
