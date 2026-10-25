@@ -45,7 +45,7 @@ def check_rust_versions(rustup_raw, rustc_raw, cargo_raw, audit_raw, deny_raw):
             rust[key] = value
     allocation.require(rust.get('release') == '1.99.0' and rust.get('host') == 'x86_64-unknown-linux-gnu'
         and text[2].splitlines()[0].split()[:2] == ['cargo', '1.99.0']
-        and text[3].strip().split() == ['cargo-audit', '0.22.2']
+        and text[3].strip().split() in (['cargo-audit', '0.22.2'], ['cargo-audit-audit', '0.22.2'])
         and text[4].strip().split() == ['cargo-deny', '0.20.2'],
         'actual pinned native compiler/Cargo/audit/deny versions differ')
     return {'rustup': text[0].splitlines()[0], 'rustc': rust, 'cargo': text[2].splitlines()[0],

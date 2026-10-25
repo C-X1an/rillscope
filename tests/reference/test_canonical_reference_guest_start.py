@@ -1,6 +1,7 @@
 """Real request/grant bytes with a synthetic peer; no authenticated operator."""
 import copy
 import hashlib
+import itertools
 import json
 from pathlib import Path
 import socket
@@ -35,6 +36,9 @@ class NativeStartControls(unittest.TestCase):
 
     def exchange_case(self, *, partial=None):
         fixture = self.fixture(); left, right = socket.socketpair(); errors = []
+        # Real socket timing must share the exchange's current clock; the
+        # protocol-only fixture deliberately uses an unrelated literal epoch.
+        fixture.request['guest_pre_send_monotonic_ns'] = time.monotonic_ns()
         deadline = time.monotonic_ns() + 2 * 10**9
         def peer():
             try:
@@ -71,6 +75,12 @@ class NativeStartControls(unittest.TestCase):
 
     def test_actual_socket_exchange_preserves_original_request_and_supporting_grant(self):
         self.exchange_case()
+
+    def test_socket_timing_assertions_hold_for_young_and_long_running_clock_epochs(self):
+        for first in (10**9, 6 * 10**12):
+            with self.subTest(first=first), patch.object(time, 'monotonic_ns',
+                side_effect=itertools.count(first, 1000).__next__):
+                self.exchange_case()
 
     def test_failed_partial_grant_is_retained_without_success_document(self):
         self.exchange_case(partial=b'{"incomplete":')

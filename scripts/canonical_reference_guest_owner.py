@@ -109,6 +109,42 @@ def nonroot(command):
         'PYTHONDONTWRITEBYTECODE=1', *command]
 
 
+def retain_original_outputs(direct, *, cutoff_ns, retention_seconds, identity, receipt_path):
+    """Both retention steps spend one original reserve; retain failures too."""
+    allocation.require(type(cutoff_ns) is int and type(retention_seconds) is int
+        and 1 <= retention_seconds <= 600, 'finite original retention reserve required')
+    deadline = min(cutoff_ns, time.monotonic_ns() + retention_seconds * 10**9)
+    row = {'status': 'FAIL', 'cutoff_monotonic_ns': deadline,
+        'native_binaries': 'NOT RUN', 'release_metadata': 'NOT RUN', 'errors': []}
+    for name, command, key in [
+        ('retain-native-binaries', ['/usr/bin/python3', str(ROOT / 'scripts/canonical_reference_binaries.py'),
+            '--out', str(BASE / 'native-binaries'), '--commit', identity['commit'],
+            '--source-sha256', identity['source_sha256'], '--cutoff-monotonic-ns', str(deadline)], 'native_binaries'),
+        ('retain-canonical', ['/usr/bin/python3', str(ROOT / 'scripts/retain_release.py'),
+            '--out', str(BASE / 'retained')], 'release_metadata')]:
+        try:
+            seconds = (deadline - time.monotonic_ns()) / 10**9
+            allocation.require(seconds > 0, 'original shared guest retention reserve exhausted')
+            raw = direct(name, command, timeout=seconds, inputs=(receipt_path,))
+            if key == 'native_binaries':
+                value = strict_json(raw)
+                allocation.require(value.get('status') == 'RETAINED ORIGINAL BYTES'
+                    and value.get('reference_qualified') is False,
+                    'original native executable retention did not complete')
+            allocation.require(time.monotonic_ns() < deadline,
+                'original shared guest retention reserve exhausted after child return')
+            row[key] = 'RETAINED'
+        except (Exception, KeyboardInterrupt) as error:
+            row[key] = 'FAIL'
+            row['errors'].append({'stage': key, 'error': type(error).__name__, 'reason': str(error)[:2048]})
+    row['finished_monotonic_ns'] = time.monotonic_ns()
+    if row['finished_monotonic_ns'] >= deadline:
+        row['errors'].append({'stage': 'finalization', 'error': 'DeadlineExpired',
+            'reason': 'original shared guest retention reserve exhausted before final record'})
+    if not row['errors']: row['status'] = 'RETAINED'
+    return row
+
+
 def run_attempt(request_raw, grant_raw, *, received_ns, tail_seconds, retention_seconds):
     existing_runtime()
     allocation.require(type(tail_seconds) is int and 1 <= tail_seconds <= 600,
@@ -203,11 +239,11 @@ def run_attempt(request_raw, grant_raw, *, received_ns, tail_seconds, retention_
         # Retain the exact failed/incomplete canonical attempt too. This bounded
         # process cannot convert its original failure or a diagnostic into PASS.
         try:
-            seconds = (cutoff - time.monotonic_ns()) / 10**9
-            allocation.require(seconds > 0, 'guest retention lease exhausted')
-            direct('retain-canonical', ['/usr/bin/python3', str(ROOT / 'scripts/retain_release.py'),
-                '--out', str(BASE / 'retained')], timeout=min(retention_seconds, seconds), inputs=(receipt_path,))
-            result['retention'] = 'RETAINED'
+            retained = retain_original_outputs(direct, cutoff_ns=cutoff, retention_seconds=retention_seconds,
+                identity=identity, receipt_path=receipt_path)
+            result['native_retention'] = retained
+            result['retention'] = retained['release_metadata']
+            if retained['status'] != 'RETAINED': result['status'] = 'FAIL'
         except (Exception, KeyboardInterrupt) as error:
             result.update(status='FAIL', retention='FAIL', retention_error=type(error).__name__ + ': ' + str(error)[:2048])
         result['cleanup'] = ownership.finish(None)

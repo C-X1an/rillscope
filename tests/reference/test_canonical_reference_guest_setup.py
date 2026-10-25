@@ -32,5 +32,14 @@ class NativeSetupControls(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'actual owned guest'): setup.retire_tool_target()
             mkdir.assert_not_called(); retire.assert_not_called()
 
+    def test_observed_external_subcommand_banner_keeps_the_exact_numeric_pin(self):
+        raw = self.outputs(); raw[3] = b'cargo-audit-audit 0.22.2\n'
+        self.assertEqual(setup.check_rust_versions(*raw)['cargo_audit'], 'cargo-audit-audit 0.22.2')
+        for changed in (b'cargo-audit-audit 0.22.1\n', b'cargo-audit-audit 0.22.3\n',
+            b'cargo-audit-audit 0.22.2 extra\n', b'other-tool 0.22.2\n'):
+            with self.subTest(changed=changed):
+                bad = self.outputs(); bad[3] = changed
+                with self.assertRaises(ValueError): setup.check_rust_versions(*bad)
+
 
 if __name__ == '__main__': unittest.main()
