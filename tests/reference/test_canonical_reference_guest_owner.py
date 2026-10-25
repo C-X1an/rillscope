@@ -76,6 +76,9 @@ class CanonicalOwnerContracts(unittest.TestCase):
         command = owner.nonroot(['/usr/bin/python3', str(ROOT / 'scripts/clean_verify.py'), '--budget-seconds', '1000'])
         self.assertEqual(command[:6], ['/usr/bin/setpriv', '--reuid=65534', '--regid=65534', '--clear-groups', '--', '/usr/bin/env'])
         self.assertIn('CARGO_INCREMENTAL=0', command)
+        self.assertIn('GIT_CONFIG_COUNT=2', command)
+        self.assertEqual([value for value in command if value.startswith('GIT_CONFIG_VALUE_')],
+            ['GIT_CONFIG_VALUE_0=' + str(ROOT), 'GIT_CONFIG_VALUE_1=' + str(ROOT / '.git')])
         self.assertEqual(command[-4:], ['/usr/bin/python3', str(ROOT / 'scripts/clean_verify.py'), '--budget-seconds', '1000'])
         self.assertFalse(any(value in command for value in ('--demo-only', '--capture-only', 'diagnostic')))
 

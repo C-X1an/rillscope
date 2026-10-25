@@ -210,8 +210,9 @@ def native_versions(recovered, seed, seed_raw, source):
     home = '/work/c/.local-runs/canonical-home'
     prefix = ['/usr/bin/setpriv', '--reuid=65534', '--regid=65534', '--clear-groups', '--', '/usr/bin/env',
         'HOME=' + home, 'CARGO_HOME=' + home + '/.cargo', 'RUSTUP_HOME=' + home + '/.rustup', 'CARGO_INCREMENTAL=0',
-        'PATH=' + home + '/.cargo/bin:/usr/bin:/bin', 'GIT_OPTIONAL_LOCKS=0', 'GIT_CONFIG_COUNT=1',
-        'GIT_CONFIG_KEY_0=safe.directory', 'GIT_CONFIG_VALUE_0=/work/c', 'PYTHONDONTWRITEBYTECODE=1']
+        'PATH=' + home + '/.cargo/bin:/usr/bin:/bin', 'GIT_OPTIONAL_LOCKS=0', 'GIT_CONFIG_COUNT=2',
+        'GIT_CONFIG_KEY_0=safe.directory', 'GIT_CONFIG_VALUE_0=/work/c',
+        'GIT_CONFIG_KEY_1=safe.directory', 'GIT_CONFIG_VALUE_1=/work/c/.git', 'PYTHONDONTWRITEBYTECODE=1']
     metadata = SetupCommands(recovered); outputs = []; proofs = []
     commands = [('rustup-version', ['rustup', '--version']), ('rustc-version', ['rustc', '-vV']),
         ('cargo-version', ['cargo', '--version']), ('audit-version', ['cargo', 'audit', '--version']),

@@ -6,6 +6,7 @@ import json
 import os
 from pathlib import Path
 import pwd
+import stat
 import subprocess
 import sys
 import tempfile
@@ -22,6 +23,7 @@ from canonical_reference_guest_owner import nonroot
 from canonical_reference_device import UID, GID, check_marker
 import canonical_reference_boot as boot
 from tests.reference.test_canonical_reference_boot import create_actual_marker_fixture
+from tests.reference.test_canonical_git_permissions import actual_nonroot_fixture_prefix
 
 
 def emit_marker_child_observation(command, outcome, returncode, stdout, stderr):
@@ -45,6 +47,97 @@ def run_marker_child(command):
         raise
     emit_marker_child_observation(command, 'EXECUTED', result.returncode, result.stdout, result.stderr)
     return result
+
+
+def run_git_control(name, command):
+    """Retain exact tiny-fixture command output before asserting any result."""
+    def emit(outcome, returncode, stdout, stderr):
+        def stream(raw):
+            return {'bytes': len(raw), 'sha256': hashlib.sha256(raw).hexdigest(),
+                'base64': base64.b64encode(raw).decode('ascii')}
+        row = {'case': name, 'command': list(command), 'outcome': outcome, 'returncode': returncode,
+            'timeout_seconds': 10, 'stdout': stream(stdout), 'stderr': stream(stderr),
+            'prefix_source_sha256': hashlib.sha256((ROOT / 'scripts/canonical_reference_guest_owner.py').read_bytes()).hexdigest(),
+            'scope': 'Synthetic Git ownership control only; no product, guest, VM or reference qualification'}
+        print(json.dumps({'canonical_git_child_observation': row}), flush=True)
+    try:
+        result = subprocess.run(command, cwd='/', capture_output=True, timeout=10, check=False)
+    except subprocess.TimeoutExpired as error:
+        emit('TIMEOUT', None, error.stdout or b'', error.stderr or b'')
+        raise
+    emit('EXECUTED', result.returncode, result.stdout, result.stderr)
+    return result
+
+
+def git_clone_control():
+    """Real root-owned source -> exact UID65534 prefix -> fresh no-local clone."""
+    with tempfile.TemporaryDirectory(prefix='rill-git-permission-') as directory:
+        workspace = Path(directory); os.chmod(workspace, 0o755)
+        template = workspace / 'empty-template'; template.mkdir(mode=0o755)
+        consumer = workspace / 'consumer'; consumer.mkdir(mode=0o700); os.chown(consumer, UID, GID)
+        literal = b'SYNTHETIC GIT OWNERSHIP CONTROL ONLY\n'
+        def checked(name, command):
+            result = run_git_control(name, command)
+            require(result.returncode == 0, 'tiny Git fixture command failed: ' + name)
+            return result
+        def repository(path, name):
+            checked(name + '-init', ['/usr/bin/git', 'init', '--quiet', '--initial-branch=fixture',
+                '--object-format=sha1', '--template=' + str(template), str(path)])
+            (path / 'literal.txt').write_bytes(literal)
+            checked(name + '-add', ['/usr/bin/git', '-C', str(path), 'add', '--', 'literal.txt'])
+            checked(name + '-commit', ['/usr/bin/env', 'GIT_AUTHOR_DATE=2000-01-01T00:00:00Z',
+                'GIT_COMMITTER_DATE=2000-01-01T00:00:00Z', '/usr/bin/git', '-C', str(path),
+                '-c', 'user.name=RillScope synthetic fixture', '-c', 'user.email=fixture@rillscope.invalid',
+                '-c', 'commit.gpgsign=false', '-c', 'core.hooksPath=' + str(template),
+                'commit', '--quiet', '-m', 'Synthetic permission fixture'])
+            return checked(name + '-head', ['/usr/bin/git', '-C', str(path), 'rev-parse', 'HEAD']).stdout.strip()
+        source, unrelated = workspace / 'source', workspace / 'unrelated'
+        previous = os.umask(0o022)
+        try:
+            expected_head = repository(source, 'source'); repository(unrelated, 'unrelated')
+        finally: os.umask(previous)
+        def snapshot(root):
+            rows = []; total = 0
+            for path in [root, *sorted(root.rglob('*'))]:
+                info = path.lstat()
+                require(not path.is_symlink() and len(rows) < 512 and info.st_uid == info.st_gid == 0
+                    and not stat.S_IMODE(info.st_mode) & 0o022, 'tiny source fixture ownership/mode differs')
+                require(stat.S_ISDIR(info.st_mode) or stat.S_ISREG(info.st_mode), 'tiny Git fixture must be regular')
+                raw = path.read_bytes() if stat.S_ISREG(info.st_mode) else b''; total += len(raw)
+                require(len(raw) <= 1024**2 and total <= 8 * 1024**2, 'tiny Git fixture exceeds bound')
+                rows.append({'path': path.relative_to(root).as_posix(), 'uid': info.st_uid, 'gid': info.st_gid,
+                    'mode': stat.S_IMODE(info.st_mode), 'kind': 'file' if stat.S_ISREG(info.st_mode) else 'directory',
+                    'bytes': len(raw), 'sha256': hashlib.sha256(raw).hexdigest(),
+                    'base64': base64.b64encode(raw).decode('ascii')})
+            return rows
+        before = {'source': snapshot(source), 'unrelated': snapshot(unrelated)}
+        print(json.dumps({'canonical_git_original_fixtures': before}), flush=True)
+        prefix = lambda command: actual_nonroot_fixture_prefix(source, consumer / 'home', command)
+        old = prefix(['/usr/bin/git', 'clone', '--no-local', '--config', 'core.autocrlf=false',
+            str(source), str(consumer / 'old-clone')])
+        require(old.count('GIT_CONFIG_COUNT=2') == 1 and old.count('GIT_CONFIG_KEY_1=safe.directory') == 1
+            and old.count('GIT_CONFIG_VALUE_1=' + str(source / '.git')) == 1, 'actual exact two-entry prefix required')
+        old = [value.replace('GIT_CONFIG_COUNT=2', 'GIT_CONFIG_COUNT=1') for value in old
+            if value not in {'GIT_CONFIG_KEY_1=safe.directory', 'GIT_CONFIG_VALUE_1=' + str(source / '.git')}]
+        denied = run_git_control('original-one-entry-clone', old)
+        require(denied.returncode == 128 and b'dubious ownership' in denied.stderr
+            and str(source / '.git').encode() in denied.stderr, 'original clone ownership defect was not reproduced')
+        clone = consumer / 'fresh'; require(not clone.exists(), 'new tiny checkout required')
+        accepted = checked('two-entry-fresh-clone', prefix(['/usr/bin/git', 'clone', '--no-local',
+            '--config', 'core.autocrlf=false', str(source), str(clone)]))
+        head = checked('fresh-head', prefix(['/usr/bin/git', '-C', str(clone), 'rev-parse', 'HEAD'])).stdout.strip()
+        require(head == expected_head and (clone / 'literal.txt').read_bytes() == literal
+            and clone.stat().st_uid == UID and clone.stat().st_gid == GID, 'tiny fresh clone identity/owner/bytes differ')
+        foreign = run_git_control('unrelated-root-owned-repository', prefix(['/usr/bin/git', '-C', str(unrelated), 'rev-parse', 'HEAD']))
+        require(foreign.returncode == 128 and b'dubious ownership' in foreign.stderr
+            and str(unrelated).encode() in foreign.stderr, 'unrelated root-owned repository was unexpectedly trusted')
+        require(before == {'source': snapshot(source), 'unrelated': snapshot(unrelated)},
+            'original Git source ownership/mode/bytes changed')
+        return {'status': 'PASS', 'consumer_uid': UID, 'consumer_gid': GID, 'original_one_entry_exit': denied.returncode,
+            'two_entry_clone_exit': accepted.returncode, 'unrelated_repository_exit': foreign.returncode,
+            'source_and_unrelated_ownership_modes_bytes_unchanged': True, 'fresh_commit': head.decode('ascii'),
+            'literal_sha256': hashlib.sha256(literal).hexdigest(), 'original_fixtures': before,
+            'scope': 'Actual Linux Git on tiny synthetic root-owned fixtures only; no first-party build, guest/VM, allocation or reference qualification'}
 
 
 def main():
@@ -122,6 +215,7 @@ raise SystemExit(0 if denied else 1)
         'actual_exit_code': marker_result.returncode, 'raw_stdout': marker_result.stdout.decode(),
         'raw_stderr': marker_result.stderr.decode(), 'bootstrap_sha256': hashlib.sha256(boot.BOOTSTRAP.encode()).hexdigest(),
         'scope': 'Actual Linux creation and UID65534 read/write check of unchanged bootstrap fragment at a synthetic path; no actual guest/VM/device or allocation claim'}
+    record['canonical_git_clone_control'] = git_clone_control()
     (out / 'result.json').write_text(json.dumps(record, indent=2) + '\n', encoding='utf-8')
     print(json.dumps(record)); return 0
 

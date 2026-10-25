@@ -3,7 +3,7 @@ import copy
 import base64
 import hashlib
 import json
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import sys
 import tempfile
 import time
@@ -18,6 +18,7 @@ from . import test_canonical_reference_boot as boot_fixtures
 from . import test_canonical_reference_seed as seed_fixtures
 from . import test_canonical_reference_allocation as allocation_fixtures
 from . import test_canonical_reference_guest_setup as setup_fixtures
+from .test_canonical_git_permissions import actual_nonroot_fixture_prefix
 
 
 def raw(row): return (json.dumps(row, sort_keys=True, separators=(',', ':')) + '\n').encode()
@@ -92,8 +93,9 @@ def prerequisite_fixture(root):
     home = '/work/c/.local-runs/canonical-home'
     prefix = ['/usr/bin/setpriv', '--reuid=65534', '--regid=65534', '--clear-groups', '--', '/usr/bin/env',
         'HOME=' + home, 'CARGO_HOME=' + home + '/.cargo', 'RUSTUP_HOME=' + home + '/.rustup', 'CARGO_INCREMENTAL=0',
-        'PATH=' + home + '/.cargo/bin:/usr/bin:/bin', 'GIT_OPTIONAL_LOCKS=0', 'GIT_CONFIG_COUNT=1',
-        'GIT_CONFIG_KEY_0=safe.directory', 'GIT_CONFIG_VALUE_0=/work/c', 'PYTHONDONTWRITEBYTECODE=1']
+        'PATH=' + home + '/.cargo/bin:/usr/bin:/bin', 'GIT_OPTIONAL_LOCKS=0', 'GIT_CONFIG_COUNT=2',
+        'GIT_CONFIG_KEY_0=safe.directory', 'GIT_CONFIG_VALUE_0=/work/c',
+        'GIT_CONFIG_KEY_1=safe.directory', 'GIT_CONFIG_VALUE_1=/work/c/.git', 'PYTHONDONTWRITEBYTECODE=1']
     commands = [('rustup-version', ['rustup', '--version']), ('rustc-version', ['rustc', '-vV']),
         ('cargo-version', ['cargo', '--version']), ('audit-version', ['cargo', 'audit', '--version']),
         ('deny-version', ['cargo', 'deny', '--version'])]
@@ -150,6 +152,43 @@ def prerequisite_fixture(root):
 
 
 class RecoveredRecordControls(unittest.TestCase):
+    def native_commands(self, transform):
+        local = ROOT / '.local-runs'; local.mkdir(exist_ok=True)
+        with tempfile.TemporaryDirectory(prefix='n19-', dir=local) as directory:
+            root = Path(directory).resolve()
+            if sys.platform == 'win32': root = Path('\\\\?\\' + str(root))
+            attempt, artifact, terminal, source = prerequisite_fixture(root)
+            for path in (artifact / 'recovery/setup/commands').glob('*/receipt.json'):
+                row = json.loads(path.read_bytes()); row['command'] = transform(row['command']); path.write_bytes(raw(row))
+            reindex(artifact, terminal['collector']['recovery'])
+            with patch.object(archive_capture, 'ROOT', root):
+                return records.validate_prerequisites(attempt, terminal, source=source, deadline=time.monotonic() + 30)
+
+    def test_actual_current_producer_version_commands_are_accepted(self):
+        def actual(command):
+            end = command.index('PYTHONDONTWRITEBYTECODE=1') + 1
+            return actual_nonroot_fixture_prefix(PurePosixPath('/work/c'),
+                PurePosixPath('/work/c/.local-runs/canonical-home'), command[end:])
+        try: result = self.native_commands(actual)
+        except ValueError as error: self.fail('Current actual producer command rejected: ' + str(error))
+        self.assertEqual(result['status'], 'CHECKED ORIGINAL RECOVERY AND NATIVE PREREQUISITES')
+        self.assertIs(result['reference_qualified'], False)
+
+    def test_old_extra_wildcard_and_foreign_git_trust_entries_are_rejected(self):
+        def changed(command, kind):
+            if kind == 'old':
+                return ['GIT_CONFIG_COUNT=1' if value == 'GIT_CONFIG_COUNT=2' else value
+                    for value in command if value not in {'GIT_CONFIG_KEY_1=safe.directory', 'GIT_CONFIG_VALUE_1=/work/c/.git'}]
+            if kind == 'extra':
+                command = ['GIT_CONFIG_COUNT=3' if value == 'GIT_CONFIG_COUNT=2' else value for value in command]
+                index = command.index('PYTHONDONTWRITEBYTECODE=1')
+                return command[:index] + ['GIT_CONFIG_KEY_2=safe.directory', 'GIT_CONFIG_VALUE_2=/foreign'] + command[index:]
+            return ['GIT_CONFIG_VALUE_1=' + ('*' if kind == 'wildcard' else '/foreign/.git')
+                if value == 'GIT_CONFIG_VALUE_1=/work/c/.git' else value for value in command]
+        for kind in ('old', 'extra', 'wildcard', 'foreign'):
+            with self.subTest(kind=kind), self.assertRaises(ValueError):
+                self.native_commands(lambda command: changed(command, kind))
+
     def check(self, change=None):
         with tempfile.TemporaryDirectory(prefix='rill-recovered-unit-') as name:
             root = Path(name).resolve(); artifact, row, budget = fixture(root)

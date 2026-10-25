@@ -2,7 +2,7 @@
 import copy
 import hashlib
 import json
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import sys
 import tempfile
 import unittest
@@ -15,6 +15,7 @@ from .test_canonical_reference_seed import literal_seed
 from . import test_canonical_reference_boot as boot_fixtures
 from . import test_canonical_reference_allocation as allocation_fixtures
 from . import test_canonical_reference_guest_setup as setup_fixtures
+from .test_canonical_git_permissions import actual_nonroot_fixture_prefix
 
 
 class DiagnosticControls(unittest.TestCase):
@@ -37,7 +38,7 @@ class DiagnosticControls(unittest.TestCase):
                 for name in ('boot', 'setup', 'start')]}
         return seed, footer, recovered, {'boot': progress, 'setup': setup, 'start': start}
 
-    def check(self, change=None):
+    def check(self, change=None, command_transform=None):
         seed, footer, recovered, values = self.records()
         if change: change(seed, footer, recovered, values)
         local = ROOT / '.local-runs'; local.mkdir(exist_ok=True)
@@ -53,7 +54,8 @@ class DiagnosticControls(unittest.TestCase):
             prefix = ['/usr/bin/setpriv', '--reuid=65534', '--regid=65534', '--clear-groups', '--',
                 '/usr/bin/env', 'HOME=' + home, 'CARGO_HOME=' + home + '/.cargo', 'RUSTUP_HOME=' + home + '/.rustup',
                 'CARGO_INCREMENTAL=0', 'PATH=' + home + '/.cargo/bin:/usr/bin:/bin', 'GIT_OPTIONAL_LOCKS=0',
-                'GIT_CONFIG_COUNT=1', 'GIT_CONFIG_KEY_0=safe.directory', 'GIT_CONFIG_VALUE_0=/work/c', 'PYTHONDONTWRITEBYTECODE=1']
+                'GIT_CONFIG_COUNT=2', 'GIT_CONFIG_KEY_0=safe.directory', 'GIT_CONFIG_VALUE_0=/work/c',
+                'GIT_CONFIG_KEY_1=safe.directory', 'GIT_CONFIG_VALUE_1=/work/c/.git', 'PYTHONDONTWRITEBYTECODE=1']
             commands = [('rustup-version', ['rustup', '--version']), ('rustc-version', ['rustc', '-vV']),
                 ('cargo-version', ['cargo', '--version']), ('audit-version', ['cargo', 'audit', '--version']),
                 ('deny-version', ['cargo', 'deny', '--version'])]
@@ -68,8 +70,34 @@ class DiagnosticControls(unittest.TestCase):
                     'inputs_before': inputs, 'inputs_after': inputs,
                     'stdout': {'file': 'stdout.txt', 'sha256': hashlib.sha256(raw).hexdigest()},
                     'stderr': {'file': 'stderr.txt', 'sha256': hashlib.sha256(b'').hexdigest()}}
+                if command_transform is not None: receipt['command'] = command_transform(receipt['command'])
                 (path / 'receipt.json').write_text(json.dumps(receipt), encoding='utf-8')
             return diagnostic.check_setup_metadata(artifact, recovered, footer, seed)
+
+    def test_actual_current_producer_version_commands_are_accepted(self):
+        def actual(command):
+            end = command.index('PYTHONDONTWRITEBYTECODE=1') + 1
+            return actual_nonroot_fixture_prefix(PurePosixPath('/work/c'),
+                PurePosixPath('/work/c/.local-runs/canonical-home'), command[end:])
+        try: result = self.check(command_transform=actual)
+        except ValueError as error: self.fail('Current actual producer command rejected: ' + str(error))
+        self.assertEqual(result['elapsed_seconds'], 123.5)
+        self.assertIs(result['reference_qualified'], False)
+
+    def test_old_extra_wildcard_and_foreign_git_trust_entries_are_rejected(self):
+        def changed(command, kind):
+            if kind == 'old':
+                return ['GIT_CONFIG_COUNT=1' if value == 'GIT_CONFIG_COUNT=2' else value
+                    for value in command if value not in {'GIT_CONFIG_KEY_1=safe.directory', 'GIT_CONFIG_VALUE_1=/work/c/.git'}]
+            if kind == 'extra':
+                command = ['GIT_CONFIG_COUNT=3' if value == 'GIT_CONFIG_COUNT=2' else value for value in command]
+                index = command.index('PYTHONDONTWRITEBYTECODE=1')
+                return command[:index] + ['GIT_CONFIG_KEY_2=safe.directory', 'GIT_CONFIG_VALUE_2=/foreign'] + command[index:]
+            return ['GIT_CONFIG_VALUE_1=' + ('*' if kind == 'wildcard' else '/foreign/.git')
+                if value == 'GIT_CONFIG_VALUE_1=/work/c/.git' else value for value in command]
+        for kind in ('old', 'extra', 'wildcard', 'foreign'):
+            with self.subTest(kind=kind), self.assertRaises(ValueError):
+                self.check(command_transform=lambda command: changed(command, kind))
 
     def test_correlated_progress_remains_unqualified_and_separate_from_final_footer(self):
         row = self.check()
