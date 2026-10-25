@@ -113,8 +113,9 @@ def retain_original_outputs(direct, *, cutoff_ns, retention_seconds, identity, r
     """Both retention steps spend one original reserve; retain failures too."""
     allocation.require(type(cutoff_ns) is int and type(retention_seconds) is int
         and 1 <= retention_seconds <= 600, 'finite original retention reserve required')
-    deadline = min(cutoff_ns, time.monotonic_ns() + retention_seconds * 10**9)
-    row = {'status': 'FAIL', 'cutoff_monotonic_ns': deadline,
+    started_ns = time.monotonic_ns()
+    deadline = min(cutoff_ns, started_ns + retention_seconds * 10**9)
+    row = {'status': 'FAIL', 'started_monotonic_ns': started_ns, 'cutoff_monotonic_ns': deadline,
         'native_binaries': 'NOT RUN', 'release_metadata': 'NOT RUN', 'errors': []}
     for name, command, key in [
         ('retain-native-binaries', ['/usr/bin/python3', str(ROOT / 'scripts/canonical_reference_binaries.py'),

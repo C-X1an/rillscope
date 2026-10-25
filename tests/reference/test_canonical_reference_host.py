@@ -19,6 +19,19 @@ from kvm_reference_channel import PORT_NAME
 
 
 class CanonicalHostControls(unittest.TestCase):
+    def test_prefilled_execution_record_cannot_authorize_an_original_process(self):
+        for slot in ({'process': {'pid': 12345}}, [], {'cleanup': {'status': 'PASS'}}):
+            with self.subTest(slot=slot), \
+                patch.object(host.platform, 'system', return_value='Linux'), \
+                patch.object(host.os, 'geteuid', return_value=0, create=True), \
+                patch.dict(os.environ, {'GITHUB_REPOSITORY': 'C-X1an/rillscope', 'GITHUB_RUN_ID': '123', 'GITHUB_RUN_ATTEMPT': '1'}), \
+                patch.object(host, 'source_check') as source, patch.object(host.subprocess, 'Popen') as launch:
+                with self.assertRaisesRegex(ValueError, 'empty in-process execution slot'):
+                    host.run_vm(Path('unused'), image=Path('unused-image'), run_as='runner', port=12345,
+                        commit='a' * 40, source_sha256='b' * 64, vm_seconds=100, setup_seconds=10,
+                        ownership=None, execution=slot)
+                source.assert_not_called(); launch.assert_not_called()
+
     def test_observation_spends_original_vm_cutoff_without_renewal(self):
         with patch.object(host.time, 'monotonic_ns', return_value=100), \
             patch.object(host, 'AllocationDeadline') as deadline:
@@ -49,6 +62,7 @@ class CanonicalHostControls(unittest.TestCase):
                 self.thread = SimpleNamespace(start=lambda: None, is_alive=lambda: True)
                 self.report = {'status': 'FAIL', 'synthetic_live_thread': True}
             def close(self): raise ValueError('synthetic original allocator did not stop')
+        created = Process(); execution = {}
         local = ROOT / '.local-runs'; local.mkdir(exist_ok=True)
         with tempfile.TemporaryDirectory(prefix='host-finalize-', dir=local) as directory:
             out = Path(directory); (out / 'artifact').mkdir(); (out / 'runtime').mkdir()
@@ -65,20 +79,24 @@ class CanonicalHostControls(unittest.TestCase):
                 patch.object(host, 'source_check'), patch.object(host, 'sha', return_value=host.IMAGE_SHA), \
                 patch.object(host.shutil, 'which', return_value='SYNTHETIC'), \
                 patch.object(host, 'qemu_command', return_value=['SYNTHETIC NO PROCESS']), \
-                patch.object(host.subprocess, 'Popen', return_value=Process()), \
+                patch.object(host.subprocess, 'Popen', return_value=created), \
                 patch.object(host, 'BoundedCapture', Capture), patch.object(host, 'CanonicalChannel', Channel), \
                 patch.object(host.stat, 'S_ISSOCK', return_value=True), \
                 patch.object(host, 'snapshot_before_cutoff', side_effect=lambda *args: {'monotonic_ns': time.monotonic_ns()}), \
                 patch.object(host, 'fsync_directory'), patch.object(host, 'stop_vm', return_value=stopped), \
                 patch.object(host.time, 'sleep', side_effect=RuntimeError('synthetic loop stop')):
                 result = host.run_vm(out, image=out / 'image', run_as='runner', port=12345,
-                    commit='a' * 40, source_sha256='b' * 64, vm_seconds=100, setup_seconds=10, ownership=None)
+                    commit='a' * 40, source_sha256='b' * 64, vm_seconds=100, setup_seconds=10,
+                    ownership=None, execution=execution)
             stop_record = json.loads((out / 'artifact/vm-stop.json').read_bytes())
             self.assertEqual(result['status'], 'FAIL')
             self.assertEqual(result['cleanup']['status'], 'FAIL')
             self.assertIs(result['channel_thread_stopped'], False)
             self.assertEqual(stop_record['cleanup']['status'], 'FAIL',
                 'persisted vm-stop.json reports PASS for a known-live allocator')
+            self.assertIs(execution['process'], created)
+            self.assertEqual(execution['cleanup']['status'], 'FAIL')
+            self.assertIsNone(execution['qemu_exit_observed_before_owned_stop'])
 
     def test_explicit_lifetime_is_never_renewed_from_receiver_start(self):
         self.assertEqual(host.finite_lifetime(100, 20000, 2000), 20_000_000_000_100)

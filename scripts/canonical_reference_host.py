@@ -21,7 +21,7 @@ from canonical_reference_channel import CanonicalChannel
 from canonical_reference_deadline import AllocationDeadline
 from canonical_reference_events import parse, bind
 from canonical_reference_reservation import (source_check, validate_qmp_binding,
-    actual_tasks, fsync_directory)
+    observed_membership, fsync_directory)
 import kvm_benchmark_pilot as pilot
 from kvm_reference_channel import PORT_NAME
 from kvm_reference_host import check_sample, stop_vm
@@ -61,13 +61,16 @@ def snapshot_before_cutoff(pid, port, vm_deadline_ns):
         lambda: False).snapshot(pid, port)
 
 
-def run_vm(out, *, image, run_as, port, commit, source_sha256, vm_seconds, setup_seconds, ownership):
+def run_vm(out, *, image, run_as, port, commit, source_sha256, vm_seconds, setup_seconds, ownership,
+        execution=None):
     allocation.require(platform.system() == 'Linux' and hasattr(os, 'geteuid') and os.geteuid() == 0,
         'BLOCKED: actual existing scoped Linux root controller required')
     allocation.require(os.environ.get('GITHUB_REPOSITORY') == 'C-X1an/rillscope'
         and re.fullmatch('[1-9][0-9]{0,18}', os.environ.get('GITHUB_RUN_ID', ''))
         and re.fullmatch('[1-9][0-9]{0,8}', os.environ.get('GITHUB_RUN_ATTEMPT', '')),
         'actual scoped workflow identity required before VM launch')
+    allocation.require(execution is None or type(execution) is dict and not execution,
+        'new empty in-process execution slot required; never hydrate original processes from JSON')
     allocation.require(type(run_as) is str and re.fullmatch('[a-z_][a-z0-9_-]{0,31}', run_as)
         and type(port) is int and 0 < port < 65536, 'existing QEMU identity and loopback QMP endpoint required')
     import archive_capture
@@ -94,6 +97,7 @@ def run_vm(out, *, image, run_as, port, commit, source_sha256, vm_seconds, setup
         'whole_job_fit': 'NOT ESTABLISHED BY THIS COMPONENT', 'reference_qualified': False})
     fsync_directory(artifact)
     process = channel = None; captures = []; failure = None; events = []
+    observed_exit = observed_exit_ns = None
     prefix_at = ready_at = end_at = None; final_observed = False; link_ack = None
     count = 0; last_required = None
     append_cost = {'calls': 0, 'wall_ns': 0, 'cpu_ns': 0}
@@ -109,7 +113,8 @@ def run_vm(out, *, image, run_as, port, commit, source_sha256, vm_seconds, setup
         if required:
             try:
                 check_sample(sample, account.pw_uid)
-                validate_qmp_binding(command, port, sample, process.pid, actual_tasks(process.pid))
+                sample, members = observed_membership(sample, process.pid)
+                validate_qmp_binding(command, port, sample, process.pid, members)
                 if last_required is not None:
                     allocation.require(0 < sample['monotonic_ns'] - last_required <= MAX_GAP_NS,
                         'required canonical host sample gap exceeded')
@@ -128,6 +133,10 @@ def run_vm(out, *, image, run_as, port, commit, source_sha256, vm_seconds, setup
     try:
         process = subprocess.Popen(command, cwd=ROOT, stdin=subprocess.DEVNULL,
             stdout=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=0, start_new_session=True)
+        if execution is not None:
+            execution.update(process=process, command=list(command), channel=None,
+                method=allocation.METHOD, commit=commit, source_sha256=source_sha256,
+                started_monotonic_ns=started_ns, deadline_monotonic_ns=deadline_ns)
         write_json(artifact / 'original-process.json', {'pid': process.pid, 'command': command,
             'started_monotonic_ns': started_ns, 'deadline_monotonic_ns': deadline_ns})
         captures = [BoundedCapture(process.stdout, artifact / 'serial.txt', SERIAL_LIMIT),
@@ -142,6 +151,7 @@ def run_vm(out, *, image, run_as, port, commit, source_sha256, vm_seconds, setup
                 channel = CanonicalChannel(path, artifact / 'channel', process=process, command=command,
                     uid=account.pw_uid, qmp_port=port, commit=commit, source_sha256=source_sha256,
                     vm_started_ns=started_ns, vm_deadline_ns=deadline_ns, allocation_id=secrets.token_hex(16))
+                if execution is not None: execution['channel'] = channel
                 channel.thread.start()
             if channel is not None and channel.done.is_set():
                 allocation.require(channel.report['status'] == 'VERIFIED HOST BYTES', 'actual canonical channel failed')
@@ -183,7 +193,9 @@ def run_vm(out, *, image, run_as, port, commit, source_sha256, vm_seconds, setup
                     'required_interval': required, 'error': type(error).__name__, 'reason': str(error)[:2048]})
                 if required: raise
             time.sleep(HOST_PERIOD_SECONDS)
-        allocation.require(process.returncode == 0, 'actual canonical QEMU exit failed')
+        observed_exit, observed_exit_ns = process.returncode, time.monotonic_ns()
+        allocation.require(type(observed_exit) is int and observed_exit == 0, 'actual canonical QEMU exit failed')
+        allocation.require(observed_exit_ns < deadline_ns, 'original canonical VM cutoff exhausted before terminal observation')
     except (Exception, KeyboardInterrupt) as error:
         failure = {'error': type(error).__name__, 'reason': str(error)[:2048]}
     finally:
@@ -202,6 +214,10 @@ def run_vm(out, *, image, run_as, port, commit, source_sha256, vm_seconds, setup
                 allocator_thread='original allocator did not stop; no successful cleanup endpoint')
         if stopped['cleanup']['status'] != 'PASS': failure = failure or {'error': 'CleanupError', 'reason': 'owned VM cleanup failed'}
         write_json(artifact / 'vm-stop.json', stopped)
+        if execution is not None and process is not None:
+            execution.update(cleanup=dict(stopped['cleanup']),
+                qemu_exit_observed_before_owned_stop=observed_exit,
+                qemu_exit_observed_monotonic_ns=observed_exit_ns)
         for capture in captures:
             try:
                 capture.drain()
@@ -227,9 +243,12 @@ def run_vm(out, *, image, run_as, port, commit, source_sha256, vm_seconds, setup
         'channel': channel.report if channel is not None else None,
         'channel_thread_stopped': channel is None or not channel.thread.is_alive(),
         'receiver_exit_before_owned_cleanup': stopped['receiver_exit_observed_before_stop'],
+        'qemu_exit_observed_before_owned_stop': observed_exit,
+        'qemu_exit_observed_monotonic_ns': observed_exit_ns,
         'cleanup': stopped['cleanup'], 'failure': failure,
         'scope': 'New-method VM ownership, prior grant, sampled resources, serial events and retained capture bytes only; guest boot/unmount, stopped-disk recovery, complete canonical/all-record validation and provider fit remain separate.'}
-    if (failure is None and final_observed and final_fsync is not None and link_ack is not None
+    if (failure is None and observed_exit == 0 and observed_exit_ns < deadline_ns
+        and final_observed and final_fsync is not None and link_ack is not None
         and channel is not None and not channel.thread.is_alive()
         and channel.report['status'] == 'VERIFIED HOST BYTES'
         and stopped['receiver_exit_observed_before_stop'] == 0

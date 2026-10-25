@@ -110,6 +110,7 @@ def retain(out):
                 early=owned_path(ROOT,experiment/('capture-'+stage))
                 if not source.exists() and not (early/'capture.zip').exists(): continue
                 include(early/'archive-result.json')
+                include(early/'host-export-result.json')
                 row={'source':source.relative_to(ROOT).as_posix(),
                     'package':'capture-'+str(len(stages)),'result':{'status':'PENDING'}}
                 if len(stages)>=MAX_CAPTURES: raise ValueError('release capture count exceeds bound')

@@ -83,5 +83,26 @@ class ReservationTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     reservation.validate_qmp_binding(command, 12345, sample, 201, tasks)
 
+    def test_recorded_membership_keeps_the_observed_set_including_non_vcpu_tasks(self):
+        sample={'qemu_pid':201,'vcpu_threads':[{'thread_id':value} for value in (301,302,303,304)]}
+        observed={201,301,302,303,304,900}
+        with patch.object(reservation,'actual_tasks',return_value=observed) as read:
+            retained,members=reservation.observed_membership(sample,201)
+        read.assert_called_once_with(201)
+        self.assertEqual(retained['actual_qemu_task_ids'],[201,301,302,303,304,900])
+        self.assertIs(members,observed)
+        self.assertNotIn('actual_qemu_task_ids',sample)
+
+    def test_failed_or_invalid_task_observation_is_not_replaced_with_qmp_claims(self):
+        sample={'qemu_pid':201,'vcpu_threads':[{'thread_id':value} for value in (301,302,303,304)]}
+        with patch.object(reservation,'actual_tasks',side_effect=OSError('literal vanished process fixture')):
+            with self.assertRaises(OSError):reservation.observed_membership(sample,201)
+        for members in ({301,302,303,304},{201,True},[201,301,302,303,304]):
+            with self.subTest(members=members),patch.object(reservation,'actual_tasks',return_value=members):
+                with self.assertRaises(ValueError):reservation.observed_membership(sample,201)
+        with patch.object(reservation,'actual_tasks') as read:
+            with self.assertRaises(ValueError):reservation.observed_membership(sample,202)
+            read.assert_not_called()
+
 
 if __name__ == '__main__': unittest.main()

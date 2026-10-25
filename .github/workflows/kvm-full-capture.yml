@@ -3,7 +3,8 @@
   "on": {
     "workflow_dispatch": {
       "inputs": {
-        "expected_commit": {"description": "Exact audited public commit SHA", "required": true, "type": "string"}
+        "expected_commit": {"description": "Exact audited public commit SHA", "required": true, "type": "string"},
+        "capture_mode": {"description": "Original legacy campaigns or source-only native canonical recipe", "required": true, "type": "choice", "default": "legacy-full", "options": ["legacy-full", "canonical-native"]}
       }
     }
   },
@@ -11,6 +12,7 @@
   "concurrency": {"group": "kvm-full-${{ github.run_id }}", "cancel-in-progress": false},
   "jobs": {
     "collect": {
+      "if": "${{ inputs.capture_mode == 'legacy-full' || inputs.capture_mode == '' }}",
       "runs-on": "ubuntu-24.04",
       "timeout-minutes": 360,
       "steps": [
@@ -55,7 +57,7 @@
       ]
     },
     "validate-all-records": {
-      "if": "${{ always() }}", "needs": "collect", "runs-on": "ubuntu-24.04", "timeout-minutes": 360,
+      "if": "${{ always() && (inputs.capture_mode == 'legacy-full' || inputs.capture_mode == '') }}", "needs": "collect", "runs-on": "ubuntu-24.04", "timeout-minutes": 360,
       "steps": [
         {
           "name": "Require the same exact audited commit",
@@ -94,6 +96,161 @@
             "name": "original-full-kvm-all-record-validation", "retention-days": 7,
             "include-hidden-files": true, "if-no-files-found": "error",
             "path": ".local-runs/kfull-validation-command/\n.local-runs/kfull-validation/results.json\n.local-runs/kfull-validation/verified-grid.json\n.local-runs/kfull-validation/verified-cancel.json\n.local-runs/kfull-validation/verified-sort-null.json"
+          }
+        }
+      ]
+    },
+    "reject-unknown-capture-mode": {
+      "if": "${{ inputs.capture_mode != '' && inputs.capture_mode != 'legacy-full' && inputs.capture_mode != 'canonical-native' }}",
+      "runs-on": "ubuntu-24.04",
+      "timeout-minutes": 4,
+      "steps": [
+        {
+          "name": "Require the exact audited commit before checkout or execution",
+          "id": "source_guard",
+          "timeout-minutes": 1,
+          "env": {
+            "EXPECTED_COMMIT": "${{ inputs.expected_commit }}"
+          },
+          "run": "python3 -c 'import os,re,sys; e=os.environ[\"EXPECTED_COMMIT\"]; sys.exit(0 if re.fullmatch(\"[0-9a-f]{40}\",e) and e == os.environ[\"GITHUB_SHA\"] else \"audited commit mismatch\")'"
+        },
+        {
+          "uses": "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "id": "checkout",
+          "timeout-minutes": 2,
+          "with": {
+            "persist-credentials": false
+          }
+        },
+        {
+          "name": "Reject unsupported capture mode",
+          "run": "echo \"unsupported capture mode\" >&2\nexit 2",
+          "timeout-minutes": 1
+        }
+      ]
+    },
+    "collect-canonical": {
+      "if": "${{ inputs.capture_mode == 'canonical-native' }}",
+      "runs-on": "ubuntu-24.04",
+      "timeout-minutes": 360,
+      "steps": [
+        {
+          "name": "Require the exact audited commit before checkout or execution",
+          "id": "source_guard",
+          "timeout-minutes": 1,
+          "env": {
+            "EXPECTED_COMMIT": "${{ inputs.expected_commit }}"
+          },
+          "run": "python3 -c 'import os,re,sys; e=os.environ[\"EXPECTED_COMMIT\"]; sys.exit(0 if re.fullmatch(\"[0-9a-f]{40}\",e) and e == os.environ[\"GITHUB_SHA\"] else \"audited commit mismatch\")'"
+        },
+        {
+          "uses": "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "id": "checkout",
+          "timeout-minutes": 2,
+          "with": {
+            "persist-credentials": false
+          }
+        },
+        {
+          "name": "Declare one exact source-bound native canonical plan",
+          "id": "plan",
+          "timeout-minutes": 1,
+          "run": "mkdir -p .local-runs\npython3 - <<'PY'\nimport json, os, sys\nfrom pathlib import Path\nsys.path[:0] = ['scripts', 'benchmarks']\nfrom evidence import source_identity\nfrom run_canonical_reference import validate_plan\nfrom canonical_reference_allocation import METHOD\nplan = validate_plan({'schema_version': 1, 'method': METHOD, 'mode': 'canonical',\n    'commit': os.environ['GITHUB_SHA'], 'source_sha256': source_identity()['sha256'],\n    'provision_seconds': 120, 'prepare_seconds': 180, 'vm_seconds': 20040,\n    'guest_setup_seconds': 900, 'guest_tail_seconds': 60, 'guest_retention_seconds': 180,\n    'recovery_seconds': 300, 'cleanup_reserve_seconds': 120, 'whole_seconds': 20880})\nwith Path('.local-runs/canonical-plan.json').open('x', encoding='utf-8') as stream:\n    stream.write(json.dumps(plan, sort_keys=True, indent=2) + '\\n')\nprint(json.dumps({'status': 'DECLARED; NOT EXECUTED', 'whole_seconds': plan['whole_seconds'],\n    'provider_fit': 'NOT ESTABLISHED', 'reference_qualified': False}))\nPY\nsudo -n env GITHUB_REPOSITORY=\"$GITHUB_REPOSITORY\" GITHUB_RUN_ID=\"$GITHUB_RUN_ID\" GITHUB_RUN_ATTEMPT=\"$GITHUB_RUN_ATTEMPT\" GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=safe.directory GIT_CONFIG_VALUE_0=\"$PWD\" GIT_OPTIONAL_LOCKS=0 PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 scripts/evidence.py --out .local-runs/canonical-handoff-permission-command --timeout 30 -- /usr/bin/python3 tests/system/canonical_handoff_permissions.py --out .local-runs/canonical-handoff-permission-control --run-as \"$(id -un)\""
+        },
+        {
+          "name": "Execute the unchanged native canonical recipe under one original owner deadline",
+          "id": "collection",
+          "timeout-minutes": 349,
+          "run": "sudo -n env GITHUB_REPOSITORY=\"$GITHUB_REPOSITORY\" GITHUB_RUN_ID=\"$GITHUB_RUN_ID\" GITHUB_RUN_ATTEMPT=\"$GITHUB_RUN_ATTEMPT\" GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=safe.directory GIT_CONFIG_VALUE_0=\"$PWD\" GIT_OPTIONAL_LOCKS=0 PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 scripts/evidence.py --out .local-runs/canonical-owner --timeout 20910 --input .local-runs/canonical-plan.json -- /usr/bin/python3 scripts/run_canonical_reference.py --config .local-runs/canonical-plan.json --out .local-runs/canonical-attempt --run-as \"$(id -un)\""
+        },
+        {
+          "name": "Retain original stopped bytes or select the complete available failure prefix",
+          "id": "retention",
+          "if": "${{ always() && steps.source_guard.outcome == 'success' && steps.checkout.outcome == 'success' }}",
+          "timeout-minutes": 2,
+          "run": "if sudo -n env GITHUB_REPOSITORY=\"$GITHUB_REPOSITORY\" GITHUB_RUN_ID=\"$GITHUB_RUN_ID\" GITHUB_RUN_ATTEMPT=\"$GITHUB_RUN_ATTEMPT\" GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=safe.directory GIT_CONFIG_VALUE_0=\"$PWD\" GIT_OPTIONAL_LOCKS=0 PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 scripts/evidence.py --out .local-runs/canonical-retention-command --timeout 110 -- /usr/bin/python3 scripts/retain_canonical_reference.py --source .local-runs/canonical-attempt --owner-receipt .local-runs/canonical-owner/receipt.json --out .local-runs/canonical-retained.zip --budget-seconds 90; then\n  retention_status=0\n  upload_paths=\".local-runs/canonical-retained.zip\n.local-runs/canonical-owner/\n.local-runs/canonical-retention-command/\n.local-runs/canonical-plan.json\n.local-runs/canonical-retained.json\n.local-runs/canonical-handoff-permission-command/\n.local-runs/canonical-handoff-permission-control/result.json\n.local-runs/canonical-handoff-permission-control/before-stdout.txt\n.local-runs/canonical-handoff-permission-control/before-stderr.txt\n.local-runs/canonical-handoff-permission-control/after-stdout.txt\n.local-runs/canonical-handoff-permission-control/after-stderr.txt\n.local-runs/canonical-handoff-permission-control/readable.zip\n.local-runs/canonical-handoff-permission-control/readable.json\"\nelse\n  retention_status=$?\n  upload_paths=\".local-runs/canonical-retained.zip\n.local-runs/canonical-retained.zip.pending\n.local-runs/canonical-retained.json\n.local-runs/canonical-failure.zip\n.local-runs/canonical-failure.zip.pending\n.local-runs/canonical-failure.json\n.local-runs/canonical-failure-command/\n.local-runs/canonical-plan.json\n.local-runs/canonical-handoff-permission-command/\n.local-runs/canonical-handoff-permission-control/result.json\n.local-runs/canonical-handoff-permission-control/before-stdout.txt\n.local-runs/canonical-handoff-permission-control/before-stderr.txt\n.local-runs/canonical-handoff-permission-control/after-stdout.txt\n.local-runs/canonical-handoff-permission-control/after-stderr.txt\n.local-runs/canonical-handoff-permission-control/readable.zip\n.local-runs/canonical-handoff-permission-control/readable.json\"\nfi\n{\n  printf '%s\\n' 'upload_paths<<RILLSCOPE_ORIGINAL_PATHS_EOF'\n  printf '%s\\n' \"$upload_paths\"\n  printf '%s\\n' 'RILLSCOPE_ORIGINAL_PATHS_EOF'\n} >> \"$GITHUB_OUTPUT\"\nexit \"$retention_status\""
+        },
+        {
+          "name": "Export bounded original failure bytes for the existing nonroot uploader",
+          "id": "failure_handoff",
+          "if": "${{ always() && steps.source_guard.outcome == 'success' && steps.checkout.outcome == 'success' && steps.retention.outcome == 'failure' }}",
+          "timeout-minutes": 1,
+          "run": "sudo -n env GITHUB_REPOSITORY=\"$GITHUB_REPOSITORY\" GITHUB_RUN_ID=\"$GITHUB_RUN_ID\" GITHUB_RUN_ATTEMPT=\"$GITHUB_RUN_ATTEMPT\" GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=safe.directory GIT_CONFIG_VALUE_0=\"$PWD\" GIT_OPTIONAL_LOCKS=0 PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 scripts/evidence.py --out .local-runs/canonical-failure-command --timeout 55 -- /usr/bin/python3 scripts/export_canonical_failure.py --source .local-runs/canonical-attempt --owner-receipt .local-runs/canonical-owner/receipt.json --out .local-runs/canonical-failure.zip --budget-seconds 45"
+        },
+        {
+          "name": "Keep original bytes and failures; exclude VM disks and tool caches",
+          "if": "${{ always() && steps.source_guard.outcome == 'success' && steps.checkout.outcome == 'success' }}",
+          "timeout-minutes": 3,
+          "uses": "actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9",
+          "with": {
+            "name": "original-canonical-native-attempt",
+            "retention-days": 7,
+            "compression-level": 6,
+            "include-hidden-files": true,
+            "if-no-files-found": "error",
+            "path": "${{ steps.retention.outputs.upload_paths }}"
+          }
+        }
+      ]
+    },
+    "validate-canonical": {
+      "if": "${{ always() && inputs.capture_mode == 'canonical-native' }}",
+      "needs": "collect-canonical",
+      "runs-on": "ubuntu-24.04",
+      "timeout-minutes": 90,
+      "steps": [
+        {
+          "name": "Require the exact audited commit before checkout or execution",
+          "id": "source_guard",
+          "timeout-minutes": 1,
+          "env": {
+            "EXPECTED_COMMIT": "${{ inputs.expected_commit }}"
+          },
+          "run": "python3 -c 'import os,re,sys; e=os.environ[\"EXPECTED_COMMIT\"]; sys.exit(0 if re.fullmatch(\"[0-9a-f]{40}\",e) and e == os.environ[\"GITHUB_SHA\"] else \"audited commit mismatch\")'"
+        },
+        {
+          "uses": "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "id": "checkout",
+          "timeout-minutes": 2,
+          "with": {
+            "persist-credentials": false
+          }
+        },
+        {
+          "name": "Download this original canonical attempt with strict digest checking",
+          "timeout-minutes": 15,
+          "uses": "actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333",
+          "with": {
+            "name": "original-canonical-native-attempt",
+            "path": ".local-runs/canonical-downloaded",
+            "digest-mismatch": "error"
+          }
+        },
+        {
+          "name": "Validate complete original owner, allocation, fresh, native and every benchmark record",
+          "timeout-minutes": 58,
+          "run": "python3 scripts/evidence.py --out .local-runs/canonical-validation-command --timeout 3420 --input .local-runs/canonical-downloaded/canonical-plan.json -- python3 scripts/verify_canonical_reference.py --archive .local-runs/canonical-downloaded/canonical-retained.zip --out .local-runs/canonical-validation --max-expanded-bytes 8589934592 --budget-seconds 3300"
+        },
+        {
+          "name": "Keep the original collection failure in the final workflow result",
+          "if": "${{ always() && steps.source_guard.outcome == 'success' && steps.checkout.outcome == 'success' }}",
+          "timeout-minutes": 1,
+          "env": {
+            "ORIGINAL_COLLECTION_RESULT": "${{ needs.collect-canonical.result }}"
+          },
+          "run": "python3 -c 'import os,sys; sys.exit(0 if os.environ[\"ORIGINAL_COLLECTION_RESULT\"] == \"success\" else \"original canonical collection failed; validation cannot repair it\")'"
+        },
+        {
+          "name": "Keep actual validation receipts without another expanded capture copy",
+          "if": "${{ always() && steps.source_guard.outcome == 'success' && steps.checkout.outcome == 'success' }}",
+          "timeout-minutes": 5,
+          "uses": "actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9",
+          "with": {
+            "name": "original-canonical-native-validation",
+            "retention-days": 7,
+            "include-hidden-files": true,
+            "if-no-files-found": "error",
+            "path": ".local-runs/canonical-validation-command/\n.local-runs/canonical-validation/validation-owner.json\n.local-runs/canonical-validation/record-inspection.json\n.local-runs/canonical-validation/stdout.txt\n.local-runs/canonical-validation/stderr.txt"
           }
         }
       ]

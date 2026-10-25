@@ -172,6 +172,17 @@ def actual_tasks(pid):
     return result
 
 
+def observed_membership(sample, pid):
+    """Retain the actual procfs set; never derive it from QMP's claimed IDs."""
+    protocol.require(type(sample) is dict and protocol.integer(pid)
+        and type(sample.get('qemu_pid')) is int and sample['qemu_pid'] == pid,
+        'original QMP process required before task membership observation')
+    members = actual_tasks(pid)
+    protocol.require(type(members) is set and 0 < len(members) <= 256 and pid in members
+        and all(protocol.integer(value) for value in members), 'bounded actual QEMU task membership required')
+    return {**sample, 'actual_qemu_task_ids': sorted(members)}, members
+
+
 def create_grant(process, command, uid, port, request_raw, *, commit, source_sha256,
         vm_started_ns, vm_deadline_ns, allocation_id, exchange_deadline_ns=None, cancelled=None):
     """Reserve the actual owned guest once; return only the original prior grant.
@@ -232,8 +243,10 @@ def create_grant(process, command, uid, port, request_raw, *, commit, source_sha
         # It establishes sampled resources; the root slot action above grants
         # guest assignment. Hardware alone never produces a positive statement.
         sample = budget.snapshot(process.pid, port)
+        write_original(slot / 'qmp-observation-before-membership.json', canonical_bytes(sample), budget=budget)
+        sample, members = observed_membership(sample, qemu['pid'])
         write_original(slot / 'qmp-and-resource-inspection.json', canonical_bytes(sample), budget=budget)
-        validate_qmp_binding(command, port, sample, qemu['pid'], actual_tasks(qemu['pid']))
+        validate_qmp_binding(command, port, sample, qemu['pid'], members)
         check_sample(sample, uid)
         launch = {'method': protocol.METHOD, 'controller': controller, 'qemu': qemu,
             'command': command, 'vm_started_monotonic_ns': vm_started_ns,
