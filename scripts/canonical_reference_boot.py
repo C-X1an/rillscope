@@ -45,6 +45,7 @@ try:
     try:
         value=b'owned-ephemeral-canonical-reference\n'
         if os.write(fd,value)!=len(value):raise OSError('marker write incomplete')
+        os.fchmod(fd,0o444)
         os.fsync(fd)
     finally:os.close(fd)
     seed=pathlib.Path('/work/c/.local-runs/canonical-seed/seed.json')

@@ -3,13 +3,51 @@ import ast
 import base64
 import copy
 import json
+import os
 from pathlib import Path
+import stat
 import sys
+import tempfile
+from types import SimpleNamespace
 import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path[:0] = [str(ROOT / 'scripts'), str(ROOT / 'benchmarks')]
 import canonical_reference_boot as boot
+
+
+def actual_marker_fragment():
+    """Extract the unchanged real creation statements; never run mount/VM code."""
+    module = ast.parse(boot.BOOTSTRAP)
+    candidates = [node for node in ast.walk(module) if isinstance(node, ast.Try)
+        and any(isinstance(row, ast.Assign) and any(isinstance(target, ast.Name) and target.id == 'marker'
+            for target in row.targets) for row in node.body)]
+    if len(candidates) != 1: raise AssertionError('one actual bootstrap marker creation block required')
+    body = candidates[0].body
+    index = next(index for index, row in enumerate(body) if isinstance(row, ast.Assign)
+        and any(isinstance(target, ast.Name) and target.id == 'marker' for target in row.targets))
+    selected = body[index:index + 3]
+    if len(selected) != 3 or not isinstance(selected[-1], ast.Try):
+        raise AssertionError('complete actual marker open/write/close fragment required')
+    return ast.fix_missing_locations(ast.Module(body=selected, type_ignores=[]))
+
+
+def create_actual_marker_fixture(path, fchmod=None):
+    """Relocate only the constant destination; real Linux uses real syscalls."""
+    def destination(value):
+        if value != '/run/rillscope-owned-canonical-reference': raise AssertionError('unexpected marker destination')
+        return path
+    class MarkerOS:
+        def __getattr__(self, name):
+            if name == 'O_NOFOLLOW' and os.name == 'nt' and fchmod is not None: return 0
+            return getattr(os, name)
+        def open(self, destination, flags, mode):
+            if os.name == 'nt' and fchmod is not None: flags |= os.O_BINARY
+            return os.open(destination, flags, mode)
+        def fchmod(self, descriptor, mode):
+            return (os.fchmod if fchmod is None else fchmod)(descriptor, mode)
+    exec(compile(actual_marker_fragment(), '<actual-bootstrap-marker-fragment>', 'exec'),
+         {'os': MarkerOS(), 'pathlib': SimpleNamespace(Path=destination)})
 
 
 class NativeBootControls(unittest.TestCase):
@@ -61,6 +99,33 @@ class NativeBootControls(unittest.TestCase):
         self.assertIn('/work/c/scripts/canonical_reference_guest_start.py', source)
         self.assertNotIn('/work/c/scripts/kvm_pilot_guest.py', source)
         self.assertNotIn('/run/rillscope-owned-pilot', source)
+
+    def test_actual_marker_creation_preserves_constant_bytes_and_final_read_only_mode(self):
+        with tempfile.TemporaryDirectory(prefix='rill-marker-mode-unit-') as directory:
+            marker = Path(directory) / 'marker'; modes = []
+            def chmod(descriptor, mode):
+                modes.append(mode)
+                # Windows has no fchmod; this adapter checks its file mode and
+                # byte operations only. The mandatory Linux gate uses fchmod
+                # and a real UID65534 consumer without this adapter.
+                if hasattr(os, 'fchmod'): os.fchmod(descriptor, mode)
+                else: os.chmod(marker, mode)
+            previous = os.umask(0o077)
+            try:
+                create_actual_marker_fixture(marker, chmod)
+                self.assertEqual(marker.read_bytes(), b'owned-ephemeral-canonical-reference\n')
+                self.assertEqual(modes, [0o444])
+                self.assertEqual(stat.S_IMODE(marker.stat().st_mode), 0o444)
+            finally:
+                os.umask(previous)
+                if marker.exists(): os.chmod(marker, 0o600)
+
+    def test_actual_marker_creation_cannot_replace_an_existing_marker(self):
+        with tempfile.TemporaryDirectory(prefix='rill-marker-exclusive-unit-') as directory:
+            marker = Path(directory) / 'marker'; marker.write_bytes(b'original existing marker')
+            with self.assertRaises(FileExistsError):
+                create_actual_marker_fixture(marker, lambda *_args: self.fail('existing marker must not be changed'))
+            self.assertEqual(marker.read_bytes(), b'original existing marker')
 
 
 if __name__ == '__main__': unittest.main()
