@@ -22,6 +22,7 @@ from export_canonical_failure import export_prefix
 from canonical_reference_guest_owner import nonroot
 from canonical_reference_device import UID, GID, check_marker
 import canonical_reference_boot as boot
+import canonical_reference_device as device
 from tests.reference.test_canonical_reference_boot import create_actual_marker_fixture
 from tests.reference.test_canonical_git_permissions import actual_nonroot_fixture_prefix
 
@@ -80,7 +81,12 @@ def run_fixture_git_control(name, command):
     return run_git_control(name, fixture_git_command(command))
 
 
-def git_clone_control():
+def host_git_directory_command(prefix, source):
+    """Use implicit discovery, which checks ownership even inside .git."""
+    return prefix + ['/usr/bin/git', '-C', str(source / '.git'), 'for-each-ref']
+
+
+def git_clone_control(*, transport_regression=True):
     """Real root-owned source -> exact UID65534 prefix -> fresh no-local clone."""
     with tempfile.TemporaryDirectory(prefix='rill-git-permission-') as directory:
         workspace = Path(directory); os.chmod(workspace, 0o755)
@@ -136,9 +142,18 @@ def git_clone_control():
             and old.count('GIT_CONFIG_VALUE_1=' + str(source / '.git')) == 1, 'actual exact two-entry prefix required')
         old = [value.replace('GIT_CONFIG_COUNT=2', 'GIT_CONFIG_COUNT=1') for value in old
             if value not in {'GIT_CONFIG_KEY_1=safe.directory', 'GIT_CONFIG_VALUE_1=' + str(source / '.git')}]
-        denied = run_fixture_git_control('original-one-entry-clone', old)
-        require(denied.returncode == 128 and b'dubious ownership' in denied.stderr
-            and str(source / '.git').encode() in denied.stderr, 'original clone ownership defect was not reproduced')
+        require(type(transport_regression) is bool, 'explicit Git control context required')
+        if transport_regression:
+            denied = run_fixture_git_control('original-one-entry-clone', old)
+            require(denied.returncode == 128 and b'dubious ownership' in denied.stderr
+                and str(source / '.git').encode() in denied.stderr, 'original clone ownership defect was not reproduced')
+        else:
+            # Recent host Git deliberately permits cross-owner upload-pack.
+            # Direct repository access remains a distinct mandatory negative.
+            direct = host_git_directory_command(old[:-7], source)
+            denied = run_fixture_git_control('host-one-entry-git-directory', direct)
+            require(denied.returncode == 128 and b'dubious ownership' in denied.stderr
+                and str(source / '.git').encode() in denied.stderr, 'host direct Git directory was unexpectedly trusted')
         clone = consumer / 'fresh'; require(not clone.exists(), 'new tiny checkout required')
         accepted = checked('two-entry-fresh-clone', prefix(['/usr/bin/git', 'clone', '--no-local',
             '--config', 'core.autocrlf=false', str(source), str(clone)]))
@@ -150,7 +165,8 @@ def git_clone_control():
             and str(unrelated).encode() in foreign.stderr, 'unrelated root-owned repository was unexpectedly trusted')
         require(before == {'source': snapshot(source), 'unrelated': snapshot(unrelated)},
             'original Git source ownership/mode/bytes changed')
-        return {'status': 'PASS', 'consumer_uid': UID, 'consumer_gid': GID, 'original_one_entry_exit': denied.returncode,
+        return {'status': 'PASS', 'consumer_uid': UID, 'consumer_gid': GID,
+            ('original_one_entry_exit' if transport_regression else 'direct_git_directory_exit'): denied.returncode,
             'two_entry_clone_exit': accepted.returncode, 'unrelated_repository_exit': foreign.returncode,
             'git_version': version.stdout.decode('ascii').strip(),
             'effective_trust': config.stdout.decode('utf-8').split('\0')[:-1],
@@ -235,9 +251,18 @@ raise SystemExit(0 if denied else 1)
         'actual_exit_code': marker_result.returncode, 'raw_stdout': marker_result.stdout.decode(),
         'raw_stderr': marker_result.stderr.decode(), 'bootstrap_sha256': hashlib.sha256(boot.BOOTSTRAP.encode()).hexdigest(),
         'scope': 'Actual Linux creation and UID65534 read/write check of unchanged bootstrap fragment at a synthetic path; no actual guest/VM/device or allocation claim'}
-    record['canonical_git_clone_control'] = git_clone_control()
+    record['canonical_git_clone_control'] = git_clone_control(transport_regression=False)
     (out / 'result.json').write_text(json.dumps(record, indent=2) + '\n', encoding='utf-8')
     print(json.dumps(record)); return 0
 
 
-if __name__ == '__main__': raise SystemExit(main())
+def guest_git_main():
+    """Mandatory original transport regression in the actual owned guest."""
+    identity = device.guard(0)
+    control = git_clone_control()
+    print(json.dumps({'canonical_guest_git_control': {'identity': identity, 'control': control}}), flush=True)
+    return 0
+
+
+if __name__ == '__main__':
+    raise SystemExit(guest_git_main() if sys.argv[1:] == ['--guest-git-only'] else main())

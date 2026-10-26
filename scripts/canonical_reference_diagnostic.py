@@ -4,7 +4,7 @@ import hashlib
 import json
 import math
 import os
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import re
 import signal
 import subprocess
@@ -22,6 +22,8 @@ from canonical_reference_recovery import recover
 from canonical_reference_reservation import source_check, fsync_directory
 from canonical_reference_seed import validate_seed
 from canonical_reference_guest_setup import check_rust_versions
+from canonical_reference_git_control import validate_guest_git_proof, setup_intervals
+from canonical_reference_recovered_records import OriginalRecords
 from evidence import source_identity, verify_receipt
 from inspect_reference_guest import BoundedCapture, TrialCommands, interrupted, SERIAL_LIMIT, bounded_bytes
 from kvm_pilot_common import write_json, append_json, sha
@@ -129,6 +131,15 @@ def check_setup_metadata(artifact, recovered, footer, seed):
     versions = version_observations(paths['setup'], commit=seed['commit'], source_sha256=seed['source_sha256'],
         seed_sha256=footer['seed_sha256'])
     allocation.require(versions == setup['versions'], 'actual version raw outputs differ from setup result')
+    git_metadata = OriginalRecords(paths['setup'], time.monotonic() + 30)
+    git_source = git_metadata.document('commands/guest-git-ownership/receipt.json')['source_before']
+    allocation.require(git_source.get('sha256') == seed['source_sha256'], 'diagnostic guest Git source differs')
+    version_proofs = [git_metadata.document('commands/' + name + '/receipt.json') for name in
+        ('rustup-version', 'rustc-version', 'cargo-version', 'audit-version', 'deny-version')]
+    git_proof = validate_guest_git_proof(git_metadata, PurePosixPath('commands/guest-git-ownership'), source=git_source,
+        seed=seed, seed_raw=original_seed.read_bytes(), setup=setup, before_utc=version_proofs[0]['started_utc'])
+    setup_intervals([git_proof, *version_proofs], setup['elapsed_seconds'])
+    git_metadata.unchanged()
     return {'status': 'OBSERVED NATIVE SETUP ONLY', 'elapsed_seconds': setup['elapsed_seconds'],
         'versions': versions, 'boot_id': footer['boot_id'], 'reference_qualified': False,
         'canonical': 'NOT RUN', 'provider_fit': 'NOT MEASURED',

@@ -16,11 +16,21 @@ from . import test_canonical_reference_boot as boot_fixtures
 from . import test_canonical_reference_allocation as allocation_fixtures
 from . import test_canonical_reference_guest_setup as setup_fixtures
 from .test_canonical_git_permissions import actual_nonroot_fixture_prefix
+from .test_canonical_git_guest import literal_guest_proof
 
 
 class DiagnosticControls(unittest.TestCase):
+    def test_guest_git_interval_must_fit_the_entire_native_setup_sequence(self):
+        def stale(directory):
+            path = directory / 'receipt.json'; row = json.loads(path.read_bytes())
+            row.update(started_utc='2000-01-01T00:00:00+00:00', finished_utc='2000-01-01T00:00:01+00:00')
+            path.write_text(json.dumps(row), encoding='utf-8')
+        with self.assertRaises(ValueError): self.check(git_transform=stale)
+
     def records(self):
         seed = literal_seed(); seed['mode'] = 'native-setup-diagnostic'
+        seed['files'].append({'path': 'scripts/canonical_reference_guest_owner.py', 'bytes': 1, 'mode': 0o644, 'sha256': 'c' * 64})
+        seed['files'].sort(key=lambda row: row['path'])
         footer = boot_fixtures.NativeBootControls().fixture(); footer['mode'] = seed['mode']
         progress = copy.deepcopy(footer)
         progress.update(unmount_status='PENDING', status='FAIL', finished_monotonic_ns=None, utc_ns=None)
@@ -38,7 +48,7 @@ class DiagnosticControls(unittest.TestCase):
                 for name in ('boot', 'setup', 'start')]}
         return seed, footer, recovered, {'boot': progress, 'setup': setup, 'start': start}
 
-    def check(self, change=None, command_transform=None):
+    def check(self, change=None, command_transform=None, git_transform=None):
         seed, footer, recovered, values = self.records()
         if change: change(seed, footer, recovered, values)
         local = ROOT / '.local-runs'; local.mkdir(exist_ok=True)
@@ -59,11 +69,13 @@ class DiagnosticControls(unittest.TestCase):
             commands = [('rustup-version', ['rustup', '--version']), ('rustc-version', ['rustc', '-vV']),
                 ('cargo-version', ['cargo', '--version']), ('audit-version', ['cargo', 'audit', '--version']),
                 ('deny-version', ['cargo', 'deny', '--version'])]
-            for (name, command), raw in zip(commands, setup_fixtures.NativeSetupControls().outputs()):
+            for index, ((name, command), raw) in enumerate(zip(commands, setup_fixtures.NativeSetupControls().outputs())):
                 path = artifact / 'setup/commands' / name; path.mkdir(parents=True)
                 (path / 'stdout.txt').write_bytes(raw); (path / 'stderr.txt').write_bytes(b'')
                 inputs = [{'path': '/work/c/.local-runs/canonical-seed/seed.json', 'sha256': footer['seed_sha256']}]
                 receipt = {'command': prefix + command, 'cwd': '/work/c', 'verification_status': 'PASS',
+                    'started_utc': '2026-10-25T00:00:0' + str(index + 1) + '+00:00',
+                    'finished_utc': '2026-10-25T00:00:0' + str(index + 2) + '+00:00', 'elapsed_seconds': 1,
                     'exit_code': 0, 'execution_outcome': 'EXECUTED', 'source_before': {'sha256': seed['source_sha256']},
                     'source_after_sha256': seed['source_sha256'], 'git': {'commit': seed['commit'], 'dirty': False},
                     'process_cleanup': {'status': 'PASS', 'remaining_active_processes': 0},
@@ -72,7 +84,29 @@ class DiagnosticControls(unittest.TestCase):
                     'stderr': {'file': 'stderr.txt', 'sha256': hashlib.sha256(b'').hexdigest()}}
                 if command_transform is not None: receipt['command'] = command_transform(receipt['command'])
                 (path / 'receipt.json').write_text(json.dumps(receipt), encoding='utf-8')
+            literal_guest_proof(artifact / 'setup/commands/guest-git-ownership', seed, seed_raw,
+                {'sha256': seed['source_sha256']}, values['setup'])
+            if git_transform is not None: git_transform(artifact / 'setup/commands/guest-git-ownership')
+            (artifact / 'setup/setup-result.json').write_text(json.dumps(values['setup']), encoding='utf-8')
             return diagnostic.check_setup_metadata(artifact, recovered, footer, seed)
+
+    def test_guest_original_command_raw_seed_and_deadline_are_required(self):
+        def alter(directory, kind):
+            path = directory / 'receipt.json'; row = json.loads(path.read_bytes())
+            if kind == 'missing': path.unlink(); return
+            if kind == 'command': row['command'] = ['/usr/bin/true']
+            if kind == 'seed': row['inputs_before'][0]['sha256'] = 'd' * 64
+            if kind == 'duration': row['elapsed_seconds'] = 31
+            if kind == 'old-success':
+                stdout = directory / 'stdout.txt'
+                events = [json.loads(line) for line in stdout.read_bytes().splitlines()]
+                events[11]['canonical_git_child_observation']['returncode'] = 0
+                data = b''.join(json.dumps(event).encode() + b'\n' for event in events)
+                stdout.write_bytes(data); row['stdout']['sha256'] = hashlib.sha256(data).hexdigest()
+            path.write_text(json.dumps(row), encoding='utf-8')
+        for kind in ('missing', 'command', 'seed', 'duration', 'old-success'):
+            with self.subTest(kind=kind), self.assertRaises((ValueError, FileNotFoundError)):
+                self.check(git_transform=lambda directory: alter(directory, kind))
 
     def test_actual_current_producer_version_commands_are_accepted(self):
         def actual(command):

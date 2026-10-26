@@ -19,14 +19,16 @@ from . import test_canonical_reference_seed as seed_fixtures
 from . import test_canonical_reference_allocation as allocation_fixtures
 from . import test_canonical_reference_guest_setup as setup_fixtures
 from .test_canonical_git_permissions import actual_nonroot_fixture_prefix
+from .test_canonical_git_guest import literal_guest_proof
 
 
 def raw(row): return (json.dumps(row, sort_keys=True, separators=(',', ':')) + '\n').encode()
 def digest(value): return hashlib.sha256(value).hexdigest()
 
 
-def fixture(root):
-    artifact = root / '.local-runs/capture/artifact'; (artifact / 'recovery').mkdir(parents=True)
+def fixture(root, *, canonical_path=False):
+    artifact = root / ('.local-runs/capture/vm/artifact' if canonical_path else '.local-runs/capture/artifact')
+    (artifact / 'recovery').mkdir(parents=True)
     scopes = [('boot', '/c/.local-runs/canonical-boot', 'boot-result.json'),
         ('setup', '/c/.local-runs/canonical-setup', 'setup-result.json'),
         ('start', '/c/.local-runs/canonical-start', 'start-result.json'),
@@ -69,9 +71,10 @@ def reindex(artifact, recovery):
 
 def prerequisite_fixture(root):
     """Explicitly synthetic clocks, source and receipts; no command is executed."""
-    artifact, recovery, budget = fixture(root); attempt = artifact.parent; second = 10**9
-    (attempt / 'vm').mkdir(); artifact.rename(attempt / 'vm/artifact'); artifact = attempt / 'vm/artifact'
+    artifact, recovery, budget = fixture(root, canonical_path=True); attempt = artifact.parent.parent; second = 10**9
     seed = seed_fixtures.literal_seed(); seed.update(setup_seconds=900, tail_seconds=60, retention_seconds=180)
+    seed['files'].append({'path': 'scripts/canonical_reference_guest_owner.py', 'bytes': 1, 'mode': 0o644, 'sha256': 'c' * 64})
+    seed['files'].sort(key=lambda row: row['path'])
     source = {'sha256': seed['source_sha256'], 'files': [[row['path'], row['sha256']] for row in seed['files']
         if not row['path'].startswith('.git/') and row['path'] != records.INSTALLER_RELATIVE]}
     seed_raw = raw(seed); preparation = attempt / 'vm/preparation'; preparation.mkdir(parents=True)
@@ -110,6 +113,8 @@ def prerequisite_fixture(root):
             'stdout': {'file': 'stdout.txt', 'sha256': digest(value)}, 'stderr': {'file': 'stderr.txt', 'sha256': digest(b'')},
             'inputs_before': inputs, 'inputs_after': inputs, 'stdin': None, 'fixture': 'No command executed'}
         (directory / 'receipt.json').write_bytes(raw(proof)); (directory / 'stdout.txt').write_bytes(value); (directory / 'stderr.txt').write_bytes(b'')
+    literal_guest_proof(artifact / 'recovery/setup/commands/guest-git-ownership', seed, seed_raw, source, setup)
+    (artifact / 'recovery/setup/setup-result.json').write_bytes(raw(setup))
     owner = {**common, 'schema_version': 1, 'status': 'PASS', 'boot_id': footer['boot_id'], 'retention': 'RETAINED',
         'cleanup': complete, 'started_monotonic_ns': 120 * second, 'canonical_started_monotonic_ns': 121 * second,
         'canonical_finished_monotonic_ns': 17000 * second, 'finished_monotonic_ns': 17010 * second,
@@ -152,6 +157,45 @@ def prerequisite_fixture(root):
 
 
 class RecoveredRecordControls(unittest.TestCase):
+    def test_prerequisite_fixture_constructs_final_path_without_directory_rename(self):
+        local = ROOT / '.local-runs'; local.mkdir(exist_ok=True)
+        with tempfile.TemporaryDirectory(prefix='g26-', dir=local) as directory:
+            root = Path(directory).resolve()
+            if sys.platform == 'win32': root = Path('\\\\?\\' + str(root))
+            with patch.object(Path, 'rename', side_effect=AssertionError('synthetic directory rename forbidden')):
+                try: attempt, artifact, terminal, source = prerequisite_fixture(root)
+                except AssertionError as error: self.fail(str(error))
+            self.assertEqual(artifact, attempt / 'vm/artifact')
+            with patch.object(archive_capture, 'ROOT', root):
+                result = records.validate_prerequisites(attempt, terminal, source=source, deadline=time.monotonic() + 30)
+            self.assertEqual(result['status'], 'CHECKED ORIGINAL RECOVERY AND NATIVE PREREQUISITES')
+
+    def test_original_guest_transport_proof_is_mandatory_after_reindexing(self):
+        for kind in ('missing', 'command', 'seed', 'duration', 'old-success'):
+            with self.subTest(kind=kind):
+                local = ROOT / '.local-runs'; local.mkdir(exist_ok=True)
+                with tempfile.TemporaryDirectory(prefix='g25-', dir=local) as directory:
+                    root = Path(directory).resolve()
+                    if sys.platform == 'win32': root = Path('\\\\?\\' + str(root))
+                    attempt, artifact, terminal, source = prerequisite_fixture(root)
+                    proof_dir = artifact / 'recovery/setup/commands/guest-git-ownership'
+                    path = proof_dir / 'receipt.json'; row = json.loads(path.read_bytes())
+                    if kind == 'missing': path.unlink()
+                    else:
+                        if kind == 'command': row['command'] = ['/usr/bin/true']
+                        if kind == 'seed': row['inputs_before'][0]['sha256'] = 'd' * 64
+                        if kind == 'duration': row['elapsed_seconds'] = 31
+                        if kind == 'old-success':
+                            stdout = proof_dir / 'stdout.txt'
+                            events = [json.loads(line) for line in stdout.read_bytes().splitlines()]
+                            events[11]['canonical_git_child_observation']['returncode'] = 0
+                            data = b''.join(json.dumps(event).encode() + b'\n' for event in events)
+                            stdout.write_bytes(data); row['stdout']['sha256'] = digest(data)
+                        path.write_bytes(raw(row))
+                    reindex(artifact, terminal['collector']['recovery'])
+                    with patch.object(archive_capture, 'ROOT', root), self.assertRaises((ValueError, FileNotFoundError)):
+                        records.validate_prerequisites(attempt, terminal, source=source, deadline=time.monotonic() + 30)
+
     def native_commands(self, transform):
         local = ROOT / '.local-runs'; local.mkdir(exist_ok=True)
         with tempfile.TemporaryDirectory(prefix='n19-', dir=local) as directory:
@@ -159,6 +203,7 @@ class RecoveredRecordControls(unittest.TestCase):
             if sys.platform == 'win32': root = Path('\\\\?\\' + str(root))
             attempt, artifact, terminal, source = prerequisite_fixture(root)
             for path in (artifact / 'recovery/setup/commands').glob('*/receipt.json'):
+                if path.parent.name == 'guest-git-ownership': continue
                 row = json.loads(path.read_bytes()); row['command'] = transform(row['command']); path.write_bytes(raw(row))
             reindex(artifact, terminal['collector']['recovery'])
             with patch.object(archive_capture, 'ROOT', root):

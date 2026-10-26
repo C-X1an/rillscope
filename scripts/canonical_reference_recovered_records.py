@@ -22,6 +22,7 @@ from canonical_reference_retained_fresh import read_bounded_file, receipt, relat
 from canonical_reference_seed import validate_seed, INSTALLER_RELATIVE
 from inspect_reference_guest import SERIAL_LIMIT
 from kvm_reference_common import strict_json
+from canonical_reference_git_control import validate_guest_git_proof
 
 MAX_FILES = 20000
 MAX_DEPTH = 32
@@ -315,6 +316,11 @@ def validate_prerequisites(attempt, terminal, *, source, deadline):
     require(elapsed_total <= setup['elapsed_seconds'] + .010
         and (previous_end - first_start).total_seconds() <= setup['elapsed_seconds'] + .010,
         'sequential original native version receipt intervals cannot fit actual setup duration')
+    git_proof = validate_guest_git_proof(SetupCommands(recovered), PurePosixPath('original-setup/commands/guest-git-ownership'),
+        source=source, seed=seed, seed_raw=seed_raw, setup=setup, before_utc=version_proofs[0]['started_utc'])
+    require(elapsed_total + git_proof['elapsed_seconds'] <= setup['elapsed_seconds'] + .010
+        and (previous_end - instant(git_proof['started_utc'])).total_seconds() <= setup['elapsed_seconds'] + .010,
+        'original guest Git and native version intervals cannot fit actual setup duration')
     start = recovered.tree_document('start', 'start-result.json'); owner = recovered.tree_document('owner', 'owner-result.json')
     require(start.get('method') == protocol.METHOD and start.get('mode') == 'canonical' and start.get('status') == 'PASS'
         and start.get('commit') == commit and start.get('source_sha256') == source['sha256']

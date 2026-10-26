@@ -21,6 +21,7 @@ from inspect_reference_guest import TrialCommands, interrupted
 from kvm_pilot_common import write_json
 from owned_process import LinuxOwnedChildren
 import reference_allocation as original
+from canonical_reference_git_control import guest_output
 
 BASE = ROOT / '.local-runs/canonical-setup'
 TOOL_TARGET = HOME / '.native-tool-build'
@@ -127,6 +128,10 @@ def setup(seed):
             'actual owned guest serial getty must be masked and inactive')
         allocation.require(original.repository_identity() == {'commit': seed['commit'],
             'source_sha256': seed['source_sha256']}, 'actual clean native source differs after system setup')
+        git_raw = checked('guest-git-ownership', ['/usr/bin/python3',
+            str(ROOT / 'tests/system/canonical_handoff_permissions.py'), '--guest-git-only'], 30)
+        record['git_ownership_control'] = guest_output(git_raw, prefix_sha256=hashlib.sha256(
+            (ROOT / 'scripts/canonical_reference_guest_owner.py').read_bytes()).hexdigest())
         for path in (HOME, HOME / '.cargo', HOME / '.rustup'):
             durable_mkdir(path, mode=0o755); os.chown(path, 65534, 65534)
         fsync_directory(HOME.parent)
