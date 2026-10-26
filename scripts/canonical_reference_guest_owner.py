@@ -105,6 +105,7 @@ def nonroot(command):
         '/usr/bin/env', 'HOME=' + str(HOME), 'CARGO_HOME=' + str(HOME / '.cargo'),
         'RUSTUP_HOME=' + str(HOME / '.rustup'), 'CARGO_INCREMENTAL=0',
         'PATH=' + str(HOME / '.cargo/bin') + ':/usr/bin:/bin', 'GIT_OPTIONAL_LOCKS=0',
+        'GIT_CONFIG_GLOBAL=' + str(ROOT.parent / 'canonical-git-trust/config'),
         'GIT_CONFIG_COUNT=2', 'GIT_CONFIG_KEY_0=safe.directory', 'GIT_CONFIG_VALUE_0=' + str(ROOT),
         'GIT_CONFIG_KEY_1=safe.directory', 'GIT_CONFIG_VALUE_1=' + str(ROOT / '.git'),
         'PYTHONDONTWRITEBYTECODE=1', *command]

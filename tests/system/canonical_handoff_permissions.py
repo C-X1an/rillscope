@@ -23,6 +23,7 @@ from canonical_reference_guest_owner import nonroot
 from canonical_reference_device import UID, GID, check_marker
 import canonical_reference_boot as boot
 import canonical_reference_device as device
+import canonical_reference_git_trust as git_trust
 from tests.reference.test_canonical_reference_boot import create_actual_marker_fixture
 from tests.reference.test_canonical_git_permissions import actual_nonroot_fixture_prefix
 
@@ -129,6 +130,8 @@ def git_clone_control(*, transport_regression=True):
                     'base64': base64.b64encode(raw).decode('ascii')})
             return rows
         before = {'source': snapshot(source), 'unrelated': snapshot(unrelated)}
+        require(not Path(git_trust.trust_path(source)).parent.exists(),
+            'original and intermediate Git controls require absent child trust file')
         print(json.dumps({'canonical_git_original_fixtures': before}), flush=True)
         prefix = lambda command: actual_nonroot_fixture_prefix(source, consumer / 'home', command)
         config = checked('effective-two-entry-trust', prefix(['/usr/bin/git', 'config', '--null',
@@ -147,6 +150,11 @@ def git_clone_control(*, transport_regression=True):
             denied = run_fixture_git_control('original-one-entry-clone', old)
             require(denied.returncode == 128 and b'dubious ownership' in denied.stderr
                 and str(source / '.git').encode() in denied.stderr, 'original clone ownership defect was not reproduced')
+            intermediate = run_fixture_git_control('two-entry-only-clone', prefix(['/usr/bin/git', 'clone',
+                '--no-local', '--config', 'core.autocrlf=false', str(source), str(consumer / 'two-entry-only')]))
+            require(intermediate.returncode == 128 and b'dubious ownership' in intermediate.stderr
+                and str(source / '.git').encode() in intermediate.stderr,
+                'client-only two-entry transport failure was not reproduced')
         else:
             # Recent host Git deliberately permits cross-owner upload-pack.
             # Direct repository access remains a distinct mandatory negative.
@@ -154,6 +162,14 @@ def git_clone_control(*, transport_regression=True):
             denied = run_fixture_git_control('host-one-entry-git-directory', direct)
             require(denied.returncode == 128 and b'dubious ownership' in denied.stderr
                 and str(source / '.git').encode() in denied.stderr, 'host direct Git directory was unexpectedly trusted')
+        protected = git_trust.install(source, fixture=True)
+        print(json.dumps({'canonical_git_protected_trust': protected}), flush=True)
+        protected_config = checked('effective-protected-trust', prefix(['/usr/bin/git', 'config', '--null',
+            '--show-origin', '--show-scope', '--get-all', 'safe.directory']))
+        expected_protected = b''.join(b'global\0file:' + str(git_trust.trust_path(source)).encode() + b'\0'
+            + str(path).encode() + b'\0' for path in (source, source / '.git')) + expected_config
+        require(protected_config.stdout == expected_protected,
+            'closed protected global and command trust origins differ')
         clone = consumer / 'fresh'; require(not clone.exists(), 'new tiny checkout required')
         accepted = checked('two-entry-fresh-clone', prefix(['/usr/bin/git', 'clone', '--no-local',
             '--config', 'core.autocrlf=false', str(source), str(clone)]))
@@ -165,12 +181,16 @@ def git_clone_control(*, transport_regression=True):
             and str(unrelated).encode() in foreign.stderr, 'unrelated root-owned repository was unexpectedly trusted')
         require(before == {'source': snapshot(source), 'unrelated': snapshot(unrelated)},
             'original Git source ownership/mode/bytes changed')
+        protected_after = git_trust.observe(source)
+        require(protected_after == protected, 'root-protected child trust bytes or role changed')
         return {'status': 'PASS', 'consumer_uid': UID, 'consumer_gid': GID,
             ('original_one_entry_exit' if transport_regression else 'direct_git_directory_exit'): denied.returncode,
             'two_entry_clone_exit': accepted.returncode, 'unrelated_repository_exit': foreign.returncode,
             'git_version': version.stdout.decode('ascii').strip(),
             'effective_trust': config.stdout.decode('utf-8').split('\0')[:-1],
-            'configuration_scope': 'Closed fixture child environment; system/global Git files are neither read nor modified',
+            'protected_effective_trust': protected_config.stdout.decode('utf-8').split('\0')[:-1],
+            'protected_trust_before': protected, 'protected_trust_after': protected_after,
+            'configuration_scope': 'New root-protected exact child file; existing user/system Git files are neither read nor modified',
             'source_and_unrelated_ownership_modes_bytes_unchanged': True, 'fresh_commit': head.decode('ascii'),
             'literal_sha256': hashlib.sha256(literal).hexdigest(), 'original_fixtures': before,
             'scope': 'Actual Linux Git on tiny synthetic root-owned fixtures only; no first-party build, guest/VM, allocation or reference qualification'}

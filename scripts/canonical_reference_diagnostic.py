@@ -24,6 +24,7 @@ from canonical_reference_seed import validate_seed
 from canonical_reference_guest_setup import check_rust_versions
 from canonical_reference_git_control import validate_guest_git_proof, setup_intervals
 from canonical_reference_recovered_records import OriginalRecords
+import canonical_reference_git_trust as git_trust
 from evidence import source_identity, verify_receipt
 from inspect_reference_guest import BoundedCapture, TrialCommands, interrupted, SERIAL_LIMIT, bounded_bytes
 from kvm_pilot_common import write_json, append_json, sha
@@ -41,11 +42,12 @@ CLEANUP_RESERVE_SECONDS = 120
 TOTAL_SECONDS = 6000
 
 
-def version_observations(setup_tree, *, commit, source_sha256, seed_sha256):
+def version_observations(setup_tree, *, commit, source_sha256, seed_sha256, seed_bytes, trust_input):
     home = '/work/c/.local-runs/canonical-home'
     prefix = ['/usr/bin/setpriv', '--reuid=65534', '--regid=65534', '--clear-groups', '--',
         '/usr/bin/env', 'HOME=' + home, 'CARGO_HOME=' + home + '/.cargo', 'RUSTUP_HOME=' + home + '/.rustup',
         'CARGO_INCREMENTAL=0', 'PATH=' + home + '/.cargo/bin:/usr/bin:/bin', 'GIT_OPTIONAL_LOCKS=0',
+        'GIT_CONFIG_GLOBAL=/work/canonical-git-trust/config',
         'GIT_CONFIG_COUNT=2', 'GIT_CONFIG_KEY_0=safe.directory', 'GIT_CONFIG_VALUE_0=/work/c',
         'GIT_CONFIG_KEY_1=safe.directory', 'GIT_CONFIG_VALUE_1=/work/c/.git', 'PYTHONDONTWRITEBYTECODE=1']
     outputs = []
@@ -68,9 +70,9 @@ def version_observations(setup_tree, *, commit, source_sha256, seed_sha256):
             and row['process_cleanup']['remaining_active_processes'] == 0,
             'actual original native command/source/nonroot identity or cleanup differs')
         inputs = row.get('inputs_before')
-        allocation.require(type(inputs) is list and len(inputs) == 1 and row.get('inputs_after') == inputs
-            and inputs[0].get('path') == '/work/c/.local-runs/canonical-seed/seed.json'
-            and inputs[0].get('sha256') == seed_sha256, 'original native version seed binding differs')
+        allocation.require(inputs == row.get('inputs_after') == [
+            {'path': '/work/c/.local-runs/canonical-seed/seed.json', 'bytes': seed_bytes, 'sha256': seed_sha256}, trust_input],
+            'original native version seed and protected trust binding differs')
         for stream in ('stdout', 'stderr'):
             allocation.require(row.get(stream, {}).get('file') == stream + '.txt'
                 and (directory / (stream + '.txt')).is_file()
@@ -128,10 +130,11 @@ def check_setup_metadata(artifact, recovered, footer, seed):
     allocation.require(original_seed.is_file() and original_seed.stat().st_size <= 4 * 1024**2
         and strict_json(original_seed.read_bytes()) == seed and sha(original_seed) == footer['seed_sha256'],
         'original diagnostic seed bytes differ from guest boot')
-    versions = version_observations(paths['setup'], commit=seed['commit'], source_sha256=seed['source_sha256'],
-        seed_sha256=footer['seed_sha256'])
-    allocation.require(versions == setup['versions'], 'actual version raw outputs differ from setup result')
     git_metadata = OriginalRecords(paths['setup'], time.monotonic() + 30)
+    trust_input = git_trust.validate_setup(git_metadata, PurePosixPath('.'), setup)
+    versions = version_observations(paths['setup'], commit=seed['commit'], source_sha256=seed['source_sha256'],
+        seed_sha256=footer['seed_sha256'], seed_bytes=len(original_seed.read_bytes()), trust_input=trust_input)
+    allocation.require(versions == setup['versions'], 'actual version raw outputs differ from setup result')
     git_source = git_metadata.document('commands/guest-git-ownership/receipt.json')['source_before']
     allocation.require(git_source.get('sha256') == seed['source_sha256'], 'diagnostic guest Git source differs')
     version_proofs = [git_metadata.document('commands/' + name + '/receipt.json') for name in

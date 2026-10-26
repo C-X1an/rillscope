@@ -20,6 +20,7 @@ from . import test_canonical_reference_allocation as allocation_fixtures
 from . import test_canonical_reference_guest_setup as setup_fixtures
 from .test_canonical_git_permissions import actual_nonroot_fixture_prefix
 from .test_canonical_git_guest import literal_guest_proof
+from .test_canonical_git_trust import literal_setup_trust
 
 
 def raw(row): return (json.dumps(row, sort_keys=True, separators=(',', ':')) + '\n').encode()
@@ -93,16 +94,18 @@ def prerequisite_fixture(root):
         'environment': environment.request['environment'], 'versions': records.check_rust_versions(*outputs),
         'tool_target_retirement': {'status': 'RETIRED', 'fixture': 'No cache existed; literal expected shape only'}}
     (artifact / 'recovery/setup/setup-result.json').write_bytes(raw(setup))
+    trust_input = literal_setup_trust(artifact / 'recovery/setup', setup)
     home = '/work/c/.local-runs/canonical-home'
     prefix = ['/usr/bin/setpriv', '--reuid=65534', '--regid=65534', '--clear-groups', '--', '/usr/bin/env',
         'HOME=' + home, 'CARGO_HOME=' + home + '/.cargo', 'RUSTUP_HOME=' + home + '/.rustup', 'CARGO_INCREMENTAL=0',
-        'PATH=' + home + '/.cargo/bin:/usr/bin:/bin', 'GIT_OPTIONAL_LOCKS=0', 'GIT_CONFIG_COUNT=2',
+        'PATH=' + home + '/.cargo/bin:/usr/bin:/bin', 'GIT_OPTIONAL_LOCKS=0',
+        'GIT_CONFIG_GLOBAL=/work/canonical-git-trust/config', 'GIT_CONFIG_COUNT=2',
         'GIT_CONFIG_KEY_0=safe.directory', 'GIT_CONFIG_VALUE_0=/work/c',
         'GIT_CONFIG_KEY_1=safe.directory', 'GIT_CONFIG_VALUE_1=/work/c/.git', 'PYTHONDONTWRITEBYTECODE=1']
     commands = [('rustup-version', ['rustup', '--version']), ('rustc-version', ['rustc', '-vV']),
         ('cargo-version', ['cargo', '--version']), ('audit-version', ['cargo', 'audit', '--version']),
         ('deny-version', ['cargo', 'deny', '--version'])]
-    inputs = [{'path': '/work/c/.local-runs/canonical-seed/seed.json', 'bytes': len(seed_raw), 'sha256': digest(seed_raw)}]
+    inputs = [{'path': '/work/c/.local-runs/canonical-seed/seed.json', 'bytes': len(seed_raw), 'sha256': digest(seed_raw)}, trust_input]
     for index, ((name, command), value) in enumerate(zip(commands, outputs)):
         directory = artifact / 'recovery/setup/commands' / name; directory.mkdir(parents=True)
         proof = {'schema_version': 1, 'command': prefix + command, 'cwd': '/work/c', 'source_before': source,
@@ -157,6 +160,25 @@ def prerequisite_fixture(root):
 
 
 class RecoveredRecordControls(unittest.TestCase):
+    def test_protected_trust_role_and_raw_custody_cannot_be_reindexed_away(self):
+        for kind in ('uid', 'raw', 'missing'):
+            with self.subTest(kind=kind):
+                local = ROOT / '.local-runs'; local.mkdir(exist_ok=True)
+                with tempfile.TemporaryDirectory(prefix='g29-', dir=local) as directory:
+                    root = Path(directory).resolve()
+                    if sys.platform == 'win32': root = Path('\\\\?\\' + str(root))
+                    attempt, artifact, terminal, source = prerequisite_fixture(root)
+                    setup_dir = artifact / 'recovery/setup'; observation = setup_dir / 'git-trust-observation.json'
+                    if kind == 'missing': observation.unlink()
+                    elif kind == 'raw': (setup_dir / 'git-trust-config.raw').write_bytes(b'changed original')
+                    else:
+                        row = json.loads(observation.read_bytes()); row['uid'] = 65534; observation.write_bytes(raw(row))
+                        path = setup_dir / 'setup-result.json'; setup = json.loads(path.read_bytes())
+                        setup['git_trust_before'] = dict(row); setup['git_trust_after'] = dict(row); path.write_bytes(raw(setup))
+                    reindex(artifact, terminal['collector']['recovery'])
+                    with patch.object(archive_capture, 'ROOT', root), self.assertRaises((ValueError, FileNotFoundError)):
+                        records.validate_prerequisites(attempt, terminal, source=source, deadline=time.monotonic() + 30)
+
     def test_prerequisite_fixture_constructs_final_path_without_directory_rename(self):
         local = ROOT / '.local-runs'; local.mkdir(exist_ok=True)
         with tempfile.TemporaryDirectory(prefix='g26-', dir=local) as directory:

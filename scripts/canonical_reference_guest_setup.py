@@ -21,6 +21,8 @@ from inspect_reference_guest import TrialCommands, interrupted
 from kvm_pilot_common import write_json
 from owned_process import LinuxOwnedChildren
 import reference_allocation as original
+import canonical_reference_git_trust as git_trust
+import base64
 from canonical_reference_git_control import guest_output
 
 BASE = ROOT / '.local-runs/canonical-setup'
@@ -113,7 +115,9 @@ def setup(seed):
     def checked(name, command, timeout=60):
         remaining = (deadline - time.monotonic_ns()) / 10**9
         allocation.require(remaining > 0, 'original native guest setup deadline exhausted')
-        return direct(name, command, timeout=min(timeout, remaining), inputs=(ROOT / INPUT_RELATIVE,))
+        inputs = (ROOT / INPUT_RELATIVE,)
+        if 'git_trust_before' in record: inputs += (Path(git_trust.trust_path(ROOT)),)
+        return direct(name, command, timeout=min(timeout, remaining), inputs=inputs)
     try:
         checked('apt-update', ['/usr/bin/apt-get', 'update'], 300)
         checked('apt-install', ['/usr/bin/apt-get', 'install', '--yes', '--no-install-recommends', *PACKAGES], 600)
@@ -132,6 +136,9 @@ def setup(seed):
             str(ROOT / 'tests/system/canonical_handoff_permissions.py'), '--guest-git-only'], 30)
         record['git_ownership_control'] = guest_output(git_raw, prefix_sha256=hashlib.sha256(
             (ROOT / 'scripts/canonical_reference_guest_owner.py').read_bytes()).hexdigest())
+        record['git_trust_before'] = git_trust.install(ROOT)
+        write_json(BASE / 'git-trust-observation.json', record['git_trust_before'])
+        (BASE / 'git-trust-config.raw').write_bytes(base64.b64decode(record['git_trust_before']['base64'], validate=True))
         for path in (HOME, HOME / '.cargo', HOME / '.rustup'):
             durable_mkdir(path, mode=0o755); os.chown(path, 65534, 65534)
         fsync_directory(HOME.parent)
@@ -158,6 +165,9 @@ def setup(seed):
             and original.repository_identity() == {'commit': seed['commit'], 'source_sha256': seed['source_sha256']},
             'native prerequisite setup must not build or run first-party source')
         record['environment'] = original.environment()
+        record['git_trust_after'] = git_trust.observe(ROOT)
+        allocation.require(record['git_trust_after'] == record['git_trust_before'],
+            'native setup changed protected child Git trust')
         record['status'] = 'PREPARED NATIVE TOOLS ONLY'
     except (Exception, KeyboardInterrupt) as error:
         record.update(status='FAIL', error=type(error).__name__, reason=str(error)[:2048])

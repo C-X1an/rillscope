@@ -10,6 +10,7 @@ import json
 from pathlib import Path, PurePosixPath
 import sys
 import unittest
+from .test_canonical_git_trust import literal_trust_observation
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path[:0] = [str(ROOT / 'scripts'), str(ROOT / 'benchmarks')]
@@ -81,6 +82,7 @@ def literal_guest_events():
     prefix = ['/usr/bin/setpriv', '--reuid=65534', '--regid=65534', '--clear-groups', '--', '/usr/bin/env',
         'HOME=' + home, 'CARGO_HOME=' + home + '/.cargo', 'RUSTUP_HOME=' + home + '/.rustup',
         'CARGO_INCREMENTAL=0', 'PATH=' + home + '/.cargo/bin:/usr/bin:/bin', 'GIT_OPTIONAL_LOCKS=0',
+        'GIT_CONFIG_GLOBAL=' + root + '/canonical-git-trust/config',
         'GIT_CONFIG_COUNT=2', 'GIT_CONFIG_KEY_0=safe.directory', 'GIT_CONFIG_VALUE_0=' + source,
         'GIT_CONFIG_KEY_1=safe.directory', 'GIT_CONFIG_VALUE_1=' + source + '/.git', 'PYTHONDONTWRITEBYTECODE=1']
     head = b'1234567890abcdef1234567890abcdef12345678\n'
@@ -97,12 +99,19 @@ def literal_guest_events():
                 'core.hooksPath=' + root + '/empty-template', 'commit', '--quiet', '-m', 'Synthetic permission fixture'], 0, b'', b''),
             (name + '-head', ['/usr/bin/git', '-C', path, 'rev-parse', 'HEAD'], 0, head, b'')])
     trust = b'command\0command line:\0' + source.encode() + b'\0command\0command line:\0' + source.encode() + b'/.git\0'
+    protected = literal_trust_observation(source)
+    protected_config = b''.join(b'global\0file:' + protected['path'].encode() + b'\0'
+        + path.encode() + b'\0' for path in (source, source + '/.git')) + trust
     old = [v.replace('GIT_CONFIG_COUNT=2', 'GIT_CONFIG_COUNT=1') for v in prefix
         if v not in ('GIT_CONFIG_KEY_1=safe.directory', 'GIT_CONFIG_VALUE_1=' + source + '/.git')]
     commands.extend([
         ('effective-two-entry-trust', prefix + ['/usr/bin/git', 'config', '--null', '--show-origin', '--show-scope', '--get-all', 'safe.directory'], 0, trust, b''),
         ('original-one-entry-clone', old + ['/usr/bin/git', 'clone', '--no-local', '--config', 'core.autocrlf=false', source, root + '/consumer/old-clone'],
             128, b'', b'fatal: detected dubious ownership in repository at ' + source.encode() + b'/.git\n'),
+        ('two-entry-only-clone', prefix + ['/usr/bin/git', 'clone', '--no-local', '--config', 'core.autocrlf=false', source, root + '/consumer/two-entry-only'],
+            128, b'', b'fatal: detected dubious ownership in repository at ' + source.encode() + b'/.git\n'),
+        ('effective-protected-trust', prefix + ['/usr/bin/git', 'config', '--null', '--show-origin', '--show-scope', '--get-all', 'safe.directory'],
+            0, protected_config, b''),
         ('two-entry-fresh-clone', prefix + ['/usr/bin/git', 'clone', '--no-local', '--config', 'core.autocrlf=false', source, root + '/consumer/fresh'], 0, b'', b'Cloning synthetic fixture\n'),
         ('fresh-head', prefix + ['/usr/bin/git', '-C', root + '/consumer/fresh', 'rev-parse', 'HEAD'], 0, head, b''),
         ('unrelated-root-owned-repository', prefix + ['/usr/bin/git', '-C', root + '/unrelated', 'rev-parse', 'HEAD'],
@@ -121,9 +130,12 @@ def literal_guest_events():
     result = {'status': 'PASS', 'consumer_uid': 65534, 'consumer_gid': 65534, 'original_one_entry_exit': 128,
         'two_entry_clone_exit': 0, 'unrelated_repository_exit': 128, 'git_version': 'git version 2.43.0',
         'effective_trust': trust.decode().split('\0')[:-1], 'configuration_scope': 'SYNTHETIC',
+        'protected_effective_trust': protected_config.decode().split('\0')[:-1],
+        'protected_trust_before': protected, 'protected_trust_after': dict(protected),
         'source_and_unrelated_ownership_modes_bytes_unchanged': True, 'fresh_commit': head.decode().strip(),
         'literal_sha256': hashlib.sha256(literal).hexdigest(), 'original_fixtures': fixtures, 'scope': 'SYNTHETIC'}
     rows.insert(9, {'canonical_git_original_fixtures': fixtures})
+    rows.insert(13, {'canonical_git_protected_trust': protected})
     rows.append({'canonical_guest_git_control': {'identity': {'uid': 0, 'gid': 0, 'groups': [0]}, 'control': result}})
     return rows, result
 
@@ -149,6 +161,15 @@ def literal_guest_proof(directory, seed, seed_raw, source, setup):
 
 
 class GuestOriginalProofControls(unittest.TestCase):
+    def test_intermediate_denial_protected_role_and_global_origins_are_required(self):
+        def origin(rows):
+            stream = rows[14]['canonical_git_child_observation']['stdout']
+            raw = base64.b64decode(stream['base64']).replace(b'global\0file:', b'global\0forged:')
+            stream.update(bytes=len(raw), sha256=hashlib.sha256(raw).hexdigest(), base64=base64.b64encode(raw).decode())
+        for change in [lambda rows: rows[12]['canonical_git_child_observation'].__setitem__('returncode', 0),
+            lambda rows: rows[13]['canonical_git_protected_trust'].__setitem__('uid', 65534), origin]:
+            with self.subTest(change=change), self.assertRaises(ValueError): self.check(change)
+
     def check(self, change=None):
         from canonical_reference_git_control import guest_output
         rows, expected = literal_guest_events()
@@ -167,7 +188,7 @@ class GuestOriginalProofControls(unittest.TestCase):
                 self.check(lambda rows: rows[index]['canonical_git_child_observation'].__setitem__(key, value))
 
     def test_positive_clone_foreign_denial_and_source_identity_are_required(self):
-        for index, key, value in [(12, 'returncode', 128), (14, 'returncode', 0),
+        for index, key, value in [(15, 'returncode', 128), (17, 'returncode', 0),
             (11, 'prefix_source_sha256', 'd' * 64)]:
             with self.subTest(index=index), self.assertRaises(ValueError):
                 self.check(lambda rows: rows[index]['canonical_git_child_observation'].__setitem__(key, value))

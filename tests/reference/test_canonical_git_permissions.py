@@ -36,7 +36,8 @@ class ExactGitTrust(unittest.TestCase):
         command = actual_nonroot_fixture_prefix(root, home, ['/usr/bin/git', 'clone', '--no-local'])
         self.assertEqual(command[:6], ['/usr/bin/setpriv', '--reuid=65534', '--regid=65534', '--clear-groups', '--', '/usr/bin/env'])
         entries = [value for value in command[6:] if value.startswith('GIT_CONFIG_')]
-        self.assertEqual(entries, ['GIT_CONFIG_COUNT=2', 'GIT_CONFIG_KEY_0=safe.directory',
+        self.assertEqual(entries, ['GIT_CONFIG_GLOBAL=/synthetic/canonical-git-trust/config',
+            'GIT_CONFIG_COUNT=2', 'GIT_CONFIG_KEY_0=safe.directory',
             'GIT_CONFIG_VALUE_0=/synthetic/source', 'GIT_CONFIG_KEY_1=safe.directory',
             'GIT_CONFIG_VALUE_1=/synthetic/source/.git'])
         self.assertNotIn('*', '\n'.join(command))
@@ -128,6 +129,7 @@ class FixtureGitConfiguration(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix='g22-', dir=local) as directory:
             path = Path(directory); home = path / 'h'; home.mkdir(); xdg = path / 'x'; xdg.mkdir()
             system, global_config = path / 's', path / 'g'
+            (path / 'empty-child-global').write_bytes(b'')
             for file in (system, global_config): file.write_text('[safe]\n\tdirectory = *\n', encoding='utf-8')
             ambient = {**os.environ, 'GIT_CONFIG_SYSTEM': str(system), 'GIT_CONFIG_GLOBAL': str(global_config),
                 'GIT_CONFIG_PARAMETERS': "'safe.directory'='*'", 'GIT_CONFIG_COUNT': '1',
@@ -139,6 +141,10 @@ class FixtureGitConfiguration(unittest.TestCase):
         # Windows adapts executable spelling and prevents MSYS from rewriting literal POSIX config values.
         # The production Linux command and every expected byte remain unchanged. No UID operation runs.
         adapted = [env if value == '/usr/bin/env' else value for value in command]
+        # The pure literal prefix uses a synthetic absolute path. Configuration-only
+        # execution binds that one selector to this test's own empty file.
+        adapted = ['GIT_CONFIG_GLOBAL=' + str(directory / 'empty-child-global')
+            if value == 'GIT_CONFIG_GLOBAL=/synthetic/canonical-git-trust/config' else value for value in adapted]
         if os.name == 'nt' and adapted[:2] == [env, '-i']:
             adapted[2:2] = ['MSYS2_ARG_CONV_EXCL=*', 'MSYS2_ENV_CONV_EXCL=*']
         return subprocess.run(adapted, cwd=directory, env=ambient, capture_output=True, timeout=10, check=False)

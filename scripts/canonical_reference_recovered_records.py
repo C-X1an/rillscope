@@ -23,6 +23,7 @@ from canonical_reference_seed import validate_seed, INSTALLER_RELATIVE
 from inspect_reference_guest import SERIAL_LIMIT
 from kvm_reference_common import strict_json
 from canonical_reference_git_control import validate_guest_git_proof
+import canonical_reference_git_trust as git_trust
 
 MAX_FILES = 20000
 MAX_DEPTH = 32
@@ -207,11 +208,12 @@ class SetupCommands:
         value = strict_json(self.raw(path, limit)); require(type(value) is dict, 'native setup object required'); return value
 
 
-def native_versions(recovered, seed, seed_raw, source):
+def native_versions(recovered, seed, seed_raw, source, trust_input):
     home = '/work/c/.local-runs/canonical-home'
     prefix = ['/usr/bin/setpriv', '--reuid=65534', '--regid=65534', '--clear-groups', '--', '/usr/bin/env',
         'HOME=' + home, 'CARGO_HOME=' + home + '/.cargo', 'RUSTUP_HOME=' + home + '/.rustup', 'CARGO_INCREMENTAL=0',
-        'PATH=' + home + '/.cargo/bin:/usr/bin:/bin', 'GIT_OPTIONAL_LOCKS=0', 'GIT_CONFIG_COUNT=2',
+        'PATH=' + home + '/.cargo/bin:/usr/bin:/bin', 'GIT_OPTIONAL_LOCKS=0',
+        'GIT_CONFIG_GLOBAL=/work/canonical-git-trust/config', 'GIT_CONFIG_COUNT=2',
         'GIT_CONFIG_KEY_0=safe.directory', 'GIT_CONFIG_VALUE_0=/work/c',
         'GIT_CONFIG_KEY_1=safe.directory', 'GIT_CONFIG_VALUE_1=/work/c/.git', 'PYTHONDONTWRITEBYTECODE=1']
     metadata = SetupCommands(recovered); outputs = []; proofs = []
@@ -219,7 +221,7 @@ def native_versions(recovered, seed, seed_raw, source):
         ('cargo-version', ['cargo', '--version']), ('audit-version', ['cargo', 'audit', '--version']),
         ('deny-version', ['cargo', 'deny', '--version'])]
     expected = [{'path': '/work/c/.local-runs/canonical-seed/seed.json', 'bytes': len(seed_raw),
-        'sha256': hashlib.sha256(seed_raw).hexdigest()}]
+        'sha256': hashlib.sha256(seed_raw).hexdigest()}, trust_input]
     for name, command in commands:
         directory = PurePosixPath('original-setup/commands') / name
         proof = receipt(metadata, directory, source=source, commit=seed['commit'], command=prefix + command, cwd=PurePosixPath('/work/c'))
@@ -303,7 +305,8 @@ def validate_prerequisites(attempt, terminal, *, source, deadline):
     retirement = setup.get('tool_target_retirement')
     require(type(retirement) is dict and retirement.get('status') in ('RETIRED', 'ABSENT'),
         'original stopped third-party setup cache disposition required')
-    versions, version_proofs = native_versions(recovered, seed, seed_raw, source)
+    trust_input = git_trust.validate_setup(SetupCommands(recovered), PurePosixPath('original-setup'), setup)
+    versions, version_proofs = native_versions(recovered, seed, seed_raw, source, trust_input)
     require(versions == setup.get('versions'), 'original five native version outputs differ from result')
     previous_end = None; first_start = None; elapsed_total = 0
     for proof in version_proofs:

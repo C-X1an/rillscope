@@ -17,6 +17,7 @@ from . import test_canonical_reference_allocation as allocation_fixtures
 from . import test_canonical_reference_guest_setup as setup_fixtures
 from .test_canonical_git_permissions import actual_nonroot_fixture_prefix
 from .test_canonical_git_guest import literal_guest_proof
+from .test_canonical_git_trust import literal_setup_trust
 
 
 class DiagnosticControls(unittest.TestCase):
@@ -48,7 +49,7 @@ class DiagnosticControls(unittest.TestCase):
                 for name in ('boot', 'setup', 'start')]}
         return seed, footer, recovered, {'boot': progress, 'setup': setup, 'start': start}
 
-    def check(self, change=None, command_transform=None, git_transform=None):
+    def check(self, change=None, command_transform=None, git_transform=None, trust_transform=None):
         seed, footer, recovered, values = self.records()
         if change: change(seed, footer, recovered, values)
         local = ROOT / '.local-runs'; local.mkdir(exist_ok=True)
@@ -60,10 +61,12 @@ class DiagnosticControls(unittest.TestCase):
             values['boot']['seed_sha256'] = footer['seed_sha256']
             for name, filename in [('boot', 'boot-result.json'), ('setup', 'setup-result.json'), ('start', 'start-result.json')]:
                 (artifact / name).mkdir(); (artifact / name / filename).write_text(json.dumps(values[name]), encoding='utf-8')
+            trust_input = literal_setup_trust(artifact / 'setup', values['setup'])
             home = '/work/c/.local-runs/canonical-home'
             prefix = ['/usr/bin/setpriv', '--reuid=65534', '--regid=65534', '--clear-groups', '--',
                 '/usr/bin/env', 'HOME=' + home, 'CARGO_HOME=' + home + '/.cargo', 'RUSTUP_HOME=' + home + '/.rustup',
                 'CARGO_INCREMENTAL=0', 'PATH=' + home + '/.cargo/bin:/usr/bin:/bin', 'GIT_OPTIONAL_LOCKS=0',
+                'GIT_CONFIG_GLOBAL=/work/canonical-git-trust/config',
                 'GIT_CONFIG_COUNT=2', 'GIT_CONFIG_KEY_0=safe.directory', 'GIT_CONFIG_VALUE_0=/work/c',
                 'GIT_CONFIG_KEY_1=safe.directory', 'GIT_CONFIG_VALUE_1=/work/c/.git', 'PYTHONDONTWRITEBYTECODE=1']
             commands = [('rustup-version', ['rustup', '--version']), ('rustc-version', ['rustc', '-vV']),
@@ -72,7 +75,8 @@ class DiagnosticControls(unittest.TestCase):
             for index, ((name, command), raw) in enumerate(zip(commands, setup_fixtures.NativeSetupControls().outputs())):
                 path = artifact / 'setup/commands' / name; path.mkdir(parents=True)
                 (path / 'stdout.txt').write_bytes(raw); (path / 'stderr.txt').write_bytes(b'')
-                inputs = [{'path': '/work/c/.local-runs/canonical-seed/seed.json', 'sha256': footer['seed_sha256']}]
+                inputs = [{'path': '/work/c/.local-runs/canonical-seed/seed.json',
+                    'bytes': len(seed_raw), 'sha256': footer['seed_sha256']}, trust_input]
                 receipt = {'command': prefix + command, 'cwd': '/work/c', 'verification_status': 'PASS',
                     'started_utc': '2026-10-25T00:00:0' + str(index + 1) + '+00:00',
                     'finished_utc': '2026-10-25T00:00:0' + str(index + 2) + '+00:00', 'elapsed_seconds': 1,
@@ -87,8 +91,21 @@ class DiagnosticControls(unittest.TestCase):
             literal_guest_proof(artifact / 'setup/commands/guest-git-ownership', seed, seed_raw,
                 {'sha256': seed['source_sha256']}, values['setup'])
             if git_transform is not None: git_transform(artifact / 'setup/commands/guest-git-ownership')
+            if trust_transform is not None: trust_transform(artifact / 'setup', values['setup'])
             (artifact / 'setup/setup-result.json').write_text(json.dumps(values['setup']), encoding='utf-8')
             return diagnostic.check_setup_metadata(artifact, recovered, footer, seed)
+
+    def test_protected_trust_original_role_and_captured_bytes_are_mandatory(self):
+        def alter(directory, setup, kind):
+            path = directory / 'git-trust-observation.json'
+            if kind == 'missing': path.unlink(); return
+            if kind == 'raw': (directory / 'git-trust-config.raw').write_bytes(b'changed original'); return
+            row = json.loads(path.read_bytes()); row['uid'] = 65534
+            setup['git_trust_before'] = dict(row); setup['git_trust_after'] = dict(row)
+            path.write_text(json.dumps(row), encoding='utf-8')
+        for kind in ('uid', 'raw', 'missing'):
+            with self.subTest(kind=kind), self.assertRaises((ValueError, FileNotFoundError)):
+                self.check(trust_transform=lambda directory, setup: alter(directory, setup, kind))
 
     def test_guest_original_command_raw_seed_and_deadline_are_required(self):
         def alter(directory, kind):
