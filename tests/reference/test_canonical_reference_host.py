@@ -1,5 +1,6 @@
 """Literal new-method resource/deadline controls, not a QEMU execution."""
 from pathlib import Path
+from contextlib import ExitStack
 import io
 import json
 import os
@@ -62,6 +63,11 @@ class CanonicalHostControls(unittest.TestCase):
                 self.thread = SimpleNamespace(start=lambda: None, is_alive=lambda: True)
                 self.report = {'status': 'FAIL', 'synthetic_live_thread': True}
             def close(self): raise ValueError('synthetic original allocator did not stop')
+        class Readiness:
+            """Finalization fixture only; process identity has separate controls."""
+            def __init__(self,*args,**kwargs):pass
+            def poll(self):return True
+            def fail(self,error):pass
         created = Process(); execution = {}
         local = ROOT / '.local-runs'; local.mkdir(exist_ok=True)
         with tempfile.TemporaryDirectory(prefix='host-finalize-', dir=local) as directory:
@@ -81,6 +87,7 @@ class CanonicalHostControls(unittest.TestCase):
                 patch.object(host, 'qemu_command', return_value=['SYNTHETIC NO PROCESS']), \
                 patch.object(host.subprocess, 'Popen', return_value=created), \
                 patch.object(host, 'BoundedCapture', Capture), patch.object(host, 'CanonicalChannel', Channel), \
+                patch.object(host, 'ProcessReadiness', Readiness), \
                 patch.object(host.stat, 'S_ISSOCK', return_value=True), \
                 patch.object(host, 'snapshot_before_cutoff', side_effect=lambda *args: {'monotonic_ns': time.monotonic_ns()}), \
                 patch.object(host, 'fsync_directory'), patch.object(host, 'stop_vm', return_value=stopped), \
@@ -105,6 +112,65 @@ class CanonicalHostControls(unittest.TestCase):
             with self.subTest(start=start, seconds=seconds, setup=setup):
                 with self.assertRaises(ValueError): host.finite_lifetime(start, seconds, setup)
         self.assertEqual((old.VM_SECONDS, old.OWNER_SECONDS), (18000, 19500))
+
+    def test_socket_does_not_connect_or_start_a_channel_before_same_child_readiness(self):
+        """Synthetic host loop only; all processes, resources and UID facts are literal."""
+        for reaches_ready in (False,True):
+            with self.subTest(reaches_ready=reaches_ready):
+                state={'polls':0,'connections':0,'starts':0}
+                process=SimpleNamespace(pid=12345,returncode=0,stdout=io.BytesIO(),stderr=io.BytesIO(),
+                    poll=lambda:None,wait=lambda timeout:0)
+                class Capture:
+                    eof=True;exceeded=False
+                    def __init__(self,source,path,limit):self.path=path;path.write_bytes(b'')
+                    def drain(self):pass
+                    def close(self):pass
+                    def record(self):return {'synthetic':True,'file':self.path.name}
+                class Readiness:
+                    def __init__(self,*args,**kwargs):state['identity']=self
+                    def poll(self):state['polls']+=1;return reaches_ready and state['polls']==2
+                    def fail(self,error):pass
+                class Channel:
+                    receiver_process=exchange_record=None
+                    def __init__(self,*args,**kwargs):
+                        self_identity=kwargs['identity']
+                        if state['polls']!=2 or self_identity is not state['identity']:
+                            raise AssertionError('channel connected before original child readiness')
+                        state['connections']+=1
+                        self.done=SimpleNamespace(is_set=lambda:False)
+                        self.thread=SimpleNamespace(start=lambda:state.update(starts=state['starts']+1),is_alive=lambda:False)
+                        self.report={'status':'SYNTHETIC ONLY'}
+                    def close(self):pass
+                def sleep(seconds):
+                    if state['polls']==1:
+                        self.assertEqual((state['connections'],state['starts']),(0,0))
+                        if reaches_ready:return
+                    raise RuntimeError('synthetic host loop stop')
+                local=ROOT/'.local-runs';local.mkdir(exist_ok=True)
+                with tempfile.TemporaryDirectory(prefix='host-readiness-',dir=local) as directory,ExitStack() as stack:
+                    out=Path(directory);(out/'artifact').mkdir();(out/'runtime').mkdir()
+                    for name in ('seed.iso','disk.qcow2','work.raw','image','runtime/capture.sock'):
+                        (out/name).write_bytes(b'SYNTHETIC ONLY')
+                    stopped={'errors':[],'cleanup':{'status':'PASS','synthetic_only':True},'receiver_exit_observed_before_stop':None}
+                    stack.enter_context(patch.dict(sys.modules,{'pwd':SimpleNamespace(getpwnam=lambda name:SimpleNamespace(pw_uid=1001))}))
+                    stack.enter_context(patch.dict(os.environ,{'GITHUB_REPOSITORY':'C-X1an/rillscope','GITHUB_RUN_ID':'123','GITHUB_RUN_ATTEMPT':'1'}))
+                    stack.enter_context(patch.object(host.platform,'system',return_value='Linux'))
+                    stack.enter_context(patch.object(host.os,'geteuid',return_value=0,create=True))
+                    stack.enter_context(patch.object(archive_capture,'owned',side_effect=lambda path:Path(path)))
+                    patches=[(host,'source_check',{}),(host,'sha',{'return_value':host.IMAGE_SHA}),
+                        (host.shutil,'which',{'return_value':'SYNTHETIC'}),(host,'qemu_command',{'return_value':['SYNTHETIC NO PROCESS']}),
+                        (host.subprocess,'Popen',{'return_value':process}),(host,'BoundedCapture',{'new':Capture}),
+                        (host,'CanonicalChannel',{'new':Channel}),(host,'ProcessReadiness',{'new':Readiness}),
+                        (host.stat,'S_ISSOCK',{'return_value':True}),
+                        (host,'snapshot_before_cutoff',{'side_effect':lambda *args:{'monotonic_ns':time.monotonic_ns()}}),
+                        (host,'fsync_directory',{}),(host,'stop_vm',{'return_value':stopped}),(host.time,'sleep',{'side_effect':sleep})]
+                    for target,name,kwargs in patches:stack.enter_context(patch.object(target,name,**kwargs))
+                    result=host.run_vm(out,image=out/'image',run_as='runner',port=12345,commit='a'*40,
+                        source_sha256='b'*64,vm_seconds=100,setup_seconds=10,ownership=None,execution={})
+                    self.assertEqual(result['status'],'FAIL')
+                    self.assertEqual(result['failure']['reason'],'synthetic host loop stop')
+                    self.assertEqual(state['polls'],2 if reaches_ready else 1)
+                    self.assertEqual((state['connections'],state['starts']),(1,1) if reaches_ready else (0,0))
 
     def test_qemu_template_retains_kvm_resources_and_exact_inner_capture_port(self):
         command = host.qemu_command(Path('/owned'), Path('/image'), 'runner', 12345)

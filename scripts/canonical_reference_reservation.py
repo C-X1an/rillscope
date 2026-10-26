@@ -184,7 +184,7 @@ def observed_membership(sample, pid):
 
 
 def create_grant(process, command, uid, port, request_raw, *, commit, source_sha256,
-        vm_started_ns, vm_deadline_ns, allocation_id, exchange_deadline_ns=None, cancelled=None):
+        vm_started_ns, vm_deadline_ns, allocation_id, exchange_deadline_ns=None, cancelled=None, identity=None):
     """Reserve the actual owned guest once; return only the original prior grant.
 
     The outer canonical owner must launch no competing guest workload, retain
@@ -200,7 +200,13 @@ def create_grant(process, command, uid, port, request_raw, *, commit, source_sha
         'original exchange deadline must spend the existing VM lease')
     budget = AllocationDeadline(exchange_deadline_ns, cancelled)
     source_check(commit, source_sha256, budget=budget)
-    qemu = live_child(process, command, uid, budget=budget)
+    def inspect(stage):
+        if identity is None:return live_child(process, command, uid, budget=budget)
+        from canonical_reference_process import ProcessReadiness
+        protocol.require(type(identity) is ProcessReadiness, 'original in-process readiness identity required')
+        identity.bind(process, command, uid, commit, source_sha256, vm_started_ns, vm_deadline_ns)
+        return identity.verify(stage, budget=budget)
+    qemu = inspect('grant-before')
     now = time.monotonic_ns()
     protocol.require(all(protocol.integer(value) for value in (vm_started_ns, vm_deadline_ns))
         and vm_started_ns <= now < vm_deadline_ns
@@ -270,7 +276,7 @@ def create_grant(process, command, uid, port, request_raw, *, commit, source_sha
             'reserved_monotonic_ns': reserved, 'commit': commit, 'source_sha256': source_sha256,
             'boot_id': request['boot_id'], 'nonce': request['nonce'],
             'dedication': protocol.DEDICATION, 'physical_scope': protocol.PHYSICAL_SCOPE}
-        protocol.require(live_child(process, command, uid, budget=budget) == qemu, 'actual QEMU identity changed before grant')
+        protocol.require(inspect('grant-after') == qemu, 'actual QEMU identity changed before grant')
         source_check(commit, source_sha256, budget=budget)
         budget.check()
         grant = protocol.GrantSession(commit=commit, source_sha256=source_sha256).grant(request,

@@ -20,6 +20,7 @@ import archive_capture
 import canonical_reference_allocation as allocation
 import canonical_reference_reservation as reservation
 from canonical_reference_deadline import AllocationDeadline
+from canonical_reference_process import ProcessReadiness
 from kvm_pilot_common import write_json
 from inspect_reference_guest import BoundedCapture
 from reference_allocation import read_bounded, decode_document, DOCUMENT_LIMIT
@@ -73,7 +74,7 @@ def exchange(connection, *, commit, source_sha256, deadline_ns, allocate, trace,
 
 class CanonicalChannel:
     def __init__(self, path, out, *, process, command, uid, qmp_port, commit, source_sha256,
-            vm_started_ns, vm_deadline_ns, allocation_id):
+            vm_started_ns, vm_deadline_ns, allocation_id, identity=None):
         allocation.require(platform.system() == 'Linux' and hasattr(os, 'geteuid') and os.geteuid() == 0,
             'actual existing Linux root QEMU controller required')
         allocation.require(all(allocation.integer(value) for value in (vm_started_ns, vm_deadline_ns))
@@ -85,7 +86,10 @@ class CanonicalChannel:
         allocation.require(not self.out.exists(), 'new controller channel retention directory required')
         reservation.durable_mkdir(self.out, mode=0o700)
         reservation.source_check(commit, source_sha256)
-        reservation.live_child(process, command, uid)
+        allocation.require(type(identity) is ProcessReadiness, 'original process readiness object required before channel admission')
+        identity.bind(process, command, uid, commit, source_sha256, vm_started_ns, vm_deadline_ns)
+        identity.verify('channel')
+        self.identity = identity
         self.process, self.command, self.uid, self.qmp_port = process, command, uid, qmp_port
         self.commit, self.source_sha256 = commit, source_sha256
         self.started_ns, self.deadline_ns, self.allocation_id = vm_started_ns, vm_deadline_ns, allocation_id
@@ -126,7 +130,7 @@ class CanonicalChannel:
                 return reservation.create_grant(self.process, self.command, self.uid, self.qmp_port,
                     raw, commit=self.commit, source_sha256=self.source_sha256,
                     vm_started_ns=self.started_ns, vm_deadline_ns=self.deadline_ns, allocation_id=self.allocation_id,
-                    exchange_deadline_ns=exchange_deadline_ns, cancelled=cancelled)
+                    exchange_deadline_ns=exchange_deadline_ns, cancelled=cancelled, identity=self.identity)
             with (self.out / 'request-wire.raw').open('xb') as trace:
                 try:
                     self.exchange_record = exchange(self.connection, commit=self.commit,

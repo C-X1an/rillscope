@@ -1006,5 +1006,9 @@
   "ri-visual-unfilled": {
     "path": "verification/product/runs/ri-visual-unfilled.json",
     "sha256": "df3ddeebaaab55167c3a3d0117424c2daf25e974e7570e11b16c95f87d7013a2"
+  },
+  "process-readiness-wording": {
+    "path": "verification/product/runs/process-readiness-wording.json",
+    "sha256": "420f5e6bcc7b106c85fca4087dec7235d157f299cc44a9bb363d8c9cca2d656f"
   }
 }

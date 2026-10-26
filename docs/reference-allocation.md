@@ -63,3 +63,28 @@ missing binding fields cannot use that legacy path.
 
 Synthetic unit documents test rejection and binding logic only. They are not
 allocation evidence and must never be used for an actual benchmark claim.
+
+The canonical VM controller treats a capture socket as a startup signal. Before
+connecting the allocation channel, it repeatedly observes the original owned
+QEMU child under the original absolute setup cutoff. An otherwise matching
+child with all four Linux UIDs still zero may continue startup; it receives no
+channel or allocation grant. The final observation must match the selected
+nonroot UID in all four fields. Mixed or foreign UIDs, another parent, changed
+PID/start time, command, executable path or executable digest, and an exited
+child fail closed. The channel and both grant boundaries repeat these strict
+checks against the same in-process identity pin. Setup, VM and allocation
+exchange deadlines remain the original deadlines, including after diagnostic
+retention; no inspection or retry renews them.
+
+Private `artifact/process-identity/` records retain the first pending startup
+observation, final readiness, channel/grant boundary observations and terminal
+failure when reached. At most six files of 512 KiB each are emitted. Each binds
+the exact source, original cutoffs, observed clocks, expected/actual identity,
+distinct mismatch fields and lossless bounded procfs bytes with hashes. A read
+failure, cutoff or cancellation preserves the bytes already observed, including
+an incomplete or over-limit prefix. Intermediate readiness probes are counted,
+but these records are not a complete startup trace. Diagnostic cleanup may
+retain a failure after the setup cutoff; it cannot admit a channel or grant.
+The records never establish resource dedication or reference qualification.
+Portable synthetic controls test these rejection and retention paths; actual
+Linux process identity, guest boot and the native campaign require execution.

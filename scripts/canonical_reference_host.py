@@ -18,6 +18,7 @@ import time
 
 import canonical_reference_allocation as allocation
 from canonical_reference_channel import CanonicalChannel
+from canonical_reference_process import ProcessReadiness
 from canonical_reference_deadline import AllocationDeadline
 from canonical_reference_events import parse, bind
 from canonical_reference_reservation import (source_check, validate_qmp_binding,
@@ -96,7 +97,7 @@ def run_vm(out, *, image, run_as, port, commit, source_sha256, vm_seconds, setup
         'deadline_monotonic_ns': deadline_ns, 'setup_seconds': setup_seconds,
         'whole_job_fit': 'NOT ESTABLISHED BY THIS COMPONENT', 'reference_qualified': False})
     fsync_directory(artifact)
-    process = channel = None; captures = []; failure = None; events = []
+    process = channel = readiness = None; captures = []; failure = None; events = []
     observed_exit = observed_exit_ns = None
     prefix_at = ready_at = end_at = None; final_observed = False; link_ack = None
     count = 0; last_required = None
@@ -141,6 +142,10 @@ def run_vm(out, *, image, run_as, port, commit, source_sha256, vm_seconds, setup
             'started_monotonic_ns': started_ns, 'deadline_monotonic_ns': deadline_ns})
         captures = [BoundedCapture(process.stdout, artifact / 'serial.txt', SERIAL_LIMIT),
             BoundedCapture(process.stderr, artifact / 'qemu.stderr', 256 * 1024)]
+        readiness = ProcessReadiness(process, command, account.pw_uid,
+            out=artifact / 'process-identity', commit=commit, source_sha256=source_sha256,
+            started_ns=started_ns, setup_deadline_ns=min(deadline_ns, started_ns + setup_seconds * 10**9),
+            vm_deadline_ns=deadline_ns)
         while process.poll() is None:
             allocation.require(time.monotonic_ns() < deadline_ns, 'original canonical VM lease exhausted')
             for capture in captures: capture.drain()
@@ -148,11 +153,13 @@ def run_vm(out, *, image, run_as, port, commit, source_sha256, vm_seconds, setup
             if channel is None and path.exists():
                 allocation.require(stat.S_ISSOCK(path.lstat().st_mode), 'actual owned QEMU capture socket required')
                 os.chmod(path, 0o600)
-                channel = CanonicalChannel(path, artifact / 'channel', process=process, command=command,
-                    uid=account.pw_uid, qmp_port=port, commit=commit, source_sha256=source_sha256,
-                    vm_started_ns=started_ns, vm_deadline_ns=deadline_ns, allocation_id=secrets.token_hex(16))
-                if execution is not None: execution['channel'] = channel
-                channel.thread.start()
+                if readiness.poll():
+                    channel = CanonicalChannel(path, artifact / 'channel', process=process, command=command,
+                        uid=account.pw_uid, qmp_port=port, commit=commit, source_sha256=source_sha256,
+                        vm_started_ns=started_ns, vm_deadline_ns=deadline_ns, allocation_id=secrets.token_hex(16),
+                        identity=readiness)
+                    if execution is not None: execution['channel'] = channel
+                    channel.thread.start()
             if channel is not None and channel.done.is_set():
                 allocation.require(channel.report['status'] == 'VERIFIED HOST BYTES', 'actual canonical channel failed')
             serial = bounded_bytes(artifact / 'serial.txt', SERIAL_LIMIT).decode('utf-8', errors='replace')
@@ -198,6 +205,10 @@ def run_vm(out, *, image, run_as, port, commit, source_sha256, vm_seconds, setup
         allocation.require(observed_exit_ns < deadline_ns, 'original canonical VM cutoff exhausted before terminal observation')
     except (Exception, KeyboardInterrupt) as error:
         failure = {'error': type(error).__name__, 'reason': str(error)[:2048]}
+        if readiness is not None:
+            try: readiness.fail(error)
+            except Exception as retention_error:
+                failure['identity_retention_error'] = type(retention_error).__name__
     finally:
         # Join the allocator before the subreaper cleanup endpoint. Its exact
         # exchange deadline and stop flag also constrain inspections and writes.
