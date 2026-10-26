@@ -69,6 +69,17 @@ def run_git_control(name, command):
     return result
 
 
+def fixture_git_command(command):
+    """Scope tiny synthetic Git to explicit config without changing host files."""
+    return ['/usr/bin/env', '-i', 'PATH=/usr/bin:/bin', 'LC_ALL=C',
+        'GIT_CONFIG_NOSYSTEM=1', 'GIT_CONFIG_SYSTEM=/dev/null',
+        'GIT_CONFIG_GLOBAL=/dev/null', *command]
+
+
+def run_fixture_git_control(name, command):
+    return run_git_control(name, fixture_git_command(command))
+
+
 def git_clone_control():
     """Real root-owned source -> exact UID65534 prefix -> fresh no-local clone."""
     with tempfile.TemporaryDirectory(prefix='rill-git-permission-') as directory:
@@ -77,7 +88,7 @@ def git_clone_control():
         consumer = workspace / 'consumer'; consumer.mkdir(mode=0o700); os.chown(consumer, UID, GID)
         literal = b'SYNTHETIC GIT OWNERSHIP CONTROL ONLY\n'
         def checked(name, command):
-            result = run_git_control(name, command)
+            result = run_fixture_git_control(name, command)
             require(result.returncode == 0, 'tiny Git fixture command failed: ' + name)
             return result
         def repository(path, name):
@@ -91,6 +102,7 @@ def git_clone_control():
                 '-c', 'commit.gpgsign=false', '-c', 'core.hooksPath=' + str(template),
                 'commit', '--quiet', '-m', 'Synthetic permission fixture'])
             return checked(name + '-head', ['/usr/bin/git', '-C', str(path), 'rev-parse', 'HEAD']).stdout.strip()
+        version = checked('fixture-git-version', ['/usr/bin/git', '--version'])
         source, unrelated = workspace / 'source', workspace / 'unrelated'
         previous = os.umask(0o022)
         try:
@@ -113,13 +125,18 @@ def git_clone_control():
         before = {'source': snapshot(source), 'unrelated': snapshot(unrelated)}
         print(json.dumps({'canonical_git_original_fixtures': before}), flush=True)
         prefix = lambda command: actual_nonroot_fixture_prefix(source, consumer / 'home', command)
+        config = checked('effective-two-entry-trust', prefix(['/usr/bin/git', 'config', '--null',
+            '--show-origin', '--show-scope', '--get-all', 'safe.directory']))
+        expected_config = b''.join(b'command\0command line:\0' + str(path).encode() + b'\0'
+            for path in (source, source / '.git'))
+        require(config.stdout == expected_config, 'tiny Git effective trust must have exactly two command entries')
         old = prefix(['/usr/bin/git', 'clone', '--no-local', '--config', 'core.autocrlf=false',
             str(source), str(consumer / 'old-clone')])
         require(old.count('GIT_CONFIG_COUNT=2') == 1 and old.count('GIT_CONFIG_KEY_1=safe.directory') == 1
             and old.count('GIT_CONFIG_VALUE_1=' + str(source / '.git')) == 1, 'actual exact two-entry prefix required')
         old = [value.replace('GIT_CONFIG_COUNT=2', 'GIT_CONFIG_COUNT=1') for value in old
             if value not in {'GIT_CONFIG_KEY_1=safe.directory', 'GIT_CONFIG_VALUE_1=' + str(source / '.git')}]
-        denied = run_git_control('original-one-entry-clone', old)
+        denied = run_fixture_git_control('original-one-entry-clone', old)
         require(denied.returncode == 128 and b'dubious ownership' in denied.stderr
             and str(source / '.git').encode() in denied.stderr, 'original clone ownership defect was not reproduced')
         clone = consumer / 'fresh'; require(not clone.exists(), 'new tiny checkout required')
@@ -128,13 +145,16 @@ def git_clone_control():
         head = checked('fresh-head', prefix(['/usr/bin/git', '-C', str(clone), 'rev-parse', 'HEAD'])).stdout.strip()
         require(head == expected_head and (clone / 'literal.txt').read_bytes() == literal
             and clone.stat().st_uid == UID and clone.stat().st_gid == GID, 'tiny fresh clone identity/owner/bytes differ')
-        foreign = run_git_control('unrelated-root-owned-repository', prefix(['/usr/bin/git', '-C', str(unrelated), 'rev-parse', 'HEAD']))
+        foreign = run_fixture_git_control('unrelated-root-owned-repository', prefix(['/usr/bin/git', '-C', str(unrelated), 'rev-parse', 'HEAD']))
         require(foreign.returncode == 128 and b'dubious ownership' in foreign.stderr
             and str(unrelated).encode() in foreign.stderr, 'unrelated root-owned repository was unexpectedly trusted')
         require(before == {'source': snapshot(source), 'unrelated': snapshot(unrelated)},
             'original Git source ownership/mode/bytes changed')
         return {'status': 'PASS', 'consumer_uid': UID, 'consumer_gid': GID, 'original_one_entry_exit': denied.returncode,
             'two_entry_clone_exit': accepted.returncode, 'unrelated_repository_exit': foreign.returncode,
+            'git_version': version.stdout.decode('ascii').strip(),
+            'effective_trust': config.stdout.decode('utf-8').split('\0')[:-1],
+            'configuration_scope': 'Closed fixture child environment; system/global Git files are neither read nor modified',
             'source_and_unrelated_ownership_modes_bytes_unchanged': True, 'fresh_commit': head.decode('ascii'),
             'literal_sha256': hashlib.sha256(literal).hexdigest(), 'original_fixtures': before,
             'scope': 'Actual Linux Git on tiny synthetic root-owned fixtures only; no first-party build, guest/VM, allocation or reference qualification'}
