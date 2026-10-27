@@ -21,10 +21,40 @@ from . import test_canonical_reference_guest_setup as setup_fixtures
 from .test_canonical_git_permissions import actual_nonroot_fixture_prefix
 from .test_canonical_git_guest import literal_guest_proof
 from .test_canonical_git_trust import literal_setup_trust
+from . import test_canonical_reference_native_apt as apt_fixtures
 
 
 def raw(row): return (json.dumps(row, sort_keys=True, separators=(',', ':')) + '\n').encode()
 def digest(value): return hashlib.sha256(value).hexdigest()
+
+
+def literal_apt_acquisition(folder, setup, seed, seed_raw, source):
+    """Literal tiny metadata only. No APT process or file role is exercised."""
+    policy, _ = apt_fixtures.fixture()
+    observation = {'nodes': policy['nodes'], 'ancestors': policy['ancestors']}
+    setup['apt_acquisition'] = {'policy': policy, 'checks': [{'stage': name,
+        'before': copy.deepcopy(observation), 'after': copy.deepcopy(observation)} for name in ('apt-update', 'apt-install')]}
+    inputs = [{'path': '/work/c/.local-runs/canonical-seed/seed.json', 'bytes': len(seed_raw), 'sha256': digest(seed_raw)},
+        {'path': apt_fixtures.DIR + '/native.sources', 'bytes': len(apt_fixtures.SOURCE), 'sha256': digest(apt_fixtures.SOURCE)},
+        {'path': apt_fixtures.KEY, 'bytes': len(apt_fixtures.PUBLIC_KEY_FIXTURE), 'sha256': digest(apt_fixtures.PUBLIC_KEY_FIXTURE)}]
+    prefix = ['/usr/bin/apt-get', '-o', 'Dir::Etc::sourcelist=' + apt_fixtures.DIR + '/native.sources',
+        '-o', 'Dir::Etc::sourceparts=' + apt_fixtures.DIR + '/empty-sources.d', '-o', 'Acquire::Languages=none',
+        '-o', 'Acquire::AllowInsecureRepositories=false', '-o', 'Acquire::AllowWeakRepositories=false',
+        '-o', 'Acquire::AllowDowngradeToInsecureRepositories=false', '-o', 'Acquire::Check-Valid-Until=true',
+        '-o', 'APT::Get::AllowUnauthenticated=false']
+    for index, (name, suffix) in enumerate([('apt-update', ['--error-on=any', 'update']),
+            ('apt-install', ['install', '--yes', '--no-install-recommends', *apt_fixtures.PACKAGES])]):
+        directory = folder / 'commands' / name; directory.mkdir(parents=True)
+        value = b'SYNTHETIC successful command output; no command executed\n'
+        proof = {'schema_version': 1, 'command': prefix + suffix, 'cwd': '/work/c', 'source_before': source,
+            'source_after_sha256': source['sha256'], 'verification_status': 'PASS', 'execution_outcome': 'EXECUTED', 'exit_code': 0,
+            'process_cleanup': {'status': 'PASS', 'remaining_active_processes': 0}, 'environment': {'system': 'Linux'},
+            'git': {'commit': seed['commit'], 'dirty': False},
+            'started_utc': '2026-10-24T23:59:5' + str(4 + index * 2) + '+00:00',
+            'finished_utc': '2026-10-24T23:59:5' + str(5 + index * 2) + '+00:00', 'elapsed_seconds': 1,
+            'stdout': {'file': 'stdout.txt', 'sha256': digest(value)}, 'stderr': {'file': 'stderr.txt', 'sha256': digest(b'')},
+            'inputs_before': inputs, 'inputs_after': inputs, 'stdin': None, 'fixture': 'No command executed'}
+        (directory / 'receipt.json').write_bytes(raw(proof)); (directory / 'stdout.txt').write_bytes(value); (directory / 'stderr.txt').write_bytes(b'')
 
 
 def fixture(root, *, canonical_path=False):
@@ -117,6 +147,7 @@ def prerequisite_fixture(root):
             'inputs_before': inputs, 'inputs_after': inputs, 'stdin': None, 'fixture': 'No command executed'}
         (directory / 'receipt.json').write_bytes(raw(proof)); (directory / 'stdout.txt').write_bytes(value); (directory / 'stderr.txt').write_bytes(b'')
     literal_guest_proof(artifact / 'recovery/setup/commands/guest-git-ownership', seed, seed_raw, source, setup)
+    literal_apt_acquisition(artifact / 'recovery/setup', setup, seed, seed_raw, source)
     (artifact / 'recovery/setup/setup-result.json').write_bytes(raw(setup))
     owner = {**common, 'schema_version': 1, 'status': 'PASS', 'boot_id': footer['boot_id'], 'retention': 'RETAINED',
         'cleanup': complete, 'started_monotonic_ns': 120 * second, 'canonical_started_monotonic_ns': 121 * second,
@@ -224,8 +255,13 @@ class RecoveredRecordControls(unittest.TestCase):
             root = Path(directory).resolve()
             if sys.platform == 'win32': root = Path('\\\\?\\' + str(root))
             attempt, artifact, terminal, source = prerequisite_fixture(root)
-            for path in (artifact / 'recovery/setup/commands').glob('*/receipt.json'):
-                if path.parent.name == 'guest-git-ownership': continue
+            paths = {path.parent.name: path for path in (artifact / 'recovery/setup/commands').glob('*/receipt.json')}
+            versions = {'rustup-version', 'rustc-version', 'cargo-version', 'audit-version', 'deny-version'}
+            self.assertEqual(set(paths), versions | {'guest-git-ownership', 'apt-update', 'apt-install'})
+            # This synthetic transformer changes only the five original
+            # nonroot version commands. Root APT has separate exact bindings.
+            for name in sorted(versions):
+                path = paths[name]
                 row = json.loads(path.read_bytes()); row['command'] = transform(row['command']); path.write_bytes(raw(row))
             reindex(artifact, terminal['collector']['recovery'])
             with patch.object(archive_capture, 'ROOT', root):
@@ -344,6 +380,32 @@ class RecoveredRecordControls(unittest.TestCase):
                 root = Path(name).resolve(); attempt, artifact, terminal, source = prerequisite_fixture(root)
                 path = artifact / 'recovery/setup/commands/rustup-version/receipt.json'
                 row = json.loads(path.read_bytes()); mutate(row); path.write_bytes(raw(row)); reindex(artifact, terminal['collector']['recovery'])
+                with patch.object(archive_capture, 'ROOT', root), self.assertRaises(ValueError):
+                    records.validate_prerequisites(attempt, terminal, source=source, deadline=time.monotonic() + 30)
+
+    def test_native_apt_original_arguments_inputs_roles_and_intervals_are_required(self):
+        for kind in ('missing-stage', 'writable-after', 'broad-sources', 'allow-unauthenticated',
+                'unchecked-update', 'coherent-wrong-input', 'ancient-clock', 'over-budget'):
+            with self.subTest(kind=kind), tempfile.TemporaryDirectory(prefix='rill-apt-record-unit-') as name:
+                root = Path(name).resolve(); attempt, artifact, terminal, source = prerequisite_fixture(root)
+                path = artifact / 'recovery/setup/setup-result.json'
+                if kind in ('missing-stage', 'writable-after'):
+                    value = json.loads(path.read_bytes())
+                    if kind == 'missing-stage': value['apt_acquisition']['checks'].pop()
+                    else: value['apt_acquisition']['checks'][1]['after']['nodes'][1]['mode'] = 0o666
+                else:
+                    path = artifact / 'recovery/setup/commands/apt-update/receipt.json'
+                    value = json.loads(path.read_bytes())
+                    if kind == 'broad-sources':
+                        value['command'] = ['Dir::Etc::sourceparts=/etc/apt/sources.list.d' if arg.startswith('Dir::Etc::sourceparts=') else arg for arg in value['command']]
+                    elif kind == 'allow-unauthenticated': value['command'].insert(1, '--allow-unauthenticated')
+                    elif kind == 'unchecked-update': value['command'].remove('--error-on=any')
+                    elif kind == 'coherent-wrong-input':
+                        for field in ('inputs_before', 'inputs_after'): value[field][1]['sha256'] = 'f' * 64
+                    elif kind == 'ancient-clock':
+                        value.update(started_utc='2000-01-01T00:00:00+00:00', finished_utc='2000-01-01T00:00:01+00:00')
+                    else: value.update(elapsed_seconds=301)
+                path.write_bytes(raw(value)); reindex(artifact, terminal['collector']['recovery'])
                 with patch.object(archive_capture, 'ROOT', root), self.assertRaises(ValueError):
                     records.validate_prerequisites(attempt, terminal, source=source, deadline=time.monotonic() + 30)
 

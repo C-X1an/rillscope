@@ -24,6 +24,7 @@ from inspect_reference_guest import SERIAL_LIMIT
 from kvm_reference_common import strict_json
 from canonical_reference_git_control import validate_guest_git_proof
 import canonical_reference_git_trust as git_trust
+import canonical_reference_native_apt as native_apt
 
 MAX_FILES = 20000
 MAX_DEPTH = 32
@@ -230,6 +231,30 @@ def native_versions(recovered, seed, seed_raw, source, trust_input):
     return check_rust_versions(*outputs), proofs
 
 
+def native_acquisition(recovered, setup, seed, seed_raw, source, *, before_utc):
+    policy = native_apt.validate_acquisition(setup.get('apt_acquisition'))
+    _, sources, _ = native_apt.locations('/work/c')
+    inputs = [{'path': '/work/c/.local-runs/canonical-seed/seed.json', 'bytes': len(seed_raw),
+        'sha256': hashlib.sha256(seed_raw).hexdigest()},
+        {'path': str(sources), 'bytes': policy['source_bytes'], 'sha256': policy['source_sha256']},
+        {'path': native_apt.KEYRING, 'bytes': policy['keyring_bytes'], 'sha256': policy['keyring_sha256']}]
+    metadata = SetupCommands(recovered); proofs = []; previous = None
+    commands = native_apt.commands('/work/c', native_apt.PACKAGES)
+    for name, command, bound in zip(('apt-update', 'apt-install'), commands, (300, 600)):
+        proof = receipt(metadata, PurePosixPath('original-setup/commands') / name,
+            source=source, commit=seed['commit'], command=command, cwd=PurePosixPath('/work/c'))
+        start, end = instant(proof['started_utc']), instant(proof['finished_utc'])
+        require(proof['inputs_before'] == proof['inputs_after'] == inputs
+            and (previous is None or previous <= start) and end <= instant(before_utc)
+            and proof['elapsed_seconds'] <= min(bound, seed['setup_seconds'])
+            and proof['elapsed_seconds'] <= (end - start).total_seconds() + .010,
+            'original authenticated native APT command/input/clock binding differs')
+        previous = end; proofs.append(proof)
+    require(sum(row['elapsed_seconds'] for row in proofs) <= setup['elapsed_seconds'] + .010,
+        'native APT command durations cannot fit original setup interval')
+    return proofs
+
+
 def cleanup(row):
     require(type(row) is dict and row.get('status') == 'PASS'
         and type(row.get('remaining_active_processes')) is int and row['remaining_active_processes'] == 0,
@@ -324,6 +349,11 @@ def validate_prerequisites(attempt, terminal, *, source, deadline):
     require(elapsed_total + git_proof['elapsed_seconds'] <= setup['elapsed_seconds'] + .010
         and (previous_end - instant(git_proof['started_utc'])).total_seconds() <= setup['elapsed_seconds'] + .010,
         'original guest Git and native version intervals cannot fit actual setup duration')
+    apt_proofs = native_acquisition(recovered, setup, seed, seed_raw, source, before_utc=git_proof['started_utc'])
+    require(elapsed_total + git_proof['elapsed_seconds'] + sum(row['elapsed_seconds'] for row in apt_proofs)
+        <= setup['elapsed_seconds'] + .010
+        and (previous_end - instant(apt_proofs[0]['started_utc'])).total_seconds() <= setup['elapsed_seconds'] + .010,
+        'original APT/Git/native version intervals cannot fit actual setup duration')
     start = recovered.tree_document('start', 'start-result.json'); owner = recovered.tree_document('owner', 'owner-result.json')
     require(start.get('method') == protocol.METHOD and start.get('mode') == 'canonical' and start.get('status') == 'PASS'
         and start.get('commit') == commit and start.get('source_sha256') == source['sha256']
@@ -352,4 +382,4 @@ def validate_prerequisites(attempt, terminal, *, source, deadline):
     return {'status': 'CHECKED ORIGINAL RECOVERY AND NATIVE PREREQUISITES', 'outer': outer, 'recovered': recovered,
         'seed': seed, 'seed_raw': seed_raw, 'prepared': prepared, 'vm': vm, 'process': process,
         'footer': footer, 'serial': serial, 'setup': setup, 'start': start, 'owner': owner,
-        'version_proofs': version_proofs, 'reference_qualified': False}
+        'version_proofs': version_proofs, 'apt_proofs': apt_proofs, 'reference_qualified': False}

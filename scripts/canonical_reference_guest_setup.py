@@ -24,6 +24,7 @@ import reference_allocation as original
 import canonical_reference_git_trust as git_trust
 import base64
 from canonical_reference_git_control import guest_output
+import canonical_reference_native_apt as native_apt
 
 BASE = ROOT / '.local-runs/canonical-setup'
 TOOL_TARGET = HOME / '.native-tool-build'
@@ -116,11 +117,27 @@ def setup(seed):
         remaining = (deadline - time.monotonic_ns()) / 10**9
         allocation.require(remaining > 0, 'original native guest setup deadline exhausted')
         inputs = (ROOT / INPUT_RELATIVE,)
+        if name in ('apt-update', 'apt-install'):
+            _, sources, _ = native_apt.locations(ROOT)
+            inputs += (Path(str(sources)), Path(native_apt.KEYRING))
         if 'git_trust_before' in record: inputs += (Path(git_trust.trust_path(ROOT)),)
         return direct(name, command, timeout=min(timeout, remaining), inputs=inputs)
     try:
-        checked('apt-update', ['/usr/bin/apt-get', 'update'], 300)
-        checked('apt-install', ['/usr/bin/apt-get', 'install', '--yes', '--no-install-recommends', *PACKAGES], 600)
+        policy = native_apt.publish(ROOT)
+        record['apt_acquisition'] = {'policy': policy, 'checks': []}
+        write_json(BASE / 'setup-result.json', record)
+        update, install = native_apt.commands(ROOT, PACKAGES)
+        before = native_apt.observe(policy)
+        checked('apt-update', update, 300)
+        after = native_apt.observe(policy)
+        record['apt_acquisition']['checks'].append({'stage': 'apt-update', 'before': before, 'after': after})
+        write_json(BASE / 'setup-result.json', record)
+        before = native_apt.observe(policy)
+        checked('apt-install', install, 600)
+        after = native_apt.observe(policy)
+        record['apt_acquisition']['checks'].append({'stage': 'apt-install', 'before': before, 'after': after})
+        write_json(BASE / 'setup-result.json', record)
+        native_apt.validate_acquisition(record['apt_acquisition'], root=str(ROOT))
         checked('stop-package-services', ['/usr/bin/systemctl', 'stop', 'apt-daily.timer',
             'apt-daily-upgrade.timer', 'apt-daily.service', 'apt-daily-upgrade.service',
             'unattended-upgrades.service'], 30)
