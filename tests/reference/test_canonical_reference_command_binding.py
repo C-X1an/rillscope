@@ -14,6 +14,7 @@ sys.path[:0] = [str(ROOT / 'scripts'), str(ROOT / 'benchmarks')]
 import archive_capture
 import verify_canonical_reference as verifier
 from . import test_canonical_reference_retained_fresh as fixtures
+from .test_canonical_reference_config_handoff import access_fixture
 
 
 def raw(value): return json.dumps(value, sort_keys=True, separators=(',', ':')).encode()
@@ -40,8 +41,10 @@ def command_fixture():
         'native_retention': {'started_monotonic_ns': 161 * second, 'finished_monotonic_ns': 164 * second, 'cutoff_monotonic_ns': 341 * second}}
     inputs = [{'path': '/work/c/.local-runs/' + folder + name, 'bytes': 2, 'sha256': sha(b'{}')}
         for folder, name in [('canonical-allocation/', 'reference-host-receipt.json'),
-            ('canonical-attempt/', 'measurement-config.json'), ('canonical-attempt/', 'export-config.json')]]
+            ('canonical-config/', 'measurement-config.json'), ('canonical-config/', 'export-config.json')]]
     prefix = ['/usr/bin/setpriv', '--reuid=65534', '--regid=65534', '--clear-groups', '--', '/usr/bin/env']
+    access = access_fixture({'measurement-config.json': b'{}', 'export-config.json': b'{}'})
+    probe_command = prefix + verifier.config_handoff.command(access['publication']['files'], root=verifier.PurePosixPath('/work/c'))
     commands = [('canonical', prefix + ['/usr/bin/python3', '/work/c/scripts/clean_verify.py', '--budget-seconds', '60'], 0, 60),
         ('retain-native-binaries', ['/usr/bin/python3', '/work/c/scripts/canonical_reference_binaries.py', '--out',
             '/work/c/.local-runs/canonical-attempt/native-binaries', '--commit', commit, '--source-sha256', source['sha256'],
@@ -56,10 +59,17 @@ def command_fixture():
             stdout={'file': 'stdout.txt', 'sha256': sha(b'{}')}, stderr={'file': 'stderr.txt', 'sha256': sha(b'')})
         for leaf, value in [('receipt.json', raw(proof)), ('stdout.txt', b'{}'), ('stderr.txt', b'')]:
             path = 'commands/' + name + '/' + leaf; original.members['owner'][path] = path; original.rows[path] = value
+    probe_raw = raw(access['probe']); proof = copy.deepcopy(template)
+    proof.update(command=probe_command, cwd='/work/c', started_utc=timestamp(-2), finished_utc=timestamp(-1),
+        elapsed_seconds=1.0, inputs_before=sorted(inputs, key=lambda row: row['path']),
+        inputs_after=sorted(inputs, key=lambda row: row['path']),
+        stdout={'file': 'stdout.txt', 'sha256': sha(probe_raw)}, stderr={'file': 'stderr.txt', 'sha256': sha(b'')})
+    for leaf, value in [('receipt.json', raw(proof)), ('stdout.txt', probe_raw), ('stderr.txt', b'')]:
+        path = 'commands/config-access-probe/' + leaf; original.members['owner'][path] = path; original.rows[path] = value
     prerequisites = {'owner': parent, 'seed': {'commit': commit}, 'recovered': original,
         'version_proofs': [{'command': prefix + ['rustup', '--version'], 'started_utc': timestamp(-40), 'finished_utc': timestamp(-39)}],
         'setup': {'started_monotonic_ns': 50 * second, 'finished_monotonic_ns': 99 * second}}
-    controls = {'config_sha256': sha(b'{}'), 'export_sha256': sha(b'{}'),
+    controls = {'config_sha256': sha(b'{}'), 'export_sha256': sha(b'{}'), 'configuration_access': access,
         'events': [{'phase': 'prefix-start', 'monotonic_ns': 100 * second, 'utc_ns': verifier.utc_ns(timestamp(0))}]}
     return prerequisites, {'receipt_sha256': sha(b'{}')}, controls
 
@@ -75,6 +85,32 @@ class CanonicalCommandBindings(unittest.TestCase):
     def test_realistic_bounded_command_receipt_envelopes_and_correlated_guest_clocks(self):
         prerequisites, allocation, controls = command_fixture(); proofs = self.check(prerequisites, allocation, controls)
         self.assertEqual(len(proofs), 3); verifier.check_recorded_utc_intervals(prerequisites, controls, proofs)
+
+    def test_actual_config_probe_command_inputs_and_prior_finite_interval_cannot_be_substituted(self):
+        mutations = [lambda proof: proof['command'].__setitem__(-1, '0'*64),
+            lambda proof: proof.update(started_utc=timestamp(1), finished_utc=timestamp(2)),
+            lambda proof: proof.update(started_utc=timestamp(-20), finished_utc=timestamp(-1)),
+            lambda proof: proof.update(exit_code=1),
+            lambda proof: proof['inputs_after'][1].update(sha256='0'*64)]
+        for mutate in mutations:
+            prerequisites, allocation, controls = command_fixture()
+            change_receipt(prerequisites['recovered'], 'config-access-probe', mutate)
+            with self.subTest(mutate=mutate), self.assertRaises(ValueError): self.check(prerequisites, allocation, controls)
+
+    def test_old_inaccessible_private_config_paths_are_not_accepted_as_published_inputs(self):
+        prerequisites, allocation, controls = command_fixture()
+        def old(proof):
+            for key in ('inputs_before', 'inputs_after'):
+                for row in proof[key]: row['path'] = row['path'].replace('/canonical-config/', '/canonical-attempt/')
+        change_receipt(prerequisites['recovered'], 'canonical', old)
+        with self.assertRaisesRegex(ValueError, 'command/input/time binding'): self.check(prerequisites, allocation, controls)
+
+    def test_hash_correct_other_probe_stdout_is_not_the_bound_permission_observation(self):
+        prerequisites, allocation, controls = command_fixture(); original = prerequisites['recovered']
+        value = raw({**controls['configuration_access']['probe'], 'groups': [65534]})
+        original.rows['commands/config-access-probe/stdout.txt'] = value
+        change_receipt(original, 'config-access-probe', lambda proof: proof['stdout'].update(sha256=sha(value)))
+        with self.assertRaisesRegex(ValueError, 'config probe'): self.check(prerequisites, allocation, controls)
 
     def test_hour_long_canonical_or_day_separated_retention_do_not_fit_original_intervals(self):
         for target, mutate in [('canonical', lambda proof: proof.update(finished_utc=timestamp(3600))),

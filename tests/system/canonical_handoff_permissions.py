@@ -1,5 +1,6 @@
 """Actual scoped Linux root-to-existing-runner read-permission control only."""
 import argparse
+import ast
 import base64
 import hashlib
 import json
@@ -24,6 +25,7 @@ from canonical_reference_device import UID, GID, check_marker
 import canonical_reference_boot as boot
 import canonical_reference_device as device
 import canonical_reference_git_trust as git_trust
+import canonical_reference_config_handoff as config_handoff
 from tests.reference.test_canonical_reference_boot import create_actual_marker_fixture
 from tests.reference.test_canonical_git_permissions import actual_nonroot_fixture_prefix
 
@@ -196,6 +198,93 @@ def git_clone_control(*, transport_regression=True):
             'scope': 'Actual Linux Git on tiny synthetic root-owned fixtures only; no first-party build, guest/VM, allocation or reference qualification'}
 
 
+def configuration_handoff_control():
+    """Actual UID65534 permission failure/fix/regression/restoration on tiny fixtures."""
+    source = (ROOT / 'scripts/canonical_reference_config_handoff.py').read_text(encoding='utf-8')
+    tree = ast.parse(source); names = {'digest', 'node', 'read', 'denied_open', 'probe'}
+    functions = [node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name in names]
+    require({node.name for node in functions} == names and len(functions) == len(names),
+        'exact actual configuration probe definitions required')
+    definitions = ast.unparse(ast.Module(body=functions, type_ignores=[]))
+    # Execute those exact production function bodies without depending on
+    # traversal through a CI runner's private home to import its source tree.
+    program = '''import hashlib,json,os,platform,secrets,stat,sys
+from pathlib import Path
+NAMES=('measurement-config.json','export-config.json');LIMIT=8192
+def require(condition,message):
+    if not condition:raise ValueError(message)
+''' + definitions + '''
+value=json.loads(sys.argv[1]);private=Path(value['private']);paths=[Path(x) for x in value['paths']]
+if value['mode']=='denials':
+    require(os.getresuid()==os.getresgid()==(65534,65534,65534) and os.getgroups()==[], 'actual nonroot fixture identity required')
+    denied=[]
+    for path in paths:
+        try:read(path)
+        except PermissionError:denied.append(True)
+        else:denied.append(False)
+    result={'uids':list(os.getresuid()),'gids':list(os.getresgid()),'groups':os.getgroups(),'read_denied':denied}
+else:result=probe(private,paths,value['digests'])
+print(json.dumps(result,sort_keys=True,separators=(',',':')))
+'''
+    # probe() uses the original public method identifier, never a grant.
+    program = 'METHOD=' + repr(config_handoff.METHOD) + '\n' + program
+    definition_sha = hashlib.sha256(definitions.encode()).hexdigest()
+    observations = []
+    with tempfile.TemporaryDirectory(prefix='rill-config-permission-') as temporary:
+        workspace = Path(temporary); os.chmod(workspace, 0o755)
+        original = workspace / 'original-private'; original.mkdir(mode=0o700)
+        values = {'measurement-config.json': {'synthetic': 'measurement'}, 'export-config.json': {'synthetic': 'export'}}
+        for name in config_handoff.NAMES:
+            path = original / name
+            path.write_bytes((json.dumps(values[name], sort_keys=True, separators=(',', ':')) + '\n').encode())
+            os.chmod(path, 0o444)
+        originals = {name: (config_handoff.node(original / name), (original / name).read_bytes())
+            for name in config_handoff.NAMES}
+        original_directory = config_handoff.node(original)
+        def child(case, private, paths, digests, mode='probe'):
+            value = {'mode': mode, 'private': str(private), 'paths': [str(path) for path in paths], 'digests': digests}
+            command = actual_nonroot_fixture_prefix(workspace / 'source', workspace / 'home',
+                ['/usr/bin/python3', '-I', '-c', program, json.dumps(value, sort_keys=True)])
+            def emit(outcome, code, stdout, stderr):
+                def stream(raw): return {'bytes': len(raw), 'sha256': hashlib.sha256(raw).hexdigest(),
+                    'base64': base64.b64encode(raw).decode('ascii')}
+                row = {'case': case, 'command': command, 'outcome': outcome, 'exit_code': code,
+                    'stdout': stream(stdout), 'stderr': stream(stderr), 'timeout_seconds': 10,
+                    'probe_definitions_sha256': definition_sha,
+                    'source_sha256': hashlib.sha256(source.encode()).hexdigest(), 'scope': 'Tiny explicitly synthetic actual Linux permissions only; no native/query/reference qualification'}
+                observations.append(row); print(json.dumps({'canonical_config_child_observation': row}), flush=True)
+            try: result = subprocess.run(command, cwd='/', capture_output=True, timeout=10, check=False)
+            except subprocess.TimeoutExpired as error:
+                emit('TIMEOUT', None, error.stdout or b'', error.stderr or b''); raise
+            emit('EXECUTED', result.returncode, result.stdout, result.stderr); return result
+        old = child('original-two-private-denials', original, [original / name for name in config_handoff.NAMES], [], 'denials')
+        require(old.returncode == 0 and json.loads(old.stdout) == {'uids': [65534]*3, 'gids': [65534]*3,
+            'groups': [], 'read_denied': [True, True]}, 'both original private configuration denials must be observed')
+        private = workspace / 'fixed-private'; private.mkdir(mode=0o700)
+        publication = config_handoff.install(private, values, directory=workspace / 'published-config')
+        paths = [Path(row['published']['path']) for row in publication['files']]
+        digests = [row['sha256'] for row in publication['files']]
+        fixed = child('fixed-two-reads-and-denials', private, paths, digests)
+        require(fixed.returncode == 0, 'actual fixed configuration read/denial probe failed')
+        fixed_record = config_handoff.finish(publication, json.loads(fixed.stdout))
+        os.chmod(paths[0].parent, 0o500)
+        try: regressed = child('regressed-no-traversal', private, paths, digests)
+        finally: os.chmod(paths[0].parent, 0o555)
+        require(regressed.returncode != 0 and b'PermissionError' in regressed.stderr,
+            'removed traversal must fail the actual unchanged nonroot production probe')
+        restored = child('restored-two-reads-and-denials', private, paths, digests)
+        require(restored.returncode == 0, 'restored original configuration access probe failed')
+        restored_record = config_handoff.finish(publication, json.loads(restored.stdout))
+        require(fixed_record == restored_record and original_directory == config_handoff.node(original)
+            and originals == {name: (config_handoff.node(original / name), (original / name).read_bytes())
+                for name in config_handoff.NAMES}, 'original private permissions/inodes/bytes changed')
+    return {'status': 'PASS', 'original_read_denied': [True, True], 'sequence': ['PASS', 'FAIL', 'PASS'],
+        'actual_probe_exit_codes': [fixed.returncode, regressed.returncode, restored.returncode],
+        'original_private_unchanged': True, 'fixed': fixed_record, 'restored': restored_record,
+        'observations': observations, 'reference_qualified': False,
+        'scope': 'Actual scoped Linux cross-UID permissions on synthetic fixtures only; real guest pre-canonical probe remains mandatory'}
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__); parser.add_argument('--out', type=Path, required=True)
     parser.add_argument('--run-as', required=True); args = parser.parse_args()
@@ -272,6 +361,7 @@ raise SystemExit(0 if denied else 1)
         'raw_stderr': marker_result.stderr.decode(), 'bootstrap_sha256': hashlib.sha256(boot.BOOTSTRAP.encode()).hexdigest(),
         'scope': 'Actual Linux creation and UID65534 read/write check of unchanged bootstrap fragment at a synthetic path; no actual guest/VM/device or allocation claim'}
     record['canonical_git_clone_control'] = git_clone_control(transport_regression=False)
+    record['canonical_configuration_control'] = configuration_handoff_control()
     (out / 'result.json').write_text(json.dumps(record, indent=2) + '\n', encoding='utf-8')
     print(json.dumps(record)); return 0
 

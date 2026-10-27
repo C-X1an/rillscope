@@ -26,6 +26,12 @@ SOURCE = {'files': FILES, 'sha256': hashlib.sha256(json.dumps(FILES, separators=
 
 class CaptureExport(unittest.TestCase):
     def setUp(self):
+        # Each export test installs its own fixture authority explicitly below.
+        isolated = patch.dict(os.environ, dict(os.environ), clear=True)
+        isolated.start(); self.addCleanup(isolated.stop)
+        for suffix in ('MEASUREMENT_CONFIG', 'MEASUREMENT_CONFIG_SHA256',
+                'EXPORT_CONFIG', 'EXPORT_CONFIG_SHA256'):
+            os.environ.pop('RILLSCOPE_REFERENCE_' + suffix, None)
         (ROOT / '.local-runs').mkdir(exist_ok=True)
         self.temporary = tempfile.TemporaryDirectory(prefix='ke-', dir=ROOT / '.local-runs')
         self.base = Path(self.temporary.name)

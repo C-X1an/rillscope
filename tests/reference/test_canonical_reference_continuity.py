@@ -18,6 +18,7 @@ import canonical_reference_guest_allocation as guest_allocation
 from . import test_canonical_reference_recovered_records as previous
 from . import test_canonical_reference_allocation as allocation_fixtures
 from . import test_canonical_reference_observer as observer_fixtures
+from .test_canonical_reference_config_handoff import access_fixture
 import base64
 
 
@@ -127,6 +128,9 @@ def measured_fixture(root):
     export['transfer_seconds'] = 180
     owner_root = artifact / 'recovery/owner'; (owner_root / 'measurement-config.json').write_bytes(raw(config))
     (owner_root / 'export-config.json').write_bytes(raw(export))
+    access_raw = raw(access_fixture({'measurement-config.json': raw(config), 'export-config.json': raw(export)}))
+    (owner_root / 'configuration-access.json').write_bytes(access_raw)
+    owner['configuration_access_sha256'] = sha(access_raw)
     for stage, requested, armed, begin, end in [('grid', 132, 134, 135, 140), ('cancel', 141, 142, 143, 148), ('sort-null', 149, 150, 151, 158)]:
         request = {key: config[key] for key in ('schema_version', 'method', 'session', 'commit', 'source_sha256', 'boot_id', 'reference_qualified')}
         request.update(stage=stage, config_sha256=sha(raw(config)), utc_ns=(1000 + requested) * second, monotonic_ns=requested * second)

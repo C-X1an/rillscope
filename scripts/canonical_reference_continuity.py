@@ -208,6 +208,14 @@ def validate_controls(prerequisites, reservation):
     recovered, owner = prerequisites['recovered'], prerequisites['owner']
     config_raw = recovered.raw(recovered.members['owner']['measurement-config.json'], 8192)
     export_raw = recovered.raw(recovered.members['owner']['export-config.json'], 8192)
+    import canonical_reference_config_handoff as config_handoff
+    access_raw = recovered.raw(recovered.members['owner']['configuration-access.json'], 65536)
+    require(protocol.hex_value(owner.get('configuration_access_sha256'), 64)
+        and digest(access_raw) == owner['configuration_access_sha256'],
+        'original root owner configuration access record binding differs')
+    access = strict_json(access_raw)
+    config_handoff.validate_record(access,
+        {'measurement-config.json': config_raw, 'export-config.json': export_raw})
     config, export = strict_json(config_raw), strict_json(export_raw)
     fields = {'schema_version', 'method', 'commit', 'source_sha256', 'boot_id', 'session', 'control_root',
         'deadline_monotonic_ns', 'handshake_seconds', 'reference_qualified'}
@@ -274,7 +282,8 @@ def validate_controls(prerequisites, reservation):
         and coordination.get('allocation_receipt_sha256') == owner['allocation_receipt_sha256'], 'original guest coordination did not finish')
     network_down(coordination['network_after'])
     return {'status': 'CHECKED ORIGINAL MEASUREMENT CONTROLS', 'config': config, 'config_sha256': digest(config_raw),
-        'export_sha256': digest(export_raw), 'events': events, 'boundaries': boundaries, 'requests': requests,
+        'export_sha256': digest(export_raw), 'configuration_access': access,
+        'events': events, 'boundaries': boundaries, 'requests': requests,
         'acknowledgements': acknowledgements, 'coordination': coordination, 'reference_qualified': False}
 
 

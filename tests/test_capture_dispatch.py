@@ -1,5 +1,6 @@
 """Dispatch control-flow tests; simulated subprocess returns are not product runs."""
 from pathlib import Path
+import os
 import sys
 import unittest
 from unittest.mock import patch
@@ -9,6 +10,14 @@ import dispatch
 
 
 class CaptureDispatch(unittest.TestCase):
+    def setUp(self):
+        # Simulated operations must never consume the real parent's authority.
+        isolated = patch.dict(os.environ, dict(os.environ), clear=True)
+        isolated.start(); self.addCleanup(isolated.stop)
+        for suffix in ('MEASUREMENT_CONFIG', 'MEASUREMENT_CONFIG_SHA256',
+                'EXPORT_CONFIG', 'EXPORT_CONFIG_SHA256'):
+            os.environ.pop('RILLSCOPE_REFERENCE_' + suffix, None)
+
     def invoke(self, arguments, outcomes):
         proof = {'bins':{'rillscope-measure':{'path':'target/fake-measure'}}}
         with patch.object(sys,'argv',['dispatch.py',*arguments]), \

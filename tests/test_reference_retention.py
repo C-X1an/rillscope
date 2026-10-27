@@ -2,6 +2,7 @@
 import contextlib
 import io
 import json
+import os
 from pathlib import Path
 import sys
 import tempfile
@@ -15,6 +16,14 @@ import reference_gate
 
 
 class ReferenceRetention(unittest.TestCase):
+    def setUp(self):
+        # Simulated operations must never consume the real parent's authority.
+        isolated = patch.dict(os.environ, dict(os.environ), clear=True)
+        isolated.start(); self.addCleanup(isolated.stop)
+        for suffix in ('MEASUREMENT_CONFIG', 'MEASUREMENT_CONFIG_SHA256',
+                'EXPORT_CONFIG', 'EXPORT_CONFIG_SHA256'):
+            os.environ.pop('RILLSCOPE_REFERENCE_' + suffix, None)
+
     def invoke(self,*,collection_code=0,archive_limit=None):
         with tempfile.TemporaryDirectory() as folder:
             root=Path(folder).resolve(); out=root/'.local-runs/reference-unit'

@@ -34,6 +34,7 @@ from owned_process import LinuxOwnedChildren
 import reference_allocation as original
 import reference_measurement_barrier as barrier
 import reference_capture_export as exporter
+import canonical_reference_config_handoff as config_handoff
 
 BASE = ROOT / '.local-runs/canonical-attempt'
 HOME = ROOT / '.local-runs/canonical-home'
@@ -171,10 +172,6 @@ def run_attempt(request_raw, grant_raw, *, received_ns, tail_seconds, retention_
         durable_mkdir(path, mode=mode)
         os.chmod(path, mode)
     measure, export = inner_configurations(**identity, boot_id=boot, cutoff_ns=cutoff, session=secrets.token_hex(16))
-    for name, row, key, digest_key in [('measurement-config.json', measure, barrier.CONFIG_PATH, barrier.CONFIG_DIGEST),
-        ('export-config.json', export, exporter.CONFIG_PATH, exporter.CONFIG_DIGEST)]:
-        path = BASE / name; write_json(path, row); os.chmod(path, 0o444); fsync_directory(path.parent)
-        os.environ[key], os.environ[digest_key] = str(path), hashlib.sha256(path.read_bytes()).hexdigest()
     os.environ['RILLSCOPE_REFERENCE_HOST_RECEIPT'] = str(receipt_path)
     os.environ['PYTHONDONTWRITEBYTECODE'] = '1'
     observer = coordinator = None
@@ -194,6 +191,18 @@ def run_attempt(request_raw, grant_raw, *, received_ns, tail_seconds, retention_
             value = (cutoff - time.monotonic_ns()) / 10**9
             allocation.require(value > 0, 'original canonical guest lease exhausted')
             return value
+        publication = config_handoff.install(BASE,
+            {'measurement-config.json': measure, 'export-config.json': export})
+        config_paths = tuple(Path(row['published']['path']) for row in publication['files'])
+        for row, key, digest_key in zip(publication['files'],
+                (barrier.CONFIG_PATH, exporter.CONFIG_PATH), (barrier.CONFIG_DIGEST, exporter.CONFIG_DIGEST)):
+            os.environ[key], os.environ[digest_key] = row['published']['path'], row['sha256']
+        raw = direct('config-access-probe', nonroot(config_handoff.command(publication['files'])),
+            timeout=min(10, remaining()), inputs=(receipt_path, *config_paths))
+        access = config_handoff.finish(publication, strict_json(raw))
+        write_json(BASE / 'configuration-access.json', access)
+        result['configuration_access_sha256'] = hashlib.sha256((BASE / 'configuration-access.json').read_bytes()).hexdigest()
+        persist()
         # Preserve real character-device permission/probe facts; never fabricate
         # access from a proposed mode or a successful helper import.
         device = {'grant': {}}; capture_device.grant(device['grant'])
@@ -217,7 +226,7 @@ def run_attempt(request_raw, grant_raw, *, received_ns, tail_seconds, retention_
         persist(); emit('prefix-start', **event_fields)
         direct('canonical', nonroot(['/usr/bin/python3', str(ROOT / 'scripts/clean_verify.py'),
             '--budget-seconds', str(seconds)]), timeout=seconds, inputs=(receipt_path,
-                BASE / 'measurement-config.json', BASE / 'export-config.json'))
+                *config_paths))
         result['canonical_finished_monotonic_ns'] = time.monotonic_ns()
         allocation.require(original.repository_identity() == identity and original.observed_boot_id() == boot,
             'original source or boot changed during canonical execution')

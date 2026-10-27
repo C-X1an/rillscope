@@ -30,6 +30,7 @@ from canonical_reference_campaigns import validate_campaigns
 from evidence import source_identity, run_owned
 from kvm_pilot_common import write_json
 from kvm_reference_common import strict_json
+import canonical_reference_config_handoff as config_handoff
 
 require = protocol.require
 STEPS = ('bundle', 'terminal-owner', 'recovered-prerequisites', 'prior-reservation', 'guest-allocation',
@@ -72,6 +73,9 @@ class OwnerCommands:
 def check_canonical_commands(prerequisites, allocation, controls, *, source):
     owner = prerequisites['owner']; identity = {'commit': prerequisites['seed']['commit'], 'source': source}
     metadata = OwnerCommands(prerequisites['recovered']); root = PurePosixPath('/work/c')
+    config_handoff.validate_record(controls['configuration_access'], {name:
+        prerequisites['recovered'].raw(prerequisites['recovered'].members['owner'][name], 8192)
+        for name in config_handoff.NAMES})
     budget = owner.get('canonical_budget_seconds')
     require(type(budget) is int and budget >= 60, 'original explicit canonical command budget required')
     prefix = prerequisites['version_proofs'][0]['command'][:-2]
@@ -87,13 +91,23 @@ def check_canonical_commands(prerequisites, allocation, controls, *, source):
             len(prerequisites['recovered'].raw(prerequisites['recovered'].members['owner']['export-config.json'], 8192)))]
     expected = []
     for name, digest, size in config_names:
-        path = '/work/c/.local-runs/' + ('canonical-allocation/' if name == 'reference-host-receipt.json' else 'canonical-attempt/') + name
+        path = '/work/c/.local-runs/' + ('canonical-allocation/' if name == 'reference-host-receipt.json' else 'canonical-config/') + name
         expected.append({'path': path, 'sha256': digest, 'bytes': size})
     require(canonical['inputs_before'] == canonical['inputs_after'] == sorted(expected, key=lambda row: row['path'])
         and canonical['elapsed_seconds'] <= budget
         and canonical['elapsed_seconds'] <= canonical_wall + .010
         and canonical_wall <= (owner['canonical_finished_monotonic_ns'] - owner['canonical_started_monotonic_ns']) / 10**9 + .010,
         'original canonical direct command/input/time binding differs')
+    probe_command = prefix + config_handoff.command(controls['configuration_access']['publication']['files'], root=root)
+    access_probe = receipt(metadata, 'native-owner/commands/config-access-probe', command=probe_command, cwd=root, **identity)
+    observed_probe = strict_json(metadata.raw('native-owner/commands/config-access-probe/stdout.txt', 65536))
+    probe_wall = (instant(access_probe['finished_utc']) - instant(access_probe['started_utc'])).total_seconds()
+    require(observed_probe == controls['configuration_access']['probe']
+        and access_probe['inputs_before'] == access_probe['inputs_after'] == canonical['inputs_before']
+        and 0 <= access_probe['elapsed_seconds'] <= probe_wall + .010 and probe_wall <= 10.010
+        and instant(prerequisites['version_proofs'][-1]['finished_utc']) <= instant(access_probe['started_utc'])
+        and instant(access_probe['finished_utc']) <= instant(canonical['started_utc']),
+        'actual nonroot config probe/input/order/ten-second budget binding differs')
     retained = owner['native_retention']; previous = instant(canonical['finished_utc']); proofs = [canonical]; first_retained_utc = None
     for name, command in [('retain-native-binaries', ['/usr/bin/python3', '/work/c/scripts/canonical_reference_binaries.py',
         '--out', '/work/c/.local-runs/canonical-attempt/native-binaries', '--commit', identity['commit'],
