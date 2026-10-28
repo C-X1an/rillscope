@@ -96,6 +96,9 @@ class CanonicalChannel:
         self.controller_pid = os.getpid()
         self.connection = None; self.receiver_process = None; self.receiver_captures = []; self.exchange_record = None
         self.done, self.stop = threading.Event(), threading.Event()
+        self.stop_lock = threading.Lock()
+        self.stop_closed = False
+        self.stop_request = None
         self.report = {'status': 'RUNNING', 'method': allocation.METHOD, 'reference_qualified': False,
             'commit': commit, 'source_sha256': source_sha256,
             'vm_started_monotonic_ns': vm_started_ns, 'vm_deadline_monotonic_ns': vm_deadline_ns,
@@ -105,6 +108,21 @@ class CanonicalChannel:
     def persist(self):
         write_json(self.out / 'channel-result.json', self.report)
         reservation.fsync_directory(self.out)
+
+    def check_lifetime(self, phase):
+        """Observe cancellation and the original absolute cutoff separately."""
+        observed = time.monotonic_ns()
+        stopped = self.stop.is_set()
+        expired = observed >= self.deadline_ns
+        if stopped or expired:
+            self.report['lifetime_failure'] = {
+                'phase': phase, 'cause': 'absolute-deadline' if expired else 'controller-cancelled',
+                'observed_monotonic_ns': observed, 'vm_deadline_monotonic_ns': self.deadline_ns,
+                'stop_requested': stopped, 'deadline_exhausted': expired,
+                'stop_request': getattr(self, 'stop_request', None)}
+            allocation.require(not expired, 'original canonical capture lifetime exhausted')
+            allocation.require(not stopped, 'original canonical capture cancelled by controller')
+        return observed
 
     def run(self):
         try:
@@ -117,8 +135,7 @@ class CanonicalChannel:
             # within the original VM lifetime, then spend at most30s framing,
             # actual reservation, fsync and response; no reception-time reset.
             while True:
-                allocation.require(not self.stop.is_set() and time.monotonic_ns() < self.deadline_ns,
-                    'original VM ended before its allocation request')
+                self.check_lifetime('allocation-request')
                 ready, _, _ = select.select([self.connection], [], [],
                     min(1, max(.001, (self.deadline_ns - time.monotonic_ns()) / 10**9)))
                 if ready: break
@@ -156,8 +173,7 @@ class CanonicalChannel:
             self.receiver_captures = [BoundedCapture(self.receiver_process.stdout, self.out / 'receiver.stdout', 4 * 1024**2),
                 BoundedCapture(self.receiver_process.stderr, self.out / 'receiver.stderr', 4 * 1024**2)]
             while self.receiver_process.poll() is None:
-                allocation.require(not self.stop.is_set() and time.monotonic_ns() < self.deadline_ns,
-                    'original canonical capture lifetime exhausted')
+                self.check_lifetime('capture')
                 for capture in self.receiver_captures: capture.drain()
                 self.stop.wait(.005)
             self.report['receiver_exit_observed'] = self.receiver_process.returncode
@@ -197,15 +213,34 @@ class CanonicalChannel:
                 if self.connection is not None: self.connection.close()
             except Exception as error: errors.append(type(error).__name__ + ': channel close')
             if errors: self.report.update(status='FAIL', close_errors=errors)
-            self.report.update(finished_monotonic_ns=time.monotonic_ns())
+            # A stop can interrupt connect/exchange before either wait loop
+            # observes it. Commit its original cause with the terminal report;
+            # order later requests after this immutable reporting boundary.
+            with self.stop_lock:
+                self.stop_closed = True
+                if self.stop_request is not None:
+                    self.report['stop_request'] = self.stop_request
+                self.report.update(finished_monotonic_ns=time.monotonic_ns())
+            # Disk I/O stays outside the stop lock so close() can still spend
+            # its original finite join timeout if persistence stalls.
             try: self.persist()
             except Exception as error: self.report.update(status='FAIL', retention_error=type(error).__name__)
             self.done.set()
 
     def request_stop(self):
-        self.stop.set()
-        if self.connection is not None:
-            try: self.connection.shutdown(socket.SHUT_RDWR)
+        with self.stop_lock:
+            if self.stop_closed or self.done.is_set(): return
+            if getattr(self, 'stop_request', None) is None:
+                request = {'requested_monotonic_ns': time.monotonic_ns()}
+                failure = getattr(self, 'upstream_failure', None)
+                if type(failure) is dict:
+                    request['upstream_failure'] = {key: failure[key][:2048] for key in ('error', 'reason')
+                        if type(failure.get(key)) is str}
+                self.stop_request = request
+            self.stop.set()
+            connection = self.connection
+        if connection is not None:
+            try: connection.shutdown(socket.SHUT_RDWR)
             except OSError: pass
 
     def close(self):

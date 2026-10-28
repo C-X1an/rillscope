@@ -83,6 +83,8 @@ jobs:
           sudo apt-get update
           sudo apt-get install --yes --no-install-recommends gdb
       - run: make bootstrap build
+      - name: Verify actual Linux helper receipt producer and strict consumer
+        run: python3 scripts/evidence.py --out .local-runs/native-receipt-controls/outer --timeout 120 -- python3 scripts/guest_trial_controls.py --out .local-runs/native-receipt-controls/actual
       - run: make publication-check
       - name: Retain actual transport observations
         if: ${{ always() }}
@@ -93,6 +95,7 @@ jobs:
           if-no-files-found: error
           retention-days: 7
           path: |
+            .local-runs/native-receipt-controls/
             .local-runs/publication-boundary-*/
             .local-runs/publication-decision-*/
             .local-runs/publication-control-*/commands/

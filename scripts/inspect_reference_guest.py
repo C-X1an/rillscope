@@ -16,6 +16,7 @@ import re
 import shutil
 import signal
 import socket
+import sqlite3
 import subprocess
 import sys
 import time
@@ -132,6 +133,9 @@ class TrialCommands:
         destination=directory/name;destination.mkdir()
         state={'schema_version':1,'command':command,'cwd':str(ROOT),
                'started_utc':dt.datetime.now(dt.timezone.utc).isoformat(),
+               'environment':{'python':platform.python_version(),'sqlite':sqlite3.sqlite_version,
+                   'system':platform.system(),'machine':platform.machine(),'cpu_count':os.cpu_count()},
+               'stdin':None,
                'verification_status':'FAIL','execution_outcome':'NOT_LAUNCHED',
                'input_limits_bytes':{'ordinary':256*1024**2,'explicit_image':IMAGE_LIMIT},
                'scope':'actual direct guest helper; enclosed in scripts/evidence.py trial receipt'}

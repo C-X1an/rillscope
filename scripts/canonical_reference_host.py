@@ -213,6 +213,7 @@ def run_vm(out, *, image, run_as, port, commit, source_sha256, vm_seconds, setup
         # Join the allocator before the subreaper cleanup endpoint. Its exact
         # exchange deadline and stop flag also constrain inspections and writes.
         if channel is not None:
+            channel.upstream_failure = failure
             try: channel.close()
             except Exception as error: failure = failure or {'error': type(error).__name__, 'reason': str(error)[:2048]}
         receiver = channel.receiver_process if channel is not None else None

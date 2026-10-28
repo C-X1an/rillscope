@@ -13,8 +13,46 @@ import subprocess
 import sys
 import time
 
-from inspect_reference_guest import TrialCommands,TrialInterrupted,interrupted,require
+from inspect_reference_guest import ROOT,TrialCommands,TrialInterrupted,interrupted,require
 from owned_process import LinuxOwnedChildren
+from evidence import source_identity,git_state
+from canonical_reference_retained_fresh import receipt,read_bounded_file
+
+
+def verify_original_helper_receipt(directory):
+    """Consume the actual newly produced bytes; negative edits stay in memory."""
+    original=(directory/'receipt.json').read_bytes()
+    identity=git_state()
+    require(identity['dirty'] is False,'actual producer/consumer control requires clean committed source')
+    class Metadata:
+        omitted=None
+        def raw(self,name,limit=16*1024**2):
+            return read_bounded_file(ROOT/str(name),limit)
+        def document(self,name,limit):
+            value=json.loads(self.raw(name,limit))
+            if self.omitted is not None:value.pop(self.omitted,None)
+            return value
+    metadata=Metadata()
+    name=directory.relative_to(ROOT).as_posix()
+    expected={'source':source_identity(ROOT),'commit':identity['commit'],
+        'command':[sys.executable,'-c','print("actual helper output")'],'cwd':ROOT}
+    checked=receipt(metadata,name,**expected)
+    require(checked==json.loads(original),'strict consumer changed original producer fields')
+    rejected=[]
+    for field,reason in (('environment','native runtime'),('stdin','explicit absent stdin')):
+        metadata.omitted=field
+        try:receipt(metadata,name,**expected)
+        except ValueError as error:
+            require(reason in str(error),'negative receipt control failed for an unrelated reason')
+            rejected.append({'omitted_in_memory':field,'status':'REJECTED','reason':str(error)})
+        else:raise ValueError('strict reader accepted an omitted required producer field')
+    metadata.omitted=None
+    require(receipt(metadata,name,**expected)==checked,'restored original producer/consumer control differs')
+    require((directory/'receipt.json').read_bytes()==original,'original producer receipt was changed by controls')
+    return {'status':'PASS','producer_receipt_sha256':__import__('hashlib').sha256(original).hexdigest(),
+        'actual_environment':checked['environment'],'explicit_absent_stdin':checked['stdin'],
+        'negative_controls':rejected,'restored':'PASS','reference_qualified':False,
+        'scope':'actual Linux helper producer/strict-consumer schema and owned lifecycle only; no VM, full prerequisite or reference qualification'}
 
 
 def worker(out,mode):
@@ -65,6 +103,7 @@ def harness(out):
             if mode=='success':
                 require(state['error'] is None and wrapper['verification_status']=='PASS','successful helper was rejected')
                 require((directory/'commands/controlled-helper/stdout.txt').read_bytes()==b'actual helper output\n','actual helper output differs')
+                schema=verify_original_helper_receipt(directory/'commands/controlled-helper')
             else:
                 require(wrapper['verification_status']=='FAIL','failed helper falsely verified')
                 require(state['error']==('TrialInterrupted' if mode=='interruption' else 'TimeoutExpired'),'wrong actual failure mode')
@@ -75,6 +114,8 @@ def harness(out):
                         'actual interrupted helper output missing')
                 require((directory/'commands/controlled-helper/stderr.txt').read_bytes()==b'','actual helper stderr differs')
             require(sentinel.poll() is None,'worker cleanup killed the separate harness sentinel')
+            require(wrapper.get('environment',{}).get('system')=='Linux'
+                and 'stdin' in wrapper and wrapper['stdin'] is None,'actual helper omitted runtime or explicit absent stdin')
             rows.append({'case':mode,'status':'PASS','wrapper_status':wrapper['verification_status'],
                          'worker_cleanup':state['cleanup'],'separate_sentinel_survived':True})
     finally:
@@ -86,7 +127,7 @@ def harness(out):
         if restored['status']!='PASS': cleanup['status']='FAIL'
         (out/'cleanup.json').write_text(json.dumps(cleanup,indent=2)+'\n')
     require(cleanup['status']=='PASS','harness cleanup failed')
-    result={'status':'PASS','cases':rows,'euid':os.geteuid(),'reference_qualified':False,
+    result={'status':'PASS','cases':rows,'producer_consumer_schema':schema,'euid':os.geteuid(),'reference_qualified':False,
             'scope':'actual helper cleanup controls only; no VM boot/resource/reference evidence'}
     (out/'results.json').write_text(json.dumps(result,indent=2)+'\n');print(json.dumps(result,indent=2))
     return 0

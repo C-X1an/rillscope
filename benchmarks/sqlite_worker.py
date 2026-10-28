@@ -109,15 +109,22 @@ def main():
     executed = time.perf_counter_ns()
     rows = [list(row) for row in database.execute(spec['sql'])]
     execution_only_ns = time.perf_counter_ns() - executed
-    for row in rows:
-        for index, field in enumerate(spec['schema']):
-            if field['type'] == 'bool' and row[index] is not None: row[index] = bool(row[index])
-    result = {'version': 1, 'status': 'ok', 'implementation': 'sqlite-baseline', 'schema': spec['schema'], 'rows': rows}
+    # The query and complete row collection above stay inside execution timing.
+    # Once the row cap is exceeded, its terminal error cannot contain these
+    # cells. Avoid normalizing and serializing a discarded success envelope.
+    row_limit_exceeded = len(rows) > 10000
+    if row_limit_exceeded:
+        result = {'version': 1, 'status': 'error', 'implementation': 'sqlite-baseline', 'error': {'code': 'E_OUTPUT_LIMIT', 'scope': 'baseline harness output cap'}}
+    else:
+        for row in rows:
+            for index, field in enumerate(spec['schema']):
+                if field['type'] == 'bool' and row[index] is not None: row[index] = bool(row[index])
+        result = {'version': 1, 'status': 'ok', 'implementation': 'sqlite-baseline', 'schema': spec['schema'], 'rows': rows}
     serialized = time.perf_counter_ns()
     payload = json.dumps(result, ensure_ascii=False, separators=(',', ':')).encode()
     serialization_ns = time.perf_counter_ns() - serialized
     # These are harness output rules, not claims that SQLite implements RillScope's budget.
-    if len(rows) > 10000 or len(payload) > 1024 * 1024:
+    if not row_limit_exceeded and len(payload) > 1024 * 1024:
         result = {'version': 1, 'status': 'error', 'implementation': 'sqlite-baseline', 'error': {'code': 'E_OUTPUT_LIMIT', 'scope': 'baseline harness output cap'}}
         payload = json.dumps(result, separators=(',', ':')).encode()
     measured = {'implementation': 'sqlite-baseline', 'sqlite_version': sqlite3.sqlite_version,

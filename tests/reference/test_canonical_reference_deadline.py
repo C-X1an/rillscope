@@ -122,6 +122,8 @@ class DeadlineControls(unittest.TestCase):
         fixture = fixtures.CanonicalAllocationTests(); fixture.setUp()
         owner = channel.CanonicalChannel.__new__(channel.CanonicalChannel)
         owner.stop = threading.Event(); owner.done = threading.Event(); owner.report = {}
+        owner.stop_lock = threading.Lock()
+        owner.stop_closed = False
         left, right = socket.socketpair(); owner.connection = left
         entered = threading.Event(); errors = []
         def action(_raw, *, exchange_deadline_ns, cancelled):
