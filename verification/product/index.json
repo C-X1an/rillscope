@@ -213,13 +213,12 @@
       "scope": "Complete ec4 fresh Windows recipe executed all twelve targets: Win1314 security/verify and GNU long-path release build failed; reference benchmark blocked. New full Linux fresh reproduction remains pending"
     },
     "AC-025": {
-      "status": "BLOCKED",
+      "status": "PASS",
       "runs": [
-        "sqlite-batch-static-native",
-        "sqlite-batch-malformed",
-        "ri-current-native"
+        "nf43-current-static-native",
+        "nf43-current-malformed-native"
       ],
-      "scope": "Actual current pinned Rust format/lint/check/unit gates and 2000 bounded malformed CLI cases, 1000 JSON and 1000 SQL, with all outcomes retained; no libFuzzer claim. New canonical allocation/owner Python files require fresh complete current-source static and malformed-corpus evidence; prior proof links remain historical for this development checkout."
+      "scope": "Actual pinned Rust format/Clippy/check/unit gates and complete seeded2000-case malformed JSON/SQL corpus; current executable, recipe and test dependencies bound. Finite corpus only; libFuzzer NOT RUN."
     },
     "AC-026": {
       "status": "PASS",
@@ -1280,6 +1279,14 @@
     "process-readiness-wording": {
       "path": "verification/product/runs/process-readiness-wording.json",
       "sha256": "420f5e6bcc7b106c85fca4087dec7235d157f299cc44a9bb363d8c9cca2d656f"
+    },
+    "nf43-current-static-native": {
+      "path": "verification/product/runs/nf43-current-static-native.json",
+      "sha256": "f8ad866981dc80cfce829095464dacfe332c322e963b3b976aed51d53d12e283"
+    },
+    "nf43-current-malformed-native": {
+      "path": "verification/product/runs/nf43-current-malformed-native.json",
+      "sha256": "b4587f8fb8c4632be9ad101f794817ba26eb1674b34608b6653d94911854ede2"
     }
   },
   "release_status": "INCOMPLETE",
