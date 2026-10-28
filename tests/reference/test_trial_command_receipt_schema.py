@@ -2,6 +2,7 @@
 import copy
 import hashlib
 import io
+import itertools
 import json
 from pathlib import Path
 import platform
@@ -18,7 +19,7 @@ import canonical_reference_retained_fresh as consumer
 
 
 class TrialCommandReceiptSchema(unittest.TestCase):
-    def produce(self,directory,*,launch_error=False):
+    def produce(self,directory,*,launch_error=False,inputs=(),large_inputs=()):
         source={"sha256":"b"*64,"files":[["synthetic-test-only","c"*64]]}
         process=Mock(pid=123,returncode=0,stdout=io.BytesIO(b"original output\n"),stderr=io.BytesIO(b""))
         process.poll.return_value=0;process.wait.return_value=0
@@ -35,8 +36,9 @@ class TrialCommandReceiptSchema(unittest.TestCase):
             patch.object(producer.subprocess,"Popen",side_effect=OSError("synthetic launch failure") if launch_error else None,return_value=process) as launch:
             run=producer.TrialCommands(directory,owner)
             if launch_error:
-                with self.assertRaisesRegex(OSError,"synthetic launch failure"):run("version",command)
-            else:run("version",command)
+                with self.assertRaisesRegex(OSError,"synthetic launch failure"):
+                    run("version",command,inputs=inputs,large_inputs=large_inputs)
+            else:run("version",command,inputs=inputs,large_inputs=large_inputs)
             self.assertEqual(launch.call_args.kwargs["stdin"],producer.subprocess.DEVNULL)
         path=directory/"commands/version";row=json.loads((path/"receipt.json").read_bytes())
         return path,row,source,command
@@ -89,6 +91,43 @@ class TrialCommandReceiptSchema(unittest.TestCase):
             self.assertIn("environment",row)
             self.assertEqual(row["environment"]["system"],platform.system())
             self.assertIn("stdin",row);self.assertIsNone(row["stdin"])
+            self.assertEqual(row["verification_status"],"FAIL")
+            self.assertEqual(row["execution_outcome"],"NOT_LAUNCHED")
+
+    def test_every_caller_permutation_records_the_same_exact_sorted_inputs(self):
+        parent=ROOT/".local-runs";parent.mkdir(exist_ok=True)
+        with tempfile.TemporaryDirectory(prefix="trial-input-order-",dir=parent) as temp:
+            root=Path(temp);data={"a-input":b"first literal\n","m-input":b"middle literal\n","z-input":b"last literal\n"}
+            for name,value in data.items():(root/name).write_bytes(value)
+            expected=[{"path":str(root/name),"bytes":len(data[name]),"sha256":hashlib.sha256(data[name]).hexdigest()}
+                for name in ("a-input","m-input","z-input")]
+            for number,order in enumerate(itertools.permutations(("z-input","a-input","m-input"))):
+                with self.subTest(order=order):
+                    destination=root/("case-"+str(number));destination.mkdir()
+                    _,row,_,_=self.produce(destination,inputs=tuple(root/name for name in order))
+                    self.assertEqual(row["inputs_before"],expected)
+                    self.assertEqual(row["inputs_after"],expected)
+
+    def test_sorting_keeps_ordinary_and_explicit_image_limits_with_their_own_files(self):
+        parent=ROOT/".local-runs";parent.mkdir(exist_ok=True)
+        with tempfile.TemporaryDirectory(prefix="trial-input-limits-",dir=parent) as temp:
+            root=Path(temp);ordinary=root/"z-ordinary";image=root/"a-image"
+            ordinary.write_bytes(b"ordinary");image.write_bytes(b"explicit image")
+            expected=[(str(image),800*1024**2),(str(ordinary),256*1024**2)]
+            with patch.object(producer,"bounded_identity",wraps=producer.bounded_identity) as identity:
+                _,row,_,_=self.produce(root,inputs=(ordinary,),large_inputs=(image,))
+            self.assertEqual([(str(call.args[0]),call.args[1]) for call in identity.call_args_list],expected+expected)
+            self.assertEqual([item["path"] for item in row["inputs_before"]],[str(image),str(ordinary)])
+            self.assertEqual(row["inputs_before"],row["inputs_after"])
+
+    def test_failed_launch_preserves_the_same_sorted_input_identities(self):
+        parent=ROOT/".local-runs";parent.mkdir(exist_ok=True)
+        with tempfile.TemporaryDirectory(prefix="trial-failed-input-order-",dir=parent) as temp:
+            root=Path(temp);first=root/"a-input";last=root/"z-input"
+            first.write_bytes(b"first");last.write_bytes(b"last")
+            _,row,_,_=self.produce(root,launch_error=True,inputs=(last,first))
+            self.assertEqual([item["path"] for item in row["inputs_before"]],[str(first),str(last)])
+            self.assertEqual(row["inputs_before"],row["inputs_after"])
             self.assertEqual(row["verification_status"],"FAIL")
             self.assertEqual(row["execution_outcome"],"NOT_LAUNCHED")
 

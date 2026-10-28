@@ -5,6 +5,7 @@ The same command can run under the trial's already authorized root identity to
 exercise privileged descendant cleanup. It never signals unrelated processes.
 """
 import argparse
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -38,6 +39,10 @@ def verify_original_helper_receipt(directory):
         'command':[sys.executable,'-c','print("actual helper output")'],'cwd':ROOT}
     checked=receipt(metadata,name,**expected)
     require(checked==json.loads(original),'strict consumer changed original producer fields')
+    expected_inputs=[{'path':str(directory.parents[1]/name),'bytes':len(raw),'sha256':hashlib.sha256(raw).hexdigest()}
+        for name,raw in [('a-input.txt',b'actual first input\n'),('z-input.txt',b'actual second input\n')]]
+    require(checked['inputs_before']==checked['inputs_after']==expected_inputs,
+        'actual producer input identities must be exact, stable and in canonical path order')
     rejected=[]
     for field,reason in (('environment','native runtime'),('stdin','explicit absent stdin')):
         metadata.omitted=field
@@ -52,6 +57,7 @@ def verify_original_helper_receipt(directory):
     return {'status':'PASS','producer_receipt_sha256':__import__('hashlib').sha256(original).hexdigest(),
         'actual_environment':checked['environment'],'explicit_absent_stdin':checked['stdin'],
         'negative_controls':rejected,'restored':'PASS','reference_qualified':False,
+        'input_count':2,'canonical_input_order':True,
         'scope':'actual Linux helper producer/strict-consumer schema and owned lifecycle only; no VM, full prerequisite or reference qualification'}
 
 
@@ -61,14 +67,19 @@ def worker(out,mode):
     for number in (signal.SIGTERM,signal.SIGINT): signal.signal(number,interrupted)
     error=None
     try:
-        if mode=='success': command=[sys.executable,'-c','print("actual helper output")'];timeout=5
+        inputs=()
+        if mode=='success':
+            command=[sys.executable,'-c','print("actual helper output")'];timeout=5
+            first,last=out/'a-input.txt',out/'z-input.txt'
+            first.write_bytes(b'actual first input\n');last.write_bytes(b'actual second input\n')
+            inputs=(last,first)  # The actual producer must canonicalize this reversal.
         else:
             # The actual tool starts a new session-changing child and records
             # both PIDs. These are real owned processes, not mocked Popen calls.
             program='import json,os,pathlib,subprocess,sys,time; child=subprocess.Popen([sys.executable,"-c","import time; time.sleep(60)"],start_new_session=True); pathlib.Path(sys.argv[1]).write_text(json.dumps([os.getpid(),child.pid])); print("actual helper started",flush=True); time.sleep(60)'
             command=[sys.executable,'-c',program,str(out/'owned-pids.json')]
             timeout=.5 if mode=='timeout' else 60
-        TrialCommands(out,ownership)('controlled-helper',command,timeout=timeout)
+        TrialCommands(out,ownership)('controlled-helper',command,timeout=timeout,inputs=inputs)
     except (OSError,ValueError,subprocess.SubprocessError,TrialInterrupted) as caught:
         error=type(caught).__name__
     finally:

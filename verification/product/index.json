@@ -215,8 +215,7 @@
     "AC-025": {
       "status": "PASS",
       "runs": [
-        "nf47-current-static-native",
-        "nf47-current-malformed-native"
+        "nf54-input-order-static-malformed-native"
       ],
       "scope": "Actual pinned Rust format/Clippy/check/unit gates and complete seeded2000-case malformed JSON/SQL corpus; current executable, recipe and test dependencies bound. Finite corpus only; libFuzzer NOT RUN."
     },
@@ -1295,6 +1294,14 @@
     "nf47-current-malformed-native": {
       "path": "verification/product/runs/nf47-current-malformed-native.json",
       "sha256": "8a3c0a26db0b87722e8e0484c5d0d3a6a8016cb1283d4f2d2cfc880609c5206e"
+    },
+    "nf54-current-static-malformed-native": {
+      "path": "verification/product/runs/nf54-current-static-malformed-native.json",
+      "sha256": "ba6b556f1fa8204b2ee5b68c1a930229cfaeec251421bbf5e40e61267cf5e5ed"
+    },
+    "nf54-input-order-static-malformed-native": {
+      "path": "verification/product/runs/nf54-input-order-static-malformed-native.json",
+      "sha256": "8907fdaf78e91af0ce9f6fd416c698f1cacbf2220fa56f0c7cbc67b24349ce5d"
     }
   },
   "release_status": "INCOMPLETE",

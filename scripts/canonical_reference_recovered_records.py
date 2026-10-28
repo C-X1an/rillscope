@@ -10,6 +10,7 @@ import math
 import os
 from pathlib import Path, PurePosixPath
 import re
+import stat
 import time
 
 import archive_capture
@@ -19,7 +20,8 @@ from canonical_reference_guest_setup import check_rust_versions
 from canonical_reference_host_setup import WORK_BYTES, IMAGE_SHA, FINGERPRINT
 from canonical_reference_recovery import layout
 from canonical_reference_retained_fresh import read_bounded_file, receipt, relative, instant
-from canonical_reference_seed import validate_seed, INSTALLER_RELATIVE
+from canonical_reference_seed import (validate_seed, INSTALLER_RELATIVE,
+    MAX_FILES as SEED_MAX_FILES, MAX_FILE as SEED_MAX_FILE, MAX_TOTAL as SEED_MAX_TOTAL)
 from inspect_reference_guest import SERIAL_LIMIT
 from kvm_reference_common import strict_json
 from canonical_reference_git_control import validate_guest_git_proof
@@ -189,12 +191,68 @@ def correlate_boot_progress(progress, footer, seed):
         'original pre-unmount progress differs from final serial observation')
 
 
-def check_seed_source(seed, source):
-    validate_seed(seed); expected = dict(source['files'])
+def public_source_inventory(root):
+    """Read the complete public checkout, separately from execution identity.
+
+    Execution identity intentionally excludes published verification records.
+    A source-only Git seed transports those records too, so none may be ignored.
+    Generated work, Git internals and tool caches remain outside this snapshot.
+    """
+    root = Path(root); pending = [root]; rows = []; entries = total = 0; folded = set()
+    excluded = {'.git', '.local-runs', 'target', '__pycache__'}
+    identity = lambda info: (info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns, info.st_mode)
+    while pending:
+        directory = pending.pop()
+        require(not directory.is_symlink() and not (hasattr(directory, 'is_junction') and directory.is_junction()),
+            'public source inventory cannot traverse links')
+        with os.scandir(directory) as children:
+            for entry in children:
+                entries += 1; require(entries <= 2 * SEED_MAX_FILES, 'public source inventory entry bound exceeded')
+                # Windows DirEntry.stat leaves device/inode zero; lstat supplies
+                # the same real file identity as the held descriptor.
+                path = Path(entry.path); name = path.relative_to(root).as_posix(); before = path.lstat()
+                require(not stat.S_ISLNK(before.st_mode)
+                    and not (hasattr(path, 'is_junction') and path.is_junction()), 'public source inventory cannot include links')
+                if any(part in excluded for part in path.relative_to(root).parts): continue
+                if stat.S_ISDIR(before.st_mode): pending.append(path); continue
+                require(stat.S_ISREG(before.st_mode) and 0 <= before.st_size <= SEED_MAX_FILE,
+                    'bounded regular public source file required')
+                require(len(rows) < SEED_MAX_FILES and name.casefold() not in folded,
+                    'public source inventory file bound or case alias')
+                with path.open('rb') as stream:
+                    require(identity(os.fstat(stream.fileno())) == identity(before), 'public source descriptor changed')
+                    raw = stream.read(SEED_MAX_FILE + 1)
+                    require(len(raw) == before.st_size and identity(os.fstat(stream.fileno())) == identity(before)
+                        and identity(path.lstat()) == identity(before), 'public source file changed while reading')
+                total += len(raw); require(total <= SEED_MAX_TOTAL, 'public source inventory byte bound exceeded')
+                folded.add(name.casefold()); rows.append({'path': name, 'bytes': len(raw), 'sha256': hashlib.sha256(raw).hexdigest()})
+    require(rows, 'complete nonempty public source inventory required')
+    return sorted(rows, key=lambda item: item['path'])
+
+
+def check_seed_source(seed, source, *, public_files=None):
+    validate_seed(seed); runtime = dict(source['files']); expected = runtime; sizes = None
+    if public_files is not None:
+        require(type(public_files) is list and 0 < len(public_files) <= SEED_MAX_FILES,
+            'bounded complete public source inventory required')
+        expected = {}; sizes = {}; paths = []; folded = set(); total = 0
+        for row in public_files:
+            require(type(row) is dict and set(row) == {'path', 'bytes', 'sha256'}, 'closed public source file identity required')
+            name = relative(row['path']).as_posix()
+            require(name not in expected and name.casefold() not in folded
+                and type(row['bytes']) is int and 0 <= row['bytes'] <= SEED_MAX_FILE
+                and protocol.hex_value(row['sha256'], 64), 'unique bounded public source file identity required')
+            paths.append(name); folded.add(name.casefold()); expected[name] = row['sha256']; sizes[name] = row['bytes']
+            total += row['bytes']; require(total <= SEED_MAX_TOTAL, 'complete public source byte bound exceeded')
+        require(paths == sorted(paths) and all(expected.get(name) == digest for name, digest in runtime.items()),
+            'complete public snapshot must retain every exact execution-source file')
     actual = {row['path']: row['sha256'] for row in seed['files']
         if not row['path'].startswith('.git/') and row['path'] != INSTALLER_RELATIVE}
     require(seed['source_sha256'] == source['sha256'] and actual == expected,
         'original source-only seed public file inventory differs from exact validator source')
+    if sizes is not None:
+        require({row['path']: row['bytes'] for row in seed['files'] if row['path'] in actual} == sizes,
+            'original source-only seed public file byte counts differ from exact validator source')
 
 
 class SetupCommands:
@@ -261,7 +319,7 @@ def cleanup(row):
         'actual terminal original process cleanup required')
 
 
-def validate_prerequisites(attempt, terminal, *, source, deadline):
+def validate_prerequisites(attempt, terminal, *, source, deadline, public_files=None):
     """Check all seven stopped trees and original host/native prerequisite data."""
     attempt = archive_capture.owned(attempt); outer = OriginalRecords(attempt, deadline)
     plan, collector = terminal['plan'], terminal['collector']; commit = plan['commit']
@@ -284,7 +342,7 @@ def validate_prerequisites(attempt, terminal, *, source, deadline):
         and 0 < prepared['qmp_port'] < 65536, 'original exact source-only host preparation differs')
     _prepare_start, prepare_end = span(prepared, plan['prepare_seconds'], lower=host_end, upper=collector['finished_monotonic_ns'])
     seed_raw = outer.raw('vm/preparation/seed.json', 4 * 1024**2); seed = strict_json(seed_raw)
-    check_seed_source(seed, source)
+    check_seed_source(seed, source, public_files=public_files)
     require(seed == prepared.get('seed') and seed['mode'] == 'canonical' and seed['commit'] == commit
         and seed['setup_seconds'] == plan['guest_setup_seconds'] and seed['tail_seconds'] == plan['guest_tail_seconds']
         and seed['retention_seconds'] == plan['guest_retention_seconds']

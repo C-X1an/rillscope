@@ -143,6 +143,8 @@ class TrialCommands:
         selected=[(path,256*1024**2) for path in inputs]+[(path,IMAGE_LIMIT) for path in large_inputs]
         try:
             state.update(source_before=source_identity(),git=git_state())
+            # Canonical receipts use path order; keep each file's original cap.
+            selected.sort(key=lambda pair:str(pair[0]))
             state['inputs_before']=[bounded_identity(path,limit) for path,limit in selected]
             process=subprocess.Popen(command,cwd=ROOT,stdin=subprocess.DEVNULL,stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,bufsize=0,start_new_session=True)

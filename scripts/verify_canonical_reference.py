@@ -20,7 +20,7 @@ import archive_capture
 import canonical_reference_allocation as protocol
 from canonical_reference_bundle import extract, MAX_BYTES
 from canonical_reference_terminal_owner import validate_terminal_owner
-from canonical_reference_recovered_records import validate_prerequisites, OriginalRecords
+from canonical_reference_recovered_records import validate_prerequisites, OriginalRecords, public_source_inventory
 from canonical_reference_continuity import (validate_reservation, validate_guest_allocation,
     validate_controls, validate_resources)
 from canonical_reference_retained_fresh import (RetainedMetadata, validate_fresh, receipt, read_bounded_file, instant)
@@ -190,6 +190,7 @@ def inspect_originals(archive, out, *, max_bytes, deadline_ns):
         entry.update(status='RUNNING'); write_json(result, report); remaining()
         value = action(); remaining(); entry.update(status='PASS'); write_json(result, report); remaining(); return value
     try:
+        public_files = public_source_inventory(ROOT)
         restored = out / 'original'
         restoration = stage('bundle', lambda: extract(archive, restored, max_bytes=max_bytes,
             budget_seconds=min(1800, math.floor(remaining()))))
@@ -199,7 +200,7 @@ def inspect_originals(archive, out, *, max_bytes, deadline_ns):
         require(original.raw('input/declared-plan.json', 16384) == original.raw('attempt/declared-plan.json', 16384),
             'retained original input differs from collected declared plan')
         prerequisites = stage('recovered-prerequisites', lambda: validate_prerequisites(restored / 'attempt', terminal,
-            source=source, deadline=deadline_ns / 10**9))
+            source=source, deadline=deadline_ns / 10**9, public_files=public_files))
         reservation = stage('prior-reservation', lambda: validate_reservation(restored / 'reservation', prerequisites,
             terminal, original.document('owner/receipt.json', 8 * 1024**2), deadline=deadline_ns / 10**9))
         allocation = stage('guest-allocation', lambda: validate_guest_allocation(prerequisites, reservation))
@@ -237,8 +238,12 @@ def inspect_originals(archive, out, *, max_bytes, deadline_ns):
         def stable():
             original.unchanged(); prerequisites['outer'].unchanged(); recovered.unchanged(); reservation['files'].unchanged(); metadata.unchanged()
             require(source_identity(ROOT) == source, 'validator source changed during complete original record replay')
+            require(public_source_inventory(ROOT) == public_files,
+                'validator complete public source inventory changed during original record replay')
         stage('final-stability', stable)
         report.update(status=RESULT, commit=commit, archive_sha256=restoration['archive_sha256'],
+            public_source_files=len(public_files),
+            public_source_inventory_sha256=hashlib.sha256(json.dumps(public_files, separators=(',', ':')).encode()).hexdigest(),
             original_owner_sha256=terminal['owner_receipt_sha256'], complete_fresh=fresh, native_binaries=native,
             clean_output_binding=clean_binding,
             sampled_continuity=continuity, campaigns=campaigns,
