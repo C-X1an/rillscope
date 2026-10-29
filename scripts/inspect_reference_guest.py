@@ -132,14 +132,14 @@ class TrialCommands:
         directory=self.out/'commands';directory.mkdir(exist_ok=True)
         destination=directory/name;destination.mkdir()
         state={'schema_version':1,'command':command,'cwd':str(ROOT),
-               'started_utc':dt.datetime.now(dt.timezone.utc).isoformat(),
                'environment':{'python':platform.python_version(),'sqlite':sqlite3.sqlite_version,
                    'system':platform.system(),'machine':platform.machine(),'cpu_count':os.cpu_count()},
                'stdin':None,
                'verification_status':'FAIL','execution_outcome':'NOT_LAUNCHED',
                'input_limits_bytes':{'ordinary':256*1024**2,'explicit_image':IMAGE_LIMIT},
                'scope':'actual direct guest helper; enclosed in scripts/evidence.py trial receipt'}
-        process=None;error=None;captures=[];started=time.monotonic()
+        process=None;error=None;captures=[];started=time.monotonic_ns()
+        state['started_utc']=dt.datetime.now(dt.timezone.utc).isoformat()
         selected=[(path,256*1024**2) for path in inputs]+[(path,IMAGE_LIMIT) for path in large_inputs]
         try:
             state.update(source_before=source_identity(),git=git_state())
@@ -188,8 +188,11 @@ class TrialCommands:
                 path=destination/(label+'.txt')
                 if not path.exists(): path.write_bytes(b'')
                 state[label]={'file':path.name,'sha256':sha(path)}
+            finished=time.monotonic_ns()
             state.update(finished_utc=dt.datetime.now(dt.timezone.utc).isoformat(),
-                         elapsed_seconds=time.monotonic()-started,captures=[capture.record() for capture in captures])
+                         elapsed_seconds=(finished-started)/10**9,
+                         monotonic={'schema_version':1,'clock':'time.monotonic_ns','started_ns':started,'finished_ns':finished},
+                         captures=[capture.record() for capture in captures])
             (destination/'receipt.json').write_text(json.dumps(state,indent=2)+'\n')
             if process is not None:
                 process.stdout.close();process.stderr.close()

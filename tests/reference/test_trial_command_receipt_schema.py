@@ -19,6 +19,16 @@ import canonical_reference_retained_fresh as consumer
 
 
 class TrialCommandReceiptSchema(unittest.TestCase):
+    def test_terminal_helper_retains_the_exact_original_monotonic_samples(self):
+        parent=ROOT/".local-runs";parent.mkdir(exist_ok=True)
+        with tempfile.TemporaryDirectory(prefix="trial-clock-",dir=parent) as temp:
+            with patch.object(producer.time,"monotonic_ns",side_effect=[1_000_000_000,2_000_000_000]) as clock:
+                _,row,_,_=self.produce(Path(temp))
+            self.assertEqual(row.get("monotonic"),{"schema_version":1,"clock":"time.monotonic_ns",
+                "started_ns":1_000_000_000,"finished_ns":2_000_000_000})
+            self.assertEqual(row["elapsed_seconds"],1.0)
+            self.assertEqual(clock.call_count,2)
+
     def produce(self,directory,*,launch_error=False,inputs=(),large_inputs=()):
         source={"sha256":"b"*64,"files":[["synthetic-test-only","c"*64]]}
         process=Mock(pid=123,returncode=0,stdout=io.BytesIO(b"original output\n"),stderr=io.BytesIO(b""))
@@ -93,6 +103,11 @@ class TrialCommandReceiptSchema(unittest.TestCase):
             self.assertIn("stdin",row);self.assertIsNone(row["stdin"])
             self.assertEqual(row["verification_status"],"FAIL")
             self.assertEqual(row["execution_outcome"],"NOT_LAUNCHED")
+            self.assertEqual(set(row["monotonic"]),{"schema_version","clock","started_ns","finished_ns"})
+            self.assertEqual(row["monotonic"]["clock"],"time.monotonic_ns")
+            self.assertIs(type(row["monotonic"]["started_ns"]),int)
+            self.assertIs(type(row["monotonic"]["finished_ns"]),int)
+            self.assertLessEqual(row["monotonic"]["started_ns"],row["monotonic"]["finished_ns"])
 
     def test_every_caller_permutation_records_the_same_exact_sorted_inputs(self):
         parent=ROOT/".local-runs";parent.mkdir(exist_ok=True)

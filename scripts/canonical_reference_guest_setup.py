@@ -101,10 +101,10 @@ def setup(seed):
         and hashlib.sha256(installer.read_bytes()).hexdigest() == INSTALLER_SHA256,
         'actual pinned installer bytes differ before native execution')
     durable_mkdir(BASE, mode=0o700)
-    started = time.monotonic_ns(); deadline = started + seed['setup_seconds'] * 10**9
+    started = time.monotonic_ns(); started_utc = time.time_ns(); deadline = started + seed['setup_seconds'] * 10**9
     record = {'schema_version': 1, 'method': allocation.METHOD, 'status': 'FAIL',
         'commit': seed['commit'], 'source_sha256': seed['source_sha256'],
-        'started_monotonic_ns': started, 'deadline_monotonic_ns': deadline,
+        'started_monotonic_ns': started, 'started_utc_ns': started_utc, 'deadline_monotonic_ns': deadline,
         'boot_id': original.observed_boot_id(), 'first_party_build_transported': False,
         'canonical': 'NOT RUN', 'reference_qualified': False,
         'scope': 'Actual native prerequisites in the one owned ephemeral guest; no dedication, canonical or benchmark verdict.'}
@@ -197,8 +197,9 @@ def setup(seed):
             try: record['tool_target_retirement'] = retire_tool_target()
             except Exception as error:
                 record.update(status='FAIL', retirement_error=type(error).__name__ + ': ' + str(error)[:2048])
-        record.update(finished_monotonic_ns=time.monotonic_ns(),
-            elapsed_seconds=(time.monotonic_ns() - started) / 10**9)
+        finished = time.monotonic_ns(); finished_utc = time.time_ns()
+        record.update(finished_monotonic_ns=finished, finished_utc_ns=finished_utc,
+            elapsed_seconds=(finished - started) / 10**9)
         if record['finished_monotonic_ns'] >= deadline: record['status'] = 'FAIL'
         write_json(BASE / 'setup-result.json', record); fsync_directory(BASE)
     return record

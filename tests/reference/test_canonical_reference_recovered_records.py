@@ -1,5 +1,6 @@
 """Literal tiny inventory/clock controls; never a native VM or execution proof."""
 import copy
+import datetime as dt
 import base64
 import hashlib
 import json
@@ -34,9 +35,9 @@ def literal_apt_acquisition(folder, setup, seed, seed_raw, source):
     observation = {'nodes': policy['nodes'], 'ancestors': policy['ancestors']}
     setup['apt_acquisition'] = {'policy': policy, 'checks': [{'stage': name,
         'before': copy.deepcopy(observation), 'after': copy.deepcopy(observation)} for name in ('apt-update', 'apt-install')]}
-    inputs = [{'path': '/work/c/.local-runs/canonical-seed/seed.json', 'bytes': len(seed_raw), 'sha256': digest(seed_raw)},
+    inputs = [{'path': apt_fixtures.KEY, 'bytes': len(apt_fixtures.PUBLIC_KEY_FIXTURE), 'sha256': digest(apt_fixtures.PUBLIC_KEY_FIXTURE)},
         {'path': apt_fixtures.DIR + '/native.sources', 'bytes': len(apt_fixtures.SOURCE), 'sha256': digest(apt_fixtures.SOURCE)},
-        {'path': apt_fixtures.KEY, 'bytes': len(apt_fixtures.PUBLIC_KEY_FIXTURE), 'sha256': digest(apt_fixtures.PUBLIC_KEY_FIXTURE)}]
+        {'path': '/work/c/.local-runs/canonical-seed/seed.json', 'bytes': len(seed_raw), 'sha256': digest(seed_raw)}]
     prefix = ['/usr/bin/apt-get', '-o', 'Dir::Etc::sourcelist=' + apt_fixtures.DIR + '/native.sources',
         '-o', 'Dir::Etc::sourceparts=' + apt_fixtures.DIR + '/empty-sources.d', '-o', 'Acquire::Languages=none',
         '-o', 'Acquire::AllowInsecureRepositories=false', '-o', 'Acquire::AllowWeakRepositories=false',
@@ -123,6 +124,8 @@ def prerequisite_fixture(root):
         'deadline_monotonic_ns': 912 * second, 'elapsed_seconds': 100.0, 'cleanup': complete,
         'environment': environment.request['environment'], 'versions': records.check_rust_versions(*outputs),
         'tool_target_retirement': {'status': 'RETIRED', 'fixture': 'No cache existed; literal expected shape only'}}
+    setup['started_utc_ns'] = int(dt.datetime(2026, 10, 24, 23, 59, 53, tzinfo=dt.timezone.utc).timestamp()) * second
+    setup['finished_utc_ns'] = setup['started_utc_ns'] + 100 * second
     (artifact / 'recovery/setup/setup-result.json').write_bytes(raw(setup))
     trust_input = literal_setup_trust(artifact / 'recovery/setup', setup)
     home = '/work/c/.local-runs/canonical-home'
@@ -148,6 +151,14 @@ def prerequisite_fixture(root):
         (directory / 'receipt.json').write_bytes(raw(proof)); (directory / 'stdout.txt').write_bytes(value); (directory / 'stderr.txt').write_bytes(b'')
     literal_guest_proof(artifact / 'recovery/setup/commands/guest-git-ownership', seed, seed_raw, source, setup)
     literal_apt_acquisition(artifact / 'recovery/setup', setup, seed, seed_raw, source)
+    # Explicitly synthetic same-boot monotonic observations; never execution evidence.
+    starts = {'apt-update': 13, 'apt-install': 15, 'guest-git-ownership': 17,
+        'rustup-version': 19, 'rustc-version': 20, 'cargo-version': 21, 'audit-version': 22, 'deny-version': 23}
+    for name, begin in starts.items():
+        path = artifact / 'recovery/setup/commands' / name / 'receipt.json'; proof = json.loads(path.read_bytes())
+        proof['monotonic'] = {'schema_version': 1, 'clock': 'time.monotonic_ns', 'started_ns': begin * second,
+            'finished_ns': begin * second + int(proof['elapsed_seconds'] * second)}
+        path.write_bytes(raw(proof))
     (artifact / 'recovery/setup/setup-result.json').write_bytes(raw(setup))
     owner = {**common, 'schema_version': 1, 'status': 'PASS', 'boot_id': footer['boot_id'], 'retention': 'RETAINED',
         'cleanup': complete, 'started_monotonic_ns': 120 * second, 'canonical_started_monotonic_ns': 121 * second,

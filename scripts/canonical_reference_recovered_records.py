@@ -3,6 +3,7 @@
 This checks included bytes and recorded execution. It neither reconstructs a
 stopped VM nor grants allocation, continuous residency or reference qualification.
 """
+import datetime as dt
 import hashlib
 import io
 import json
@@ -33,6 +34,8 @@ MAX_DEPTH = 32
 MAX_BYTES = 8 * 1024**3
 MAX_FILE = 1024**3
 MAX_INVENTORY = 8 * 1024**2
+# The existing complete-canonical UTC/monotonic correlation validity limit.
+UTC_CORRELATION_TOLERANCE_NS = 1_000_000_000
 require = protocol.require
 
 
@@ -289,6 +292,34 @@ def native_versions(recovered, seed, seed_raw, source, trust_input):
     return check_rust_versions(*outputs), proofs
 
 
+def helper_monotonic_span(proof, setup):
+    """Bind recorded helper time to the same original guest setup clock."""
+    row = proof.get('monotonic'); elapsed = proof.get('elapsed_seconds')
+    require(type(row) is dict and set(row) == {'schema_version', 'clock', 'started_ns', 'finished_ns'}
+        and type(row['schema_version']) is int and row['schema_version'] == 1 and row['clock'] == 'time.monotonic_ns',
+        'closed original helper monotonic observation required')
+    begin, end = row['started_ns'], row['finished_ns']
+    lower, upper = setup.get('started_monotonic_ns'), setup.get('finished_monotonic_ns')
+    require(all(type(value) is int and 0 <= value < 2**63 for value in (begin, end, lower, upper))
+        and 0 <= lower < upper and lower <= begin <= end <= upper
+        and type(elapsed) in (int, float) and math.isfinite(elapsed) and elapsed >= 0
+        and abs(elapsed - (end - begin) / 10**9) <= .010,
+        'original helper monotonic interval/duration leaves its setup frame')
+    utc_lower, utc_upper = setup.get('started_utc_ns'), setup.get('finished_utc_ns')
+    require(type(utc_lower) is int and type(utc_upper) is int and 0 < utc_lower <= utc_upper < 2**63
+        and abs((utc_upper - utc_lower) - (upper - lower)) <= UTC_CORRELATION_TOLERANCE_NS,
+        'original setup UTC/monotonic correlation anchors differ')
+    require(type(proof.get('started_utc')) is str and type(proof.get('finished_utc')) is str,
+        'original helper UTC endpoints missing')
+    epoch = dt.datetime(1970, 1, 1, tzinfo=dt.timezone.utc)
+    for name, point in (('started_utc', begin), ('finished_utc', end)):
+        delta = instant(proof[name]) - epoch
+        value = (delta.days * 86400 + delta.seconds) * 10**9 + delta.microseconds * 1000
+        require(abs(value - (point + utc_lower - lower)) <= UTC_CORRELATION_TOLERANCE_NS,
+            'original helper UTC endpoint leaves its monotonic correlation bound')
+    return begin, end
+
+
 def native_acquisition(recovered, setup, seed, seed_raw, source, *, before_utc):
     policy = native_apt.validate_acquisition(setup.get('apt_acquisition'))
     _, sources, _ = native_apt.locations('/work/c')
@@ -296,18 +327,21 @@ def native_acquisition(recovered, setup, seed, seed_raw, source, *, before_utc):
         'sha256': hashlib.sha256(seed_raw).hexdigest()},
         {'path': str(sources), 'bytes': policy['source_bytes'], 'sha256': policy['source_sha256']},
         {'path': native_apt.KEYRING, 'bytes': policy['keyring_bytes'], 'sha256': policy['keyring_sha256']}]
-    metadata = SetupCommands(recovered); proofs = []; previous = None
+    inputs.sort(key=lambda row: row['path'])  # TrialCommands records whole input pairs in lexical path order.
+    metadata = SetupCommands(recovered); proofs = []; previous = None; previous_monotonic = None
     commands = native_apt.commands('/work/c', native_apt.PACKAGES)
     for name, command, bound in zip(('apt-update', 'apt-install'), commands, (300, 600)):
         proof = receipt(metadata, PurePosixPath('original-setup/commands') / name,
             source=source, commit=seed['commit'], command=command, cwd=PurePosixPath('/work/c'))
         start, end = instant(proof['started_utc']), instant(proof['finished_utc'])
+        monotonic_start, monotonic_end = helper_monotonic_span(proof, setup)
         require(proof['inputs_before'] == proof['inputs_after'] == inputs
             and (previous is None or previous <= start) and end <= instant(before_utc)
+            and (previous_monotonic is None or previous_monotonic <= monotonic_start)
             and proof['elapsed_seconds'] <= min(bound, seed['setup_seconds'])
             and proof['elapsed_seconds'] <= (end - start).total_seconds() + .010,
             'original authenticated native APT command/input/clock binding differs')
-        previous = end; proofs.append(proof)
+        previous = end; previous_monotonic = monotonic_end; proofs.append(proof)
     require(sum(row['elapsed_seconds'] for row in proofs) <= setup['elapsed_seconds'] + .010,
         'native APT command durations cannot fit original setup interval')
     return proofs
@@ -391,26 +425,35 @@ def validate_prerequisites(attempt, terminal, *, source, deadline, public_files=
     trust_input = git_trust.validate_setup(SetupCommands(recovered), PurePosixPath('original-setup'), setup)
     versions, version_proofs = native_versions(recovered, seed, seed_raw, source, trust_input)
     require(versions == setup.get('versions'), 'original five native version outputs differ from result')
-    previous_end = None; first_start = None; elapsed_total = 0
+    previous_end = None; first_monotonic = None; previous_monotonic = None; elapsed_total = 0
     for proof in version_proofs:
         start_utc, end_utc = instant(proof['started_utc']), instant(proof['finished_utc'])
         require(previous_end is None or previous_end <= start_utc, 'original native version receipt intervals overlap or reverse')
         require(proof['elapsed_seconds'] <= (end_utc - start_utc).total_seconds() + .010,
             'original native version elapsed exceeds its recorded UTC interval')
-        if first_start is None: first_start = start_utc
+        monotonic_start, monotonic_end = helper_monotonic_span(proof, setup)
+        require(previous_monotonic is None or previous_monotonic <= monotonic_start,
+            'original native version monotonic intervals overlap or reverse')
+        if first_monotonic is None: first_monotonic = monotonic_start
+        previous_monotonic = monotonic_end
         previous_end = end_utc; elapsed_total += proof['elapsed_seconds']
     require(elapsed_total <= setup['elapsed_seconds'] + .010
-        and (previous_end - first_start).total_seconds() <= setup['elapsed_seconds'] + .010,
+        and (previous_monotonic - first_monotonic) / 10**9 <= setup['elapsed_seconds'] + .010,
         'sequential original native version receipt intervals cannot fit actual setup duration')
     git_proof = validate_guest_git_proof(SetupCommands(recovered), PurePosixPath('original-setup/commands/guest-git-ownership'),
         source=source, seed=seed, seed_raw=seed_raw, setup=setup, before_utc=version_proofs[0]['started_utc'])
+    git_start, git_end = helper_monotonic_span(git_proof, setup)
+    require(git_end <= first_monotonic, 'original guest Git/native version monotonic order differs')
     require(elapsed_total + git_proof['elapsed_seconds'] <= setup['elapsed_seconds'] + .010
-        and (previous_end - instant(git_proof['started_utc'])).total_seconds() <= setup['elapsed_seconds'] + .010,
+        and (previous_monotonic - git_start) / 10**9 <= setup['elapsed_seconds'] + .010,
         'original guest Git and native version intervals cannot fit actual setup duration')
     apt_proofs = native_acquisition(recovered, setup, seed, seed_raw, source, before_utc=git_proof['started_utc'])
+    apt_start, _ = helper_monotonic_span(apt_proofs[0], setup)
+    _, apt_end = helper_monotonic_span(apt_proofs[-1], setup)
+    require(apt_end <= git_start, 'original APT/guest Git monotonic order differs')
     require(elapsed_total + git_proof['elapsed_seconds'] + sum(row['elapsed_seconds'] for row in apt_proofs)
         <= setup['elapsed_seconds'] + .010
-        and (previous_end - instant(apt_proofs[0]['started_utc'])).total_seconds() <= setup['elapsed_seconds'] + .010,
+        and (previous_monotonic - apt_start) / 10**9 <= setup['elapsed_seconds'] + .010,
         'original APT/Git/native version intervals cannot fit actual setup duration')
     start = recovered.tree_document('start', 'start-result.json'); owner = recovered.tree_document('owner', 'owner-result.json')
     require(start.get('method') == protocol.METHOD and start.get('mode') == 'canonical' and start.get('status') == 'PASS'
