@@ -67,7 +67,9 @@
       "status": "BLOCKED",
       "runs": [
         "fresh-rust-demo-manifest-bound",
-        "streaming-demo-current"
+        "streaming-demo-current",
+        "ri-fresh-demo-only",
+        "ri-visual-unfilled"
       ],
       "scope": "Current actual three-case Rust CLI demo matches its oracle. Current fresh/rendered visual/keyboard proof is unqualified under HA006; old fresh/browser evidence stays dated."
     },
@@ -157,9 +159,11 @@
       "status": "PASS",
       "runs": [
         "streaming-native-current",
-        "streaming-final-current-association"
+        "streaming-final-current-association",
+        "ri-current-native",
+        "ri-current-final-decision"
       ],
-      "scope": "Current ordinary cancellation/output caps and current-source original instruction/handler/envelope/source-fault record validation support the unchanged final atomic successful-response cancellation decision. No atomic-delivery or last-byte cancellation guarantee; full/reference/fresh/release remain separate."
+      "scope": "Actual current ordinary cancellation/output-cap tests and source-bound verification of the original f707 instruction capture, with finalized independent assessment and the explicitly applied final success-path cancellation decision. No last-byte or atomic-transport guarantee."
     },
     "AC-019": {
       "status": "PASS",
@@ -180,41 +184,41 @@
       "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
     },
     "AC-021": {
-      "status": "FAIL",
+      "status": "PASS",
       "runs": [
-        "full-grid-windows-failed",
-        "full-grid-windows-strong-failed",
-        "full-linux-retention-failed",
-        "nullable-sort-current",
-        "full-linux-79e-incomplete",
-        "sqlite651-full-grid-timeout"
+        "mc65-native18-complete-reference-and-fresh"
       ],
-      "scope": "Original full Windows capture retains three timeouts. Subsequent Linux failures remain dated; original651 timed out with35226/43050 observations,335 complete/1partial/74absent; cancellation and deciding-NULL absent, full semantic validation not run. New bounded-loader source requires a genuinely complete new capture."
+      "scope": "Original789814ff/source7d45 complete native Linux410-grid43050 observations,290required successes/17400comparisons, plus deciding-NULL40/4200/2400; all raw originals checked and failures retained."
     },
     "AC-022": {
-      "status": "BLOCKED",
-      "runs": [],
-      "scope": "Actual dedicated 4-core/8-GiB Linux reference host unavailable; no target result claimed"
+      "status": "PASS",
+      "runs": [
+        "mc65-native18-complete-reference-and-fresh",
+        "mc65-native18-observed-distributions"
+      ],
+      "scope": "Five actual30-repetition100kfilter execution/end-to-end distributions; dedicated four-vCPU8GiB Linux guest assigned to this campaign. Provider physical host may be shared; observed targetsMET, no future latency guarantee."
     },
     "AC-023": {
-      "status": "BLOCKED",
-      "runs": [],
-      "scope": "Actual Linux reference host required; prepared signal campaign and Windows hard-kill evidence are not substitutes"
+      "status": "PASS",
+      "runs": [
+        "mc65-native18-complete-reference-and-fresh",
+        "mc65-native18-observed-distributions"
+      ],
+      "scope": "Actual Linux175-sample campaign/150measured signal-to-exit upper bounds, p95.500458ms/max.693420ms, zero over100ms; same scoped guest allocation, all original timestamps/cleanup checked."
     },
     "AC-024": {
-      "status": "FAIL",
+      "status": "PASS",
       "runs": [
-        "fresh-ec4-windows-failed"
+        "mc65-native18-complete-reference-and-fresh"
       ],
-      "scope": "Complete ec4 fresh Windows recipe executed all twelve targets: Win1314 security/verify and GNU long-path release build failed; reference benchmark blocked. New full Linux fresh reproduction remains pending"
+      "scope": "Original789814ff fresh isolated committed Linux checkout; bootstrap/verify/demo and all18nested gates/22receipts with fresh enforced target passed. Complete source/native/all-record custody replayed; later prose/evidence differs only outside required execution dependencies."
     },
     "AC-025": {
       "status": "PASS",
       "runs": [
-        "sqlite-batch-static-native",
-        "sqlite-batch-malformed"
+        "nf58-current-static-malformed-native"
       ],
-      "scope": "Current complete Rust formatting, Clippy, all-target compilation, 47 library plus one CLI unit test and 144-file Python syntax/whitespace checks PASS. Actual finite 2000-case JSON/SQL malformed corpus PASS; libFuzzer NOT RUN."
+      "scope": "Actual pinned Rust format/Clippy/check/unit gates and complete seeded2000-case malformed JSON/SQL corpus; current executable, recipe and test dependencies bound. Finite corpus only; libFuzzer NOT RUN."
     },
     "AC-026": {
       "status": "PASS",
@@ -254,10 +258,10 @@
     "AC-030": {
       "status": "PASS",
       "runs": [
-        "current-notice-components",
-        "sqlite-batch-public-wording"
+        "ri-current-license",
+        "mc65-current-public-wording"
       ],
-      "scope": "Actual current 45-path wording and public independent-test provenance inspected separately; unchanged images hash-compared only. Preserved license notices. Failed partial experiments and Windows diagnostics establish no complete performance, reference, canonical fresh or release qualification."
+      "scope": "Actual26registry packages/27preserved notices and current46entry public wording review. Required main-chat gate follows explicit user routing; shared implementation history disclosed, no distinct independent actor invented. Full release/manual inspection remain incomplete."
     }
   },
   "artifacts": {
@@ -1184,6 +1188,134 @@
     "sqlite651-full-grid-timeout": {
       "path": "verification/product/runs/sqlite651-full-grid-timeout.json",
       "sha256": "ea3d56655c7d9a661556a93688b9a6114f193d28de7d660537ab07f85025381e"
+    },
+    "f707-identity-before": {
+      "path": "verification/product/runs/f707-identity-before.json",
+      "sha256": "1176cf28059cc7cfc9d7083156a6f235acc826638452e60755f498f67eff2e3c"
+    },
+    "f707-identity-positive": {
+      "path": "verification/product/runs/f707-identity-positive.json",
+      "sha256": "a8a0254d2455f47c35fba5005a542d59d474917a0e758cc8772efdcfa26c9340"
+    },
+    "f707-head-routing-negative": {
+      "path": "verification/product/runs/f707-head-routing-negative.json",
+      "sha256": "28ae37371b83c3642b077ae9325f21e2ee2fa41a54ba4f84dffc2120aea23b7e"
+    },
+    "f707-tree-negative": {
+      "path": "verification/product/runs/f707-tree-negative.json",
+      "sha256": "021db919562679cde18859c8391b4b7344743d9aaf5d9ec8c39043366f3a20da"
+    },
+    "f707-reference-restored": {
+      "path": "verification/product/runs/f707-reference-restored.json",
+      "sha256": "68dd7471cddc8bf5e7abcebea7bf69900453bbfd4db3c88715d63a7b44c486f6"
+    },
+    "f707-current-final-decision": {
+      "path": "verification/product/runs/f707-current-final-decision.json",
+      "sha256": "be8607e886d3a1e4c382d17ec14282891af50a87d886bf5d4cef8e377b8bafab"
+    },
+    "f707-linux-reference": {
+      "path": "verification/product/runs/f707-linux-reference.json",
+      "sha256": "81c886da6f63194c916aeebcb4f2787c22a0cf0572a9485e037d34b3e358f880"
+    },
+    "f707-linux-product": {
+      "path": "verification/product/runs/f707-linux-product.json",
+      "sha256": "8a3f6854c4231cccf978e592bd1a41605cd44dd130850308f3c78d731eb7dbaa"
+    },
+    "f707-static-syntax": {
+      "path": "verification/product/runs/f707-static-syntax.json",
+      "sha256": "d0e7210f41671d62e5db5039cf06c44edef021b25874e5f60b10a89e4c8f5c91"
+    },
+    "f707-required-closure": {
+      "path": "verification/product/runs/f707-required-closure.json",
+      "sha256": "31834644c98aa45c2e52083fe4f91510ddd28e357e7a8015941b0998bbe57b44"
+    },
+    "f707-fresh-timeout": {
+      "path": "verification/product/runs/f707-fresh-timeout.json",
+      "sha256": "f0567fd0b6f4731f707ce68f219e233a668333a5c232884f9fcd29b515afb3e8"
+    },
+    "ri-current-native": {
+      "path": "verification/product/runs/ri-current-native.json",
+      "sha256": "6ac74c9901007458198809c091fbb7e08f55ff372be2ba5784547862c7105cee"
+    },
+    "ri-current-final-decision": {
+      "path": "verification/product/runs/ri-current-final-decision.json",
+      "sha256": "e3b8fc3a5c66b1e564cd8ba4972ef9a39a38db057b026ca968d6addfde057714"
+    },
+    "ri-current-wording": {
+      "path": "verification/product/runs/ri-current-wording.json",
+      "sha256": "281947db03305e9319268d4b5c8c25f3b79e5b703268c751410db2c49eb54df9"
+    },
+    "ri-current-license": {
+      "path": "verification/product/runs/ri-current-license.json",
+      "sha256": "66fade9eafca6af497f506e8d250eae5facf09f2c281cabb1c7b2c40d14197ca"
+    },
+    "ri-disposition-before": {
+      "path": "verification/product/runs/ri-disposition-before.json",
+      "sha256": "f0709d79c3cada66ef0af7b5fc56c91c67c7cc92297e1db7574ce24300a9a41f"
+    },
+    "ri-disposition-fixed": {
+      "path": "verification/product/runs/ri-disposition-fixed.json",
+      "sha256": "9658168fe1c36192217f183f57a1b4c212e99e278cfdc2fb852a8e3ff8374f17"
+    },
+    "ri-disposition-negative": {
+      "path": "verification/product/runs/ri-disposition-negative.json",
+      "sha256": "af191c61b573b84d7bbd57b0ad29e27c4198406c6d9b841d031ca36984e289e3"
+    },
+    "ri-disposition-restored": {
+      "path": "verification/product/runs/ri-disposition-restored.json",
+      "sha256": "d92ec57120452b2bb5c8db4b9b7c4d48dbeba196b63b600f3108386d015974da"
+    },
+    "ri-fresh-demo-only": {
+      "path": "verification/product/runs/ri-fresh-demo-only.json",
+      "sha256": "4367f3b62f886d47820a24ea4fa7abaafb1ed036ee8da0105d6c88fc1a1d329a"
+    },
+    "ri-visual-unfilled": {
+      "path": "verification/product/runs/ri-visual-unfilled.json",
+      "sha256": "df3ddeebaaab55167c3a3d0117424c2daf25e974e7570e11b16c95f87d7013a2"
+    },
+    "process-readiness-wording": {
+      "path": "verification/product/runs/process-readiness-wording.json",
+      "sha256": "420f5e6bcc7b106c85fca4087dec7235d157f299cc44a9bb363d8c9cca2d656f"
+    },
+    "nf43-current-static-native": {
+      "path": "verification/product/runs/nf43-current-static-native.json",
+      "sha256": "f8ad866981dc80cfce829095464dacfe332c322e963b3b976aed51d53d12e283"
+    },
+    "nf43-current-malformed-native": {
+      "path": "verification/product/runs/nf43-current-malformed-native.json",
+      "sha256": "b4587f8fb8c4632be9ad101f794817ba26eb1674b34608b6653d94911854ede2"
+    },
+    "nf47-current-static-native": {
+      "path": "verification/product/runs/nf47-current-static-native.json",
+      "sha256": "56850c2b74e8f5cd49022e9ad8102eede06c4eec12dad59740712016b2a6b8dc"
+    },
+    "nf47-current-malformed-native": {
+      "path": "verification/product/runs/nf47-current-malformed-native.json",
+      "sha256": "8a3c0a26db0b87722e8e0484c5d0d3a6a8016cb1283d4f2d2cfc880609c5206e"
+    },
+    "nf54-current-static-malformed-native": {
+      "path": "verification/product/runs/nf54-current-static-malformed-native.json",
+      "sha256": "ba6b556f1fa8204b2ee5b68c1a930229cfaeec251421bbf5e40e61267cf5e5ed"
+    },
+    "nf54-input-order-static-malformed-native": {
+      "path": "verification/product/runs/nf54-input-order-static-malformed-native.json",
+      "sha256": "8907fdaf78e91af0ce9f6fd416c698f1cacbf2220fa56f0c7cbc67b24349ce5d"
+    },
+    "nf58-current-static-malformed-native": {
+      "path": "verification/product/runs/nf58-current-static-malformed-native.json",
+      "sha256": "32d2fb475bc53dbf3b18af201f5a28f080fd3948aa371ba56e71a824f014fdbb"
+    },
+    "mc65-native18-complete-reference-and-fresh": {
+      "path": "verification/product/runs/mc65-native18-complete-reference-and-fresh.json",
+      "sha256": "5f7034c2af7721c9a71a260f49ce57d1d5ea2c07e6ebe30fc680fdb531984745"
+    },
+    "mc65-native18-observed-distributions": {
+      "path": "verification/product/runs/mc65-native18-observed-distributions.json",
+      "sha256": "bbaed43e74dbc5f942d390e9b15091010fed3dafc4bc84c4bd7e319a27df711a"
+    },
+    "mc65-current-public-wording": {
+      "path": "verification/product/runs/mc65-current-public-wording.json",
+      "sha256": "b344ae6969c806d731d08e8b0bfe7c1df091f16adda925e5c1fab109d0770b6f"
     }
   },
   "release_status": "INCOMPLETE",

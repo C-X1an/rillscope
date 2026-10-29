@@ -279,6 +279,44 @@ def verify_records(records, source, commit):
             'scope':'all bounded artifact members/selected source and raw responses checked; no new product execution or reference-host target'}
 
 
+def checkout_binding(source, workflow, head_commit):
+    """Bind the actual clean checkout, preserving PR head and merge identities."""
+    def git(*arguments):
+        return subprocess.check_output(['git',*arguments],cwd=source,text=True).strip()
+
+    recorded = git('rev-parse','HEAD')
+    require(re.fullmatch('[0-9a-f]{40}',recorded) and not git('status','--porcelain'),
+            'exact clean recorded-source checkout required')
+    tree = git('rev-parse',recorded+'^{tree}')
+    parents = git('show','-s','--format=%P',recorded).split()
+    binding = 'exact-workflow-head'
+    if recorded != head_commit:
+        repository = workflow.get('repository')
+        require(workflow.get('event') == 'pull_request' and workflow.get('head_sha') == head_commit
+                and type(repository) is dict and repository.get('full_name') == REPOSITORY
+                and type(repository.get('id')) is int and repository['id'] > 0,
+                'distinct recorded checkout requires an actual same-repository PR workflow')
+        associations = workflow.get('pull_requests')
+        require(type(associations) is list and len(associations) == 1 and type(associations[0]) is dict,
+                'exactly one actual PR association required')
+        head, base = associations[0].get('head'), associations[0].get('base')
+        require(type(head) is dict and type(base) is dict and head.get('sha') == head_commit
+                and type(base.get('sha')) is str and re.fullmatch('[0-9a-f]{40}',base['sha']),
+                'actual PR head/base commit association differs')
+        for endpoint in (head,base):
+            repo = endpoint.get('repo')
+            require(type(repo) is dict and type(repo.get('id')) is int and repo['id'] == repository['id']
+                    and repo.get('url') == 'https://api.github.com/repos/'+REPOSITORY
+                    and repo.get('name') == REPOSITORY.rsplit('/',1)[1],
+                    'actual PR head/base repository association differs')
+        require(parents == [base['sha'],head_commit], 'recorded PR merge parent order/count differs')
+        require(tree == git('rev-parse',head_commit+'^{tree}'),
+                'recorded PR merge full Git tree differs from workflow head')
+        binding = 'same-tree-pull-request-merge'
+    return {'workflow_head_commit':head_commit,'recorded_checkout_commit':recorded,
+            'recorded_checkout_tree':tree,'recorded_checkout_parents':parents,'source_commit_binding':binding}
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--commit',required=True); parser.add_argument('--job-id',type=int,required=True)
@@ -298,11 +336,14 @@ def main():
             and artifact['workflow_run']['head_sha'] == args.commit, 'actual public job/artifact association differs')
     archive_sha = digest(args.zip.read_bytes())
     require(artifact['digest'] == 'sha256:'+archive_sha, 'download differs from actual public artifact digest')
+    source = args.source_checkout.resolve()
+    binding = checkout_binding(source,run,args.commit)
     records = Records(args.zip)
     try:
-        result = verify_records(records,args.source_checkout.resolve(),args.commit)
+        result = verify_records(records,source,binding['recorded_checkout_commit'])
     finally:
         records.archive.close()
+    result.update(binding)
     result.update(remote_repository=REPOSITORY,remote_commit=args.commit,remote_run_id=job['run_id'],
                   remote_job_id=job['id'],remote_job_name=job['name'],remote_job_conclusion=job['conclusion'],
                   remote_workflow_conclusion=run['conclusion'],remote_runner_labels=job['labels'],

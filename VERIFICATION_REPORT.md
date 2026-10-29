@@ -1,6 +1,12 @@
 # Verification report
 
-## Current original Rust development evidence
+## Complete canonical native evidence, 2026-10-29
+
+[Native run 18](https://github.com/C-X1an/rillscope/actions/runs/40887422611), commit `789814ff`, completed collection and strict original-record validation. A separate unmodified local replay passed all 12 stages and reproduced its original report exactly: 43,050 grid observations, 4,200 deciding-NULL observations, 175 cancellation observations, 19,800 independent semantic comparisons, native executable custody and the fresh checkout's 18 gates/22 receipts. The [curated record](verification/product/runs/mc65-native18-complete-reference-and-fresh.json) binds the original 357-file execution/source identity; the retained original report additionally authenticates the complete 646-file public seed. Later documentation/evidence updates retain exact execution and verification dependency bytes.
+
+The dedicated reference allocation was one four-vCPU, 8-GiB Linux KVM guest for this campaign. Physical host sharing and hypervisor scheduling remain possible, and sampled conditions do not establish uninterrupted residency. [Benchmark results](BENCHMARKS.md) report every seed's distributions and cancellation upper bounds. Required main-chat review follows the user's routing instruction and shares implementation history; it does not invent a separate reviewer. One complete method execution is observed, without a future-capacity or production guarantee. AC-008 still lacks actual manual visual/keyboard observations, libFuzzer remains not run, and the final DAG/release remain incomplete. All historical failures below retain their original outcomes.
+
+## Earlier Rust development records
 
 The original compiler/executor and fixed-scope inspector are implemented. [Curated product run summaries](verification/product/artifact-catalog.json) preserve actual exit/status, raw output digests, source-file hashes, environment and selected test/campaign observations without publishing private commands or internal logs. The [criterion index](verification/product/index.json) and [claims table](CLAIMS_EVIDENCE.md) distinguish recorded scoped successes from incomplete locked requirements. `python3 scripts/release_audit.py` checks status/link/hash consistency; `--require-all` additionally refuses unproved or historical release coverage. It does not execute product queries or provide independent authentication.
 

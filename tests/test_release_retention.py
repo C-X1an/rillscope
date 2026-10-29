@@ -149,5 +149,23 @@ class ReleaseRetention(unittest.TestCase):
             for row in result['metadata']:
                 self.assertEqual((out/row['file']).read_bytes(),expected[Path(row['source']).name])
 
+    def test_original_guest_export_result_bytes_for_all_three_stages_are_retained(self):
+        with tempfile.TemporaryDirectory(prefix='rill-retention-unit-') as folder:
+            root=Path(folder).resolve();checkout=self.fixture(root,compact=True)
+            supplement=checkout/'.local-runs/bench/s-unit/grid';supplement.mkdir(parents=True)
+            (supplement/'actual-error.txt').write_bytes(b'fixture supplement failure\n')
+            expected={}
+            for experiment,stage in [(checkout/'.local-runs/benchmark-unit','grid'),
+                (checkout/'.local-runs/benchmark-unit','cancel'),(supplement.parent,'grid')]:
+                file=experiment/('capture-'+stage)/'host-export-result.json';file.parent.mkdir()
+                original=b'{"fixture":"byte custody only","status":"FAIL"}\r\n'
+                file.write_bytes(original);expected[file.relative_to(root).as_posix()]=original
+            with patch.object(retain_release,'ROOT',root),patch.object(archive_capture,'ROOT',root):
+                out=root/'.local-runs/retained';result=retain_release.retain(out)
+            actual={row['source']:(out/row['file']).read_bytes() for row in result['metadata'] if row['source'] in expected}
+            self.assertEqual(actual,expected)
+            self.assertEqual(len(actual),3)
+            self.assertEqual(len(result['captures']),3)
+
 
 if __name__=='__main__': unittest.main()
