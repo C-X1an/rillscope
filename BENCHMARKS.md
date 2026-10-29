@@ -1,6 +1,30 @@
-# Benchmarks: methodology before claims
+# Benchmarks: recorded methods and measurements
 
-## Observed reference harness smoke run
+## Complete native Linux campaign, 2026-10-29
+
+[Canonical run 18](https://github.com/C-X1an/rillscope/actions/runs/40887422611) completed collection and strict validation at commit `789814fffdcf7ea8ee2223904ac6d38e90c6a647`, source fingerprint `7d459580f37a0c26ca75f59d32ce6d2335b63a0f675f3995f7a7d5ef44ec7f66`. A separate complete local replay reproduced the original validator report exactly: all 12 stages passed. The [curated observations](verification/product/runs/mc65-native18-complete-reference-and-fresh.json) retain source-file identities, original output digests, target distributions and acceptance associations. Original artifact SHA-256: `7f4e39b7a501a60d4d062e2039a5bea28dfb4d04b0696afdbb5267b1fb58d89a`.
+
+The reference system was a newly created KVM guest assigned exclusively to this campaign: four x86_64 virtual CPUs, 8 GiB configured RAM, AMD EPYC 9V45 CPU model, Linux 6.8.0-142-generic and the pinned Rust 1.99.0 release build. The provider's physical host and hypervisor scheduling may be shared. The original controller reservation, guest allocation, native executable bytes, source inventories, command receipts and both sides of the artifact transfers were checked. Recorded conditions include 20,117 host samples and 5,005 guest samples; maximum required host and guest gaps were 0.547 and 2.010 seconds. Sampling does not prove uninterrupted residency or physical exclusivity.
+
+The unchanged full grid retained 410 seeded cases and 43,050 observations, including all 290 required-success cases and 17,400 independent semantic comparisons. The deciding-NULL sort supplement retained 40 cases, 4,200 observations and 2,400 comparisons. The cancellation campaign retained 175 observations, including 150 measured observations. Every observation was checked; there were zero invalid observations. Expected output/work/capacity rejections remain classified outcomes, rather than omitted failures. Each grid case used five warmups and 30 measured paired repetitions of optimization on/off and an independently materialized SQLite execution; input generation stayed outside the declared timers.
+
+For the 100,000-row warm filter/project target, every seed met execution-only p95 below one second. End-to-end CLI time is reported separately; each row has 30 measured samples and 60 independent semantic comparisons.
+
+| Seed | Execution p50 (ms) | Execution p95 (ms) | Execution p99 (ms) | End-to-end p95 (ms) |
+|:--|--:|--:|--:|--:|
+| 20261014 | 16.2897340 | 16.647325 | 17.201604 | 47.261215 |
+| 20261015 | 16.4936565 | 16.923833 | 18.398225 | 47.319744 |
+| 20261016 | 16.3701550 | 19.087869 | 19.740187 | 48.194078 |
+| 20261017 | 16.1311575 | 17.013319 | 17.691175 | 45.894020 |
+| 20261018 | 16.3367945 | 17.063094 | 17.725758 | 48.151794 |
+
+All 150 measured cancellation signal-to-exit upper bounds met the 100 ms target: p50 0.436927 ms, p95 0.500458 ms, p99 0.634710 ms and maximum 0.693420 ms. These bounds include process exit and are not direct measurements of the executor's internal cancellation-check instant. The [cancellation and resource summary](verification/product/runs/mc65-native18-observed-distributions.json) retains min/max, median absolute deviation, sample counts, observer gaps and the original standalone pending-context verdict. The separate complete assessment supplies the reference context.
+
+The same run's fresh isolated committed checkout passed `make bootstrap`, `make verify` and `make demo`, with a new enforced Cargo target directory, all 18 nested gates and 22 original command receipts. The enclosing collection took 10,342.098 seconds; original strict validation took 990.825 seconds and the separate local records replay took 987.493 seconds. This demonstrates one complete execution within the existing budgets; it does not guarantee future provider capacity or a general optimization speedup.
+
+The required review was performed in the main chat under the user's explicit routing instruction and shares implementation history. Its read-only findings stage and 13 deliberate allocation/clock rejection controls preceded this scoped assessment. Original collection reports retain their pending-review flags; the subsequent assessment supplies the limited qualification above. All earlier failed attempts below retain their original outcomes. The manual visual/keyboard demo record and libFuzzer remain not run, and final release readiness remains incomplete.
+
+## Historical reference harness smoke run
 
 Status: **MEASURED, Python reference only**. Run `release-benchmark`, 2026-10-14. Source fingerprint `9233be9f70f58433f3b944b7ce72a0f959ac273ad1e3cfcb1eb1a64cc522b369`.
 
@@ -18,9 +42,9 @@ The timer includes deep copy, catalog validation, binding, row execution and out
 make benchmark-reference
 ```
 
-## Original Rust experiment runner
+## Earlier Rust instrument and capture records
 
-Status: **full Windows captures failed; a retained Linux full attempt is incomplete and failed; reference targets pending**. The synthetic-only [Rust measurement binary](src/bin/rillscope-measure.rs) calls the original library compiler and executor. The [runner](benchmarks/run.py) predeclares82 workload descriptions and five seeds:410 cases, each with five warmups and30 randomized paired repetitions of Rust optimization on/off and a separate SQLite process. Its local journals retain every warmup, error, timeout, work/output rejection, output digest, CPU time, RSS and logical reservation. Successful results must match the independently materialized authorized SQLite relation. Failure observations remain in all-outcome distributions; execution-only success distributions are labeled separately. A cancelled hosted job can lose its transient files before upload, as an older failed Linux repetition below did.
+Status of the earlier captures: **full Windows captures failed; retained Linux full attempts were incomplete and failed**. Their original outcomes remain unchanged. The synthetic-only [Rust measurement binary](src/bin/rillscope-measure.rs) calls the original library compiler and executor. The [runner](benchmarks/run.py) predeclares82 workload descriptions and five seeds:410 cases, each with five warmups and30 randomized paired repetitions of Rust optimization on/off and a separate SQLite process. Its local journals retain every warmup, error, timeout, work/output rejection, output digest, CPU time, RSS and logical reservation. Successful results must match the independently materialized authorized SQLite relation. Failure observations remain in all-outcome distributions; execution-only success distributions are labeled separately. A cancelled hosted job can lose its transient files before upload, as an older failed Linux repetition below did.
 
 The [original full KVM attempt at5778e0c](https://github.com/C-X1an/rillscope/actions/runs/39294519527) retained30,903 of43,050 expected grid observations:294 complete case summaries, one partial case and115 cases without observations. The grid owner timed out after14999.887359015seconds and confirmed owned cleanup with no active processes. Packaging retained the available bytes, but export then raised permission denied on the named virtio port. No host acknowledgement, cancellation campaign or deciding-NULL supplement was captured. The original offline validation and full run remain **FAIL**; missing results were not reconstructed. Independent inspection authenticated all383 collection/validation ZIP entries and67,860 unique CAS objects. This is preservation of a failed partial experiment, not full semantic or reference qualification.
 

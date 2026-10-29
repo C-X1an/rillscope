@@ -1038,5 +1038,17 @@
   "nf58-current-static-malformed-native": {
     "path": "verification/product/runs/nf58-current-static-malformed-native.json",
     "sha256": "32d2fb475bc53dbf3b18af201f5a28f080fd3948aa371ba56e71a824f014fdbb"
+  },
+  "mc65-native18-complete-reference-and-fresh": {
+    "path": "verification/product/runs/mc65-native18-complete-reference-and-fresh.json",
+    "sha256": "5f7034c2af7721c9a71a260f49ce57d1d5ea2c07e6ebe30fc680fdb531984745"
+  },
+  "mc65-native18-observed-distributions": {
+    "path": "verification/product/runs/mc65-native18-observed-distributions.json",
+    "sha256": "bbaed43e74dbc5f942d390e9b15091010fed3dafc4bc84c4bd7e319a27df711a"
+  },
+  "mc65-current-public-wording": {
+    "path": "verification/product/runs/mc65-current-public-wording.json",
+    "sha256": "b344ae6969c806d731d08e8b0bfe7c1df091f16adda925e5c1fab109d0770b6f"
   }
 }

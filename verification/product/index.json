@@ -184,33 +184,34 @@
       "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
     },
     "AC-021": {
-      "status": "FAIL",
+      "status": "PASS",
       "runs": [
-        "full-grid-windows-failed",
-        "full-grid-windows-strong-failed",
-        "full-linux-retention-failed",
-        "nullable-sort-current",
-        "full-linux-79e-incomplete",
-        "sqlite651-full-grid-timeout"
+        "mc65-native18-complete-reference-and-fresh"
       ],
-      "scope": "Original full Windows capture retains three timeouts. Subsequent Linux failures remain dated; original651 timed out with35226/43050 observations,335 complete/1partial/74absent; cancellation and deciding-NULL absent, full semantic validation not run. New bounded-loader source requires a genuinely complete new capture."
+      "scope": "Original789814ff/source7d45 complete native Linux410-grid43050 observations,290required successes/17400comparisons, plus deciding-NULL40/4200/2400; all raw originals checked and failures retained."
     },
     "AC-022": {
-      "status": "BLOCKED",
-      "runs": [],
-      "scope": "Actual dedicated 4-core/8-GiB Linux reference host unavailable; no target result claimed"
+      "status": "PASS",
+      "runs": [
+        "mc65-native18-complete-reference-and-fresh",
+        "mc65-native18-observed-distributions"
+      ],
+      "scope": "Five actual30-repetition100kfilter execution/end-to-end distributions; dedicated four-vCPU8GiB Linux guest assigned to this campaign. Provider physical host may be shared; observed targetsMET, no future latency guarantee."
     },
     "AC-023": {
-      "status": "BLOCKED",
-      "runs": [],
-      "scope": "Actual Linux reference host required; prepared signal campaign and Windows hard-kill evidence are not substitutes"
+      "status": "PASS",
+      "runs": [
+        "mc65-native18-complete-reference-and-fresh",
+        "mc65-native18-observed-distributions"
+      ],
+      "scope": "Actual Linux175-sample campaign/150measured signal-to-exit upper bounds, p95.500458ms/max.693420ms, zero over100ms; same scoped guest allocation, all original timestamps/cleanup checked."
     },
     "AC-024": {
-      "status": "FAIL",
+      "status": "PASS",
       "runs": [
-        "fresh-ec4-windows-failed"
+        "mc65-native18-complete-reference-and-fresh"
       ],
-      "scope": "Complete ec4 fresh Windows recipe executed all twelve targets: Win1314 security/verify and GNU long-path release build failed; reference benchmark blocked. New full Linux fresh reproduction remains pending"
+      "scope": "Original789814ff fresh isolated committed Linux checkout; bootstrap/verify/demo and all18nested gates/22receipts with fresh enforced target passed. Complete source/native/all-record custody replayed; later prose/evidence differs only outside required execution dependencies."
     },
     "AC-025": {
       "status": "PASS",
@@ -257,13 +258,10 @@
     "AC-030": {
       "status": "PASS",
       "runs": [
-        "current-notice-components",
-        "sqlite-batch-public-wording",
         "ri-current-license",
-        "ri-current-wording",
-        "process-readiness-wording"
+        "mc65-current-public-wording"
       ],
-      "scope": "Actual current MIT/dependency-notice audit and exact revalidation of the finalized independent 46-entry normalized public-wording map. Canonical claim status/link cells are audited live; no release-maturity or runtime qualification inferred."
+      "scope": "Actual26registry packages/27preserved notices and current46entry public wording review. Required main-chat gate follows explicit user routing; shared implementation history disclosed, no distinct independent actor invented. Full release/manual inspection remain incomplete."
     }
   },
   "artifacts": {
@@ -1306,6 +1304,18 @@
     "nf58-current-static-malformed-native": {
       "path": "verification/product/runs/nf58-current-static-malformed-native.json",
       "sha256": "32d2fb475bc53dbf3b18af201f5a28f080fd3948aa371ba56e71a824f014fdbb"
+    },
+    "mc65-native18-complete-reference-and-fresh": {
+      "path": "verification/product/runs/mc65-native18-complete-reference-and-fresh.json",
+      "sha256": "5f7034c2af7721c9a71a260f49ce57d1d5ea2c07e6ebe30fc680fdb531984745"
+    },
+    "mc65-native18-observed-distributions": {
+      "path": "verification/product/runs/mc65-native18-observed-distributions.json",
+      "sha256": "bbaed43e74dbc5f942d390e9b15091010fed3dafc4bc84c4bd7e319a27df711a"
+    },
+    "mc65-current-public-wording": {
+      "path": "verification/product/runs/mc65-current-public-wording.json",
+      "sha256": "b344ae6969c806d731d08e8b0bfe7c1df091f16adda925e5c1fab109d0770b6f"
     }
   },
   "release_status": "INCOMPLETE",
