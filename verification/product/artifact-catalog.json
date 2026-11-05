@@ -1,0 +1,42 @@
+{
+  "claims-audit": {
+    "path": "verification/product/runs/claims-audit.json",
+    "sha256": "dd6b6f71fd657d318c31e44f84ead7873339112e24ba4a372ad3bdcebaebc7e7"
+  },
+  "native-contracts": {
+    "path": "verification/product/runs/native-contracts.json",
+    "sha256": "bf3b0b7ada63733255753ef356594e90a26743cbc562cdf2a0da4211ed5edd06"
+  },
+  "property-checks": {
+    "path": "verification/product/runs/property-checks.json",
+    "sha256": "da711b9434e5cd203bf324bef35e86a91809d9770eea1b39e81a8ab89013386d"
+  },
+  "linux-controls": {
+    "path": "verification/product/runs/linux-controls.json",
+    "sha256": "d6b45cf79ebdd55581c6fdefb3306b5795010074c359231c58bcb3ccb25c6908"
+  },
+  "cancellation-boundary": {
+    "path": "verification/product/runs/cancellation-boundary.json",
+    "sha256": "e3b8fc3a5c66b1e564cd8ba4972ef9a39a38db057b026ca968d6addfde057714"
+  },
+  "dependency-licenses": {
+    "path": "verification/product/runs/dependency-licenses.json",
+    "sha256": "66fade9eafca6af497f506e8d250eae5facf09f2c281cabb1c7b2c40d14197ca"
+  },
+  "static-and-malformed": {
+    "path": "verification/product/runs/static-and-malformed.json",
+    "sha256": "32d2fb475bc53dbf3b18af201f5a28f080fd3948aa371ba56e71a824f014fdbb"
+  },
+  "reference-measurements": {
+    "path": "verification/product/runs/reference-measurements.json",
+    "sha256": "5f7034c2af7721c9a71a260f49ce57d1d5ea2c07e6ebe30fc680fdb531984745"
+  },
+  "benchmark-distributions": {
+    "path": "verification/product/runs/benchmark-distributions.json",
+    "sha256": "bbaed43e74dbc5f942d390e9b15091010fed3dafc4bc84c4bd7e319a27df711a"
+  },
+  "public-wording-review": {
+    "path": "verification/product/runs/public-wording-review.json",
+    "sha256": "8fc2c7365f3bd92c9c0d1a6f933854c234651df8692b15b02cdd0dfe0043c601"
+  }
+}

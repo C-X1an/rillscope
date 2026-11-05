@@ -1,0 +1,12 @@
+/target/
+/.local-runs/
+__pycache__/
+*.pyc
+.env
+.env.*
+*.key
+*.pem
+.DS_Store
+/private/
+/portfolio_profile.yaml
+/resume*

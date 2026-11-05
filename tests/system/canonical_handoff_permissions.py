@@ -1,0 +1,378 @@
+"""Actual scoped Linux root-to-existing-runner read-permission control only."""
+import argparse
+import ast
+import base64
+import hashlib
+import json
+import os
+from pathlib import Path
+import pwd
+import stat
+import subprocess
+import sys
+import tempfile
+import time
+import zipfile
+
+ROOT = Path(__file__).resolve().parents[2]
+sys.path[:0] = [str(ROOT), str(ROOT / 'scripts'), str(ROOT / 'benchmarks')]
+import archive_capture
+from canonical_reference_allocation import require
+from canonical_reference_host_setup import actual_controller
+from export_canonical_failure import export_prefix
+from canonical_reference_guest_owner import nonroot
+from canonical_reference_device import UID, GID, check_marker
+import canonical_reference_boot as boot
+import canonical_reference_device as device
+import canonical_reference_git_trust as git_trust
+import canonical_reference_config_handoff as config_handoff
+from tests.reference.test_canonical_reference_boot import create_actual_marker_fixture
+from tests.reference.test_canonical_git_permissions import actual_nonroot_fixture_prefix
+
+
+def emit_marker_child_observation(command, outcome, returncode, stdout, stderr):
+    """Keep original child bytes in the existing outer evidence stdout sink."""
+    def stream(raw):
+        return {'bytes': len(raw), 'sha256': hashlib.sha256(raw).hexdigest(),
+            'base64': base64.b64encode(raw).decode('ascii'),
+            'text_utf8_backslashreplace': raw.decode('utf-8', errors='backslashreplace')}
+    record = {'command': list(command), 'outcome': outcome, 'returncode': returncode,
+        'timeout_seconds': 10, 'stdout': stream(stdout), 'stderr': stream(stderr),
+        'bootstrap_sha256': hashlib.sha256(boot.BOOTSTRAP.encode()).hexdigest(),
+        'scope': 'Unqualified marker-child observation only; success/identity/permissions not yet validated'}
+    print(json.dumps({'canonical_marker_child_observation': record}), flush=True)
+
+
+def run_marker_child(command):
+    try:
+        result = subprocess.run(command, cwd='/', capture_output=True, timeout=10, check=False)
+    except subprocess.TimeoutExpired as error:
+        emit_marker_child_observation(command, 'TIMEOUT', None, error.stdout or b'', error.stderr or b'')
+        raise
+    emit_marker_child_observation(command, 'EXECUTED', result.returncode, result.stdout, result.stderr)
+    return result
+
+
+def run_git_control(name, command):
+    """Retain exact tiny-fixture command output before asserting any result."""
+    def emit(outcome, returncode, stdout, stderr):
+        def stream(raw):
+            return {'bytes': len(raw), 'sha256': hashlib.sha256(raw).hexdigest(),
+                'base64': base64.b64encode(raw).decode('ascii')}
+        row = {'case': name, 'command': list(command), 'outcome': outcome, 'returncode': returncode,
+            'timeout_seconds': 10, 'stdout': stream(stdout), 'stderr': stream(stderr),
+            'prefix_source_sha256': hashlib.sha256((ROOT / 'scripts/canonical_reference_guest_owner.py').read_bytes()).hexdigest(),
+            'scope': 'Synthetic Git ownership control only; no product, guest, VM or reference qualification'}
+        print(json.dumps({'canonical_git_child_observation': row}), flush=True)
+    try:
+        result = subprocess.run(command, cwd='/', capture_output=True, timeout=10, check=False)
+    except subprocess.TimeoutExpired as error:
+        emit('TIMEOUT', None, error.stdout or b'', error.stderr or b'')
+        raise
+    emit('EXECUTED', result.returncode, result.stdout, result.stderr)
+    return result
+
+
+def fixture_git_command(command):
+    """Scope tiny synthetic Git to explicit config without changing host files."""
+    return ['/usr/bin/env', '-i', 'PATH=/usr/bin:/bin', 'LC_ALL=C',
+        'GIT_CONFIG_NOSYSTEM=1', 'GIT_CONFIG_SYSTEM=/dev/null',
+        'GIT_CONFIG_GLOBAL=/dev/null', *command]
+
+
+def run_fixture_git_control(name, command):
+    return run_git_control(name, fixture_git_command(command))
+
+
+def host_git_directory_command(prefix, source):
+    """Use implicit discovery, which checks ownership even inside .git."""
+    return prefix + ['/usr/bin/git', '-C', str(source / '.git'), 'for-each-ref']
+
+
+def git_clone_control(*, transport_regression=True):
+    """Real root-owned source -> exact UID65534 prefix -> fresh no-local clone."""
+    with tempfile.TemporaryDirectory(prefix='rill-git-permission-') as directory:
+        workspace = Path(directory); os.chmod(workspace, 0o755)
+        template = workspace / 'empty-template'; template.mkdir(mode=0o755)
+        consumer = workspace / 'consumer'; consumer.mkdir(mode=0o700); os.chown(consumer, UID, GID)
+        literal = b'SYNTHETIC GIT OWNERSHIP CONTROL ONLY\n'
+        def checked(name, command):
+            result = run_fixture_git_control(name, command)
+            require(result.returncode == 0, 'tiny Git fixture command failed: ' + name)
+            return result
+        def repository(path, name):
+            checked(name + '-init', ['/usr/bin/git', 'init', '--quiet', '--initial-branch=fixture',
+                '--object-format=sha1', '--template=' + str(template), str(path)])
+            (path / 'literal.txt').write_bytes(literal)
+            checked(name + '-add', ['/usr/bin/git', '-C', str(path), 'add', '--', 'literal.txt'])
+            checked(name + '-commit', ['/usr/bin/env', 'GIT_AUTHOR_DATE=2000-01-01T00:00:00Z',
+                'GIT_COMMITTER_DATE=2000-01-01T00:00:00Z', '/usr/bin/git', '-C', str(path),
+                '-c', 'user.name=RillScope synthetic fixture', '-c', 'user.email=fixture@rillscope.invalid',
+                '-c', 'commit.gpgsign=false', '-c', 'core.hooksPath=' + str(template),
+                'commit', '--quiet', '-m', 'Synthetic permission fixture'])
+            return checked(name + '-head', ['/usr/bin/git', '-C', str(path), 'rev-parse', 'HEAD']).stdout.strip()
+        version = checked('fixture-git-version', ['/usr/bin/git', '--version'])
+        source, unrelated = workspace / 'source', workspace / 'unrelated'
+        previous = os.umask(0o022)
+        try:
+            expected_head = repository(source, 'source'); repository(unrelated, 'unrelated')
+        finally: os.umask(previous)
+        def snapshot(root):
+            rows = []; total = 0
+            for path in [root, *sorted(root.rglob('*'))]:
+                info = path.lstat()
+                require(not path.is_symlink() and len(rows) < 512 and info.st_uid == info.st_gid == 0
+                    and not stat.S_IMODE(info.st_mode) & 0o022, 'tiny source fixture ownership/mode differs')
+                require(stat.S_ISDIR(info.st_mode) or stat.S_ISREG(info.st_mode), 'tiny Git fixture must be regular')
+                raw = path.read_bytes() if stat.S_ISREG(info.st_mode) else b''; total += len(raw)
+                require(len(raw) <= 1024**2 and total <= 8 * 1024**2, 'tiny Git fixture exceeds bound')
+                rows.append({'path': path.relative_to(root).as_posix(), 'uid': info.st_uid, 'gid': info.st_gid,
+                    'mode': stat.S_IMODE(info.st_mode), 'kind': 'file' if stat.S_ISREG(info.st_mode) else 'directory',
+                    'bytes': len(raw), 'sha256': hashlib.sha256(raw).hexdigest(),
+                    'base64': base64.b64encode(raw).decode('ascii')})
+            return rows
+        before = {'source': snapshot(source), 'unrelated': snapshot(unrelated)}
+        require(not Path(git_trust.trust_path(source)).parent.exists(),
+            'original and intermediate Git controls require absent child trust file')
+        print(json.dumps({'canonical_git_original_fixtures': before}), flush=True)
+        prefix = lambda command: actual_nonroot_fixture_prefix(source, consumer / 'home', command)
+        config = checked('effective-two-entry-trust', prefix(['/usr/bin/git', 'config', '--null',
+            '--show-origin', '--show-scope', '--get-all', 'safe.directory']))
+        expected_config = b''.join(b'command\0command line:\0' + str(path).encode() + b'\0'
+            for path in (source, source / '.git'))
+        require(config.stdout == expected_config, 'tiny Git effective trust must have exactly two command entries')
+        old = prefix(['/usr/bin/git', 'clone', '--no-local', '--config', 'core.autocrlf=false',
+            str(source), str(consumer / 'old-clone')])
+        require(old.count('GIT_CONFIG_COUNT=2') == 1 and old.count('GIT_CONFIG_KEY_1=safe.directory') == 1
+            and old.count('GIT_CONFIG_VALUE_1=' + str(source / '.git')) == 1, 'actual exact two-entry prefix required')
+        old = [value.replace('GIT_CONFIG_COUNT=2', 'GIT_CONFIG_COUNT=1') for value in old
+            if value not in {'GIT_CONFIG_KEY_1=safe.directory', 'GIT_CONFIG_VALUE_1=' + str(source / '.git')}]
+        require(type(transport_regression) is bool, 'explicit Git control context required')
+        if transport_regression:
+            denied = run_fixture_git_control('original-one-entry-clone', old)
+            require(denied.returncode == 128 and b'dubious ownership' in denied.stderr
+                and str(source / '.git').encode() in denied.stderr, 'original clone ownership defect was not reproduced')
+            intermediate = run_fixture_git_control('two-entry-only-clone', prefix(['/usr/bin/git', 'clone',
+                '--no-local', '--config', 'core.autocrlf=false', str(source), str(consumer / 'two-entry-only')]))
+            require(intermediate.returncode == 128 and b'dubious ownership' in intermediate.stderr
+                and str(source / '.git').encode() in intermediate.stderr,
+                'client-only two-entry transport failure was not reproduced')
+        else:
+            # Recent host Git deliberately permits cross-owner upload-pack.
+            # Direct repository access remains a distinct mandatory negative.
+            direct = host_git_directory_command(old[:-7], source)
+            denied = run_fixture_git_control('host-one-entry-git-directory', direct)
+            require(denied.returncode == 128 and b'dubious ownership' in denied.stderr
+                and str(source / '.git').encode() in denied.stderr, 'host direct Git directory was unexpectedly trusted')
+        protected = git_trust.install(source, fixture=True)
+        print(json.dumps({'canonical_git_protected_trust': protected}), flush=True)
+        protected_config = checked('effective-protected-trust', prefix(['/usr/bin/git', 'config', '--null',
+            '--show-origin', '--show-scope', '--get-all', 'safe.directory']))
+        expected_protected = b''.join(b'global\0file:' + str(git_trust.trust_path(source)).encode() + b'\0'
+            + str(path).encode() + b'\0' for path in (source, source / '.git')) + expected_config
+        require(protected_config.stdout == expected_protected,
+            'closed protected global and command trust origins differ')
+        clone = consumer / 'fresh'; require(not clone.exists(), 'new tiny checkout required')
+        accepted = checked('two-entry-fresh-clone', prefix(['/usr/bin/git', 'clone', '--no-local',
+            '--config', 'core.autocrlf=false', str(source), str(clone)]))
+        head = checked('fresh-head', prefix(['/usr/bin/git', '-C', str(clone), 'rev-parse', 'HEAD'])).stdout.strip()
+        require(head == expected_head and (clone / 'literal.txt').read_bytes() == literal
+            and clone.stat().st_uid == UID and clone.stat().st_gid == GID, 'tiny fresh clone identity/owner/bytes differ')
+        foreign = run_fixture_git_control('unrelated-root-owned-repository', prefix(['/usr/bin/git', '-C', str(unrelated), 'rev-parse', 'HEAD']))
+        require(foreign.returncode == 128 and b'dubious ownership' in foreign.stderr
+            and str(unrelated).encode() in foreign.stderr, 'unrelated root-owned repository was unexpectedly trusted')
+        require(before == {'source': snapshot(source), 'unrelated': snapshot(unrelated)},
+            'original Git source ownership/mode/bytes changed')
+        protected_after = git_trust.observe(source)
+        require(protected_after == protected, 'root-protected child trust bytes or role changed')
+        return {'status': 'PASS', 'consumer_uid': UID, 'consumer_gid': GID,
+            ('original_one_entry_exit' if transport_regression else 'direct_git_directory_exit'): denied.returncode,
+            'two_entry_clone_exit': accepted.returncode, 'unrelated_repository_exit': foreign.returncode,
+            'git_version': version.stdout.decode('ascii').strip(),
+            'effective_trust': config.stdout.decode('utf-8').split('\0')[:-1],
+            'protected_effective_trust': protected_config.stdout.decode('utf-8').split('\0')[:-1],
+            'protected_trust_before': protected, 'protected_trust_after': protected_after,
+            'configuration_scope': 'New root-protected exact child file; existing user/system Git files are neither read nor modified',
+            'source_and_unrelated_ownership_modes_bytes_unchanged': True, 'fresh_commit': head.decode('ascii'),
+            'literal_sha256': hashlib.sha256(literal).hexdigest(), 'original_fixtures': before,
+            'scope': 'Actual Linux Git on tiny synthetic root-owned fixtures only; no first-party build, guest/VM, allocation or reference qualification'}
+
+
+def configuration_handoff_control():
+    """Actual UID65534 permission failure/fix/regression/restoration on tiny fixtures."""
+    source = (ROOT / 'scripts/canonical_reference_config_handoff.py').read_text(encoding='utf-8')
+    tree = ast.parse(source); names = {'digest', 'node', 'read', 'denied_open', 'probe'}
+    functions = [node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name in names]
+    require({node.name for node in functions} == names and len(functions) == len(names),
+        'exact actual configuration probe definitions required')
+    definitions = ast.unparse(ast.Module(body=functions, type_ignores=[]))
+    # Execute those exact production function bodies without depending on
+    # traversal through a CI runner's private home to import its source tree.
+    program = '''import hashlib,json,os,platform,secrets,stat,sys
+from pathlib import Path
+NAMES=('measurement-config.json','export-config.json');LIMIT=8192
+def require(condition,message):
+    if not condition:raise ValueError(message)
+''' + definitions + '''
+value=json.loads(sys.argv[1]);private=Path(value['private']);paths=[Path(x) for x in value['paths']]
+if value['mode']=='denials':
+    require(os.getresuid()==os.getresgid()==(65534,65534,65534) and os.getgroups()==[], 'actual nonroot fixture identity required')
+    denied=[]
+    for path in paths:
+        try:read(path)
+        except PermissionError:denied.append(True)
+        else:denied.append(False)
+    result={'uids':list(os.getresuid()),'gids':list(os.getresgid()),'groups':os.getgroups(),'read_denied':denied}
+else:result=probe(private,paths,value['digests'])
+print(json.dumps(result,sort_keys=True,separators=(',',':')))
+'''
+    # probe() uses the original public method identifier, never a grant.
+    program = 'METHOD=' + repr(config_handoff.METHOD) + '\n' + program
+    definition_sha = hashlib.sha256(definitions.encode()).hexdigest()
+    observations = []
+    with tempfile.TemporaryDirectory(prefix='rill-config-permission-') as temporary:
+        workspace = Path(temporary); os.chmod(workspace, 0o755)
+        original = workspace / 'original-private'; original.mkdir(mode=0o700)
+        values = {'measurement-config.json': {'synthetic': 'measurement'}, 'export-config.json': {'synthetic': 'export'}}
+        for name in config_handoff.NAMES:
+            path = original / name
+            path.write_bytes((json.dumps(values[name], sort_keys=True, separators=(',', ':')) + '\n').encode())
+            os.chmod(path, 0o444)
+        originals = {name: (config_handoff.node(original / name), (original / name).read_bytes())
+            for name in config_handoff.NAMES}
+        original_directory = config_handoff.node(original)
+        def child(case, private, paths, digests, mode='probe'):
+            value = {'mode': mode, 'private': str(private), 'paths': [str(path) for path in paths], 'digests': digests}
+            command = actual_nonroot_fixture_prefix(workspace / 'source', workspace / 'home',
+                ['/usr/bin/python3', '-I', '-c', program, json.dumps(value, sort_keys=True)])
+            def emit(outcome, code, stdout, stderr):
+                def stream(raw): return {'bytes': len(raw), 'sha256': hashlib.sha256(raw).hexdigest(),
+                    'base64': base64.b64encode(raw).decode('ascii')}
+                row = {'case': case, 'command': command, 'outcome': outcome, 'exit_code': code,
+                    'stdout': stream(stdout), 'stderr': stream(stderr), 'timeout_seconds': 10,
+                    'probe_definitions_sha256': definition_sha,
+                    'source_sha256': hashlib.sha256(source.encode()).hexdigest(), 'scope': 'Tiny explicitly synthetic actual Linux permissions only; no native/query/reference qualification'}
+                observations.append(row); print(json.dumps({'canonical_config_child_observation': row}), flush=True)
+            try: result = subprocess.run(command, cwd='/', capture_output=True, timeout=10, check=False)
+            except subprocess.TimeoutExpired as error:
+                emit('TIMEOUT', None, error.stdout or b'', error.stderr or b''); raise
+            emit('EXECUTED', result.returncode, result.stdout, result.stderr); return result
+        old = child('original-two-private-denials', original, [original / name for name in config_handoff.NAMES], [], 'denials')
+        require(old.returncode == 0 and json.loads(old.stdout) == {'uids': [65534]*3, 'gids': [65534]*3,
+            'groups': [], 'read_denied': [True, True]}, 'both original private configuration denials must be observed')
+        private = workspace / 'fixed-private'; private.mkdir(mode=0o700)
+        publication = config_handoff.install(private, values, directory=workspace / 'published-config')
+        paths = [Path(row['published']['path']) for row in publication['files']]
+        digests = [row['sha256'] for row in publication['files']]
+        fixed = child('fixed-two-reads-and-denials', private, paths, digests)
+        require(fixed.returncode == 0, 'actual fixed configuration read/denial probe failed')
+        fixed_record = config_handoff.finish(publication, json.loads(fixed.stdout))
+        os.chmod(paths[0].parent, 0o500)
+        try: regressed = child('regressed-no-traversal', private, paths, digests)
+        finally: os.chmod(paths[0].parent, 0o555)
+        require(regressed.returncode != 0 and b'PermissionError' in regressed.stderr,
+            'removed traversal must fail the actual unchanged nonroot production probe')
+        restored = child('restored-two-reads-and-denials', private, paths, digests)
+        require(restored.returncode == 0, 'restored original configuration access probe failed')
+        restored_record = config_handoff.finish(publication, json.loads(restored.stdout))
+        require(fixed_record == restored_record and original_directory == config_handoff.node(original)
+            and originals == {name: (config_handoff.node(original / name), (original / name).read_bytes())
+                for name in config_handoff.NAMES}, 'original private permissions/inodes/bytes changed')
+    return {'status': 'PASS', 'original_read_denied': [True, True], 'sequence': ['PASS', 'FAIL', 'PASS'],
+        'actual_probe_exit_codes': [fixed.returncode, regressed.returncode, restored.returncode],
+        'original_private_unchanged': True, 'fixed': fixed_record, 'restored': restored_record,
+        'observations': observations, 'reference_qualified': False,
+        'scope': 'Actual scoped Linux cross-UID permissions on synthetic fixtures only; real guest pre-canonical probe remains mandatory'}
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__); parser.add_argument('--out', type=Path, required=True)
+    parser.add_argument('--run-as', required=True); args = parser.parse_args()
+    actual_controller(); account = pwd.getpwnam(args.run_as)
+    require(account.pw_uid != 0, 'existing nonroot consumer required')
+    out = archive_capture.owned(args.out)
+    require(not out.exists() and out.parent.is_dir(), 'new permission control output required')
+    out.mkdir(mode=0o755); os.chmod(out, 0o755)
+    protected = out / 'protected'; protected.mkdir(mode=0o700)
+    original = protected / 'literal.raw'; raw = b'SYNTHETIC PERMISSION CONTROL ONLY; not query or execution evidence\n'
+    original.write_bytes(raw); os.chmod(original, 0o600)
+    before = [(path.stat().st_uid, path.stat().st_gid, path.stat().st_mode, path.stat().st_mtime_ns) for path in (protected, original)]
+    child = 'import hashlib,sys;from pathlib import Path;print(hashlib.sha256(Path(sys.argv[1]).read_bytes()).hexdigest())'
+    def read_as_consumer(path):
+        started = time.monotonic()
+        result = subprocess.run(['runuser', '-u', args.run_as, '--', '/usr/bin/python3', '-c', child, str(path)],
+            capture_output=True, timeout=10, check=False)
+        return result, time.monotonic() - started
+    denied, denied_seconds = read_as_consumer(original)
+    (out / 'before-stdout.txt').write_bytes(denied.stdout); (out / 'before-stderr.txt').write_bytes(denied.stderr)
+    require(denied.returncode != 0 and b'PermissionError' in denied.stderr, 'original root-private bytes were unexpectedly readable')
+    archive = out / 'readable.zip'
+    result = export_prefix([('fixture', protected)], archive, budget_seconds=10, owner_sha256=None)
+    require(result['reference_qualified'] is False, 'permission control cannot qualify reference execution')
+    with zipfile.ZipFile(archive) as bundle:
+        manifest = json.loads(bundle.read('manifest.json'))
+        require(len(manifest['files']) == 1 and manifest['files'][0]['sha256'] == hashlib.sha256(raw).hexdigest(),
+            'literal permission fixture bytes changed')
+        require(bundle.read('objects/' + manifest['files'][0]['sha256']) == raw, 'literal permission export bytes differ')
+    readable, readable_seconds = read_as_consumer(archive)
+    (out / 'after-stdout.txt').write_bytes(readable.stdout); (out / 'after-stderr.txt').write_bytes(readable.stderr)
+    require(readable.returncode == 0 and readable.stdout.decode().strip() == result['archive_sha256'],
+        'existing nonroot consumer cannot read exact exported bytes')
+    require(before == [(path.stat().st_uid, path.stat().st_gid, path.stat().st_mode, path.stat().st_mtime_ns) for path in (protected, original)]
+        and original.read_bytes() == raw, 'original permissions/ownership/bytes changed')
+    # Execute the actual bootstrap creation fragment at a synthetic destination
+    # and use the same UID/GID/cleared-groups prefix as the real device probe.
+    marker_child = '''import hashlib,json,os,sys
+from pathlib import Path
+path=Path(sys.argv[1]);raw=path.read_bytes()
+denied=False
+try:
+    with path.open('wb') as stream:stream.write(b'UNEXPECTED WRITE')
+except PermissionError:denied=True
+print(json.dumps({'uid':os.getuid(),'gid':os.getgid(),'groups':os.getgroups(),
+    'marker_sha256':hashlib.sha256(raw).hexdigest(),'write_denied':denied}))
+raise SystemExit(0 if denied else 1)
+'''
+    # A disposable tiny fixture avoids relying on traversal of the runner's
+    # private home. Original project files/permissions are never changed.
+    with tempfile.TemporaryDirectory(prefix='rill-marker-permission-') as directory:
+        os.chmod(directory, 0o755); marker = Path(directory) / 'marker'
+        previous = os.umask(0o077)
+        try: create_actual_marker_fixture(marker)
+        finally: os.umask(previous)
+        marker_command = nonroot(['/usr/bin/python3', '-I', '-c', marker_child, str(marker)])
+        marker_result = run_marker_child(marker_command)
+        require(marker_result.returncode == 0, 'actual bootstrap marker is not readable and protected for the real nonroot probe identity')
+        marker_observed = json.loads(marker_result.stdout)
+        check_marker(marker.lstat(), marker.read_bytes())
+        require(marker_observed['uid'] == UID and marker_observed['gid'] == GID and marker_observed['groups'] == []
+            and marker_observed['write_denied'] is True and marker.stat().st_uid == marker.stat().st_gid == 0
+            and marker.stat().st_mode & 0o7777 == 0o444
+            and marker.read_bytes() == b'owned-ephemeral-canonical-reference\n'
+            and marker_observed['marker_sha256'] == hashlib.sha256(marker.read_bytes()).hexdigest(), 'actual marker/identity/permissions differ')
+    record = {'status': 'PASS', 'scope': 'Actual cross-UID read permission control on tiny explicitly synthetic fixture only; no VM/native/campaign/remote upload claim',
+        'root_uid': os.geteuid(), 'consumer_uid': account.pw_uid, 'consumer': account.pw_name,
+        'original_read_exit_code': denied.returncode, 'export_read_exit_code': readable.returncode,
+        'original_mode_unchanged': True, 'archive_sha256': result['archive_sha256'], 'reference_qualified': False,
+        'denied_seconds': denied_seconds, 'readable_seconds': readable_seconds}
+    record['canonical_marker_control'] = {'status': 'PASS', 'observed': marker_observed,
+        'producer_umask': 0o077,
+        'actual_exit_code': marker_result.returncode, 'raw_stdout': marker_result.stdout.decode(),
+        'raw_stderr': marker_result.stderr.decode(), 'bootstrap_sha256': hashlib.sha256(boot.BOOTSTRAP.encode()).hexdigest(),
+        'scope': 'Actual Linux creation and UID65534 read/write check of unchanged bootstrap fragment at a synthetic path; no actual guest/VM/device or allocation claim'}
+    record['canonical_git_clone_control'] = git_clone_control(transport_regression=False)
+    record['canonical_configuration_control'] = configuration_handoff_control()
+    (out / 'result.json').write_text(json.dumps(record, indent=2) + '\n', encoding='utf-8')
+    print(json.dumps(record)); return 0
+
+
+def guest_git_main():
+    """Mandatory original transport regression in the actual owned guest."""
+    identity = device.guard(0)
+    control = git_clone_control()
+    print(json.dumps({'canonical_guest_git_control': {'identity': identity, 'control': control}}), flush=True)
+    return 0
+
+
+if __name__ == '__main__':
+    raise SystemExit(guest_git_main() if sys.argv[1:] == ['--guest-git-only'] else main())

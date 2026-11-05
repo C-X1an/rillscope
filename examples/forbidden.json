@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "plan": {
+    "op": "project",
+    "input": {
+      "op": "scan",
+      "table": "sales",
+      "alias": "s"
+    },
+    "columns": [
+      {
+        "name": "secret",
+        "expr": {
+          "col": "secret"
+        }
+      }
+    ]
+  }
+}

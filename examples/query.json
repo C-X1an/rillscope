@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "plan": {
+    "op": "aggregate",
+    "input": {
+      "op": "scan",
+      "table": "sales",
+      "alias": "s"
+    },
+    "keys": [],
+    "aggregates": [
+      {
+        "name": "orders",
+        "kind": "count_all"
+      },
+      {
+        "name": "total",
+        "kind": "sum",
+        "expr": {
+          "col": "amount"
+        }
+      }
+    ]
+  }
+}

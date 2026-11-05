@@ -1,0 +1,24 @@
+[package]
+name = "rillscope"
+version = "0.1.0-dev"
+edition = "2024"
+rust-version = "1.99"
+license = "MIT"
+description = "Experimental policy-aware restricted query compiler and bounded executor"
+publish = false
+default-run = "rillscope"
+
+[dependencies]
+serde = { version = "=1.0.229", features = ["derive"] }
+serde_json = { version = "=1.0.151", features = ["raw_value"] }
+sha2 = "=0.10.9"
+
+[target.'cfg(unix)'.dependencies]
+signal-hook = "=0.3.18"
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"

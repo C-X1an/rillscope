@@ -1,0 +1,261 @@
+{
+  "schema_version": 1,
+  "criteria": {
+    "AC-001": {
+      "status": "PASS",
+      "runs": [
+        "native-contracts"
+      ],
+      "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
+    },
+    "AC-002": {
+      "status": "PASS",
+      "runs": [
+        "native-contracts"
+      ],
+      "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
+    },
+    "AC-003": {
+      "status": "PASS",
+      "runs": [
+        "native-contracts"
+      ],
+      "scope": "Unknown, type-mismatched and ambiguous columns denied before actual scan counters advance"
+    },
+    "AC-004": {
+      "status": "PASS",
+      "runs": [
+        "native-contracts"
+      ],
+      "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
+    },
+    "AC-005": {
+      "status": "PASS",
+      "runs": [
+        "native-contracts"
+      ],
+      "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
+    },
+    "AC-006": {
+      "status": "PASS",
+      "runs": [
+        "property-checks"
+      ],
+      "scope": "1000 deterministic small-catalog cases, JSON/SQL on/off against physically scoped SQLite; all verdicts retained"
+    },
+    "AC-007": {
+      "status": "PASS",
+      "runs": [
+        "native-contracts"
+      ],
+      "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
+    },
+    "AC-008": {
+      "status": "BLOCKED",
+      "runs": [],
+      "scope": "Current visual/keyboard inspection is unverified under the documented AC-008 delivery exception."
+    },
+    "AC-009": {
+      "status": "PASS",
+      "runs": [
+        "native-contracts"
+      ],
+      "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
+    },
+    "AC-010": {
+      "status": "PASS",
+      "runs": [
+        "native-contracts"
+      ],
+      "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
+    },
+    "AC-011": {
+      "status": "PASS",
+      "runs": [
+        "native-contracts"
+      ],
+      "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
+    },
+    "AC-012": {
+      "status": "PASS",
+      "runs": [
+        "native-contracts"
+      ],
+      "scope": "Known-bad physical plans and selected real PASS-FAIL-PASS controls; source revisions are recorded"
+    },
+    "AC-013": {
+      "status": "PASS",
+      "runs": [
+        "native-contracts"
+      ],
+      "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
+    },
+    "AC-014": {
+      "status": "PASS",
+      "runs": [
+        "native-contracts"
+      ],
+      "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
+    },
+    "AC-015": {
+      "status": "PASS",
+      "runs": [
+        "native-contracts"
+      ],
+      "scope": "Finite input/work/output regression cases and actual tightened work control; no OS memory containment claim"
+    },
+    "AC-016": {
+      "status": "PASS",
+      "runs": [
+        "linux-controls"
+      ],
+      "scope": "Actual current-source Ubuntu rust-product job executed all four export controls including symbolic-link rejection; saved observations and selected Git source bytes match. Local Windows privilege failure remains separate."
+    },
+    "AC-017": {
+      "status": "PASS",
+      "runs": [
+        "native-contracts"
+      ],
+      "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
+    },
+    "AC-018": {
+      "status": "PASS",
+      "runs": [
+        "native-contracts",
+        "cancellation-boundary"
+      ],
+      "scope": "Actual current ordinary cancellation/output-cap tests and source-bound verification of the original f707 instruction capture, with finalized independent assessment and the explicitly applied final success-path cancellation decision. No last-byte or atomic-transport guarantee."
+    },
+    "AC-019": {
+      "status": "PASS",
+      "runs": [
+        "native-contracts"
+      ],
+      "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
+    },
+    "AC-020": {
+      "status": "PASS",
+      "runs": [
+        "native-contracts"
+      ],
+      "scope": "recorded Windows contract/unit/system cases only; not exhaustive correctness or independent runtime verification"
+    },
+    "AC-021": {
+      "status": "PASS",
+      "runs": [
+        "reference-measurements"
+      ],
+      "scope": "Original789814ff/source7d45 complete native Linux410-grid43050 observations,290required successes/17400comparisons, plus deciding-NULL40/4200/2400; all raw originals checked and failures retained."
+    },
+    "AC-022": {
+      "status": "PASS",
+      "runs": [
+        "reference-measurements",
+        "benchmark-distributions"
+      ],
+      "scope": "Five actual30-repetition100kfilter execution/end-to-end distributions; dedicated four-vCPU8GiB Linux guest assigned to this campaign. Provider physical host may be shared; observed targetsMET, no future latency guarantee."
+    },
+    "AC-023": {
+      "status": "PASS",
+      "runs": [
+        "reference-measurements",
+        "benchmark-distributions"
+      ],
+      "scope": "Actual Linux175-sample campaign/150measured signal-to-exit upper bounds, p95.500458ms/max.693420ms, zero over100ms; same scoped guest allocation, all original timestamps/cleanup checked."
+    },
+    "AC-024": {
+      "status": "PASS",
+      "runs": [
+        "reference-measurements"
+      ],
+      "scope": "Original789814ff fresh isolated committed Linux checkout; bootstrap/verify/demo and all18nested gates/22receipts with fresh enforced target passed. Complete source/native/all-record custody replayed; later prose/evidence differs only outside required execution dependencies."
+    },
+    "AC-025": {
+      "status": "PASS",
+      "runs": [
+        "static-and-malformed"
+      ],
+      "scope": "Actual pinned Rust format/Clippy/check/unit gates and complete seeded2000-case malformed JSON/SQL corpus; current executable, recipe and test dependencies bound. Finite corpus only; libFuzzer NOT RUN."
+    },
+    "AC-026": {
+      "status": "PASS",
+      "runs": [
+        "linux-controls"
+      ],
+      "scope": "Actual current Ubuntu rust-product job executed the named descendant, input, output and receipt controls, including detached/new-session worker cleanup. Captured named results and selected source blobs match; whole-project qualification remains separate."
+    },
+    "AC-027": {
+      "status": "PASS",
+      "runs": [
+        "claims-audit"
+      ],
+      "scope": "Actual current status/link/digest/source audit; benchmark/reference/fresh release remain incomplete"
+    },
+    "AC-028": {
+      "status": "PASS",
+      "runs": [
+        "native-contracts"
+      ],
+      "scope": "Actual fixed-scope Rust adapter/report runs with minimal OS environment, no required model/cloud keys"
+    },
+    "AC-029": {
+      "status": "PASS",
+      "runs": [
+        "native-contracts"
+      ],
+      "scope": "Actual escaped Rust text and fresh source-bound HTML PASS-FAIL-PASS control; renderer/adapter/tests now explicitly bound; no user study"
+    },
+    "AC-030": {
+      "status": "PASS",
+      "runs": [
+        "dependency-licenses",
+        "public-wording-review"
+      ],
+      "scope": "Recorded26registry packages/27preserved notices and actual29entry current public wording review. Main-chat review shares implementation history. AC008 remains unverified; no full strict acceptance or production claim."
+    }
+  },
+  "artifacts": {
+    "claims-audit": {
+      "path": "verification/product/runs/claims-audit.json",
+      "sha256": "dd6b6f71fd657d318c31e44f84ead7873339112e24ba4a372ad3bdcebaebc7e7"
+    },
+    "native-contracts": {
+      "path": "verification/product/runs/native-contracts.json",
+      "sha256": "bf3b0b7ada63733255753ef356594e90a26743cbc562cdf2a0da4211ed5edd06"
+    },
+    "property-checks": {
+      "path": "verification/product/runs/property-checks.json",
+      "sha256": "da711b9434e5cd203bf324bef35e86a91809d9770eea1b39e81a8ab89013386d"
+    },
+    "linux-controls": {
+      "path": "verification/product/runs/linux-controls.json",
+      "sha256": "d6b45cf79ebdd55581c6fdefb3306b5795010074c359231c58bcb3ccb25c6908"
+    },
+    "cancellation-boundary": {
+      "path": "verification/product/runs/cancellation-boundary.json",
+      "sha256": "e3b8fc3a5c66b1e564cd8ba4972ef9a39a38db057b026ca968d6addfde057714"
+    },
+    "dependency-licenses": {
+      "path": "verification/product/runs/dependency-licenses.json",
+      "sha256": "66fade9eafca6af497f506e8d250eae5facf09f2c281cabb1c7b2c40d14197ca"
+    },
+    "static-and-malformed": {
+      "path": "verification/product/runs/static-and-malformed.json",
+      "sha256": "32d2fb475bc53dbf3b18af201f5a28f080fd3948aa371ba56e71a824f014fdbb"
+    },
+    "reference-measurements": {
+      "path": "verification/product/runs/reference-measurements.json",
+      "sha256": "5f7034c2af7721c9a71a260f49ce57d1d5ea2c07e6ebe30fc680fdb531984745"
+    },
+    "benchmark-distributions": {
+      "path": "verification/product/runs/benchmark-distributions.json",
+      "sha256": "bbaed43e74dbc5f942d390e9b15091010fed3dafc4bc84c4bd7e319a27df711a"
+    },
+    "public-wording-review": {
+      "path": "verification/product/runs/public-wording-review.json",
+      "sha256": "8fc2c7365f3bd92c9c0d1a6f933854c234651df8692b15b02cdd0dfe0043c601"
+    }
+  },
+  "release_status": "INCOMPLETE",
+  "classification": "author-assessed criterion coverage, linked to actual scoped run summaries; not an independent certification"
+}
