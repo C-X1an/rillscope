@@ -8,6 +8,7 @@
 
 An experimental **Rust query compiler and bounded analytical executor** that accepts restricted JSON or SQL while keeping tenant access, permitted columns and execution limits under the trusted host's control.
 
+[![Rust product checks](https://img.shields.io/github/actions/workflow/status/C-X1an/rillscope/verify.yml?branch=main&label=Rust%20product%20checks&labelColor=243a31)](https://github.com/C-X1an/rillscope/actions/workflows/verify.yml)
 [![Rust 1.99](https://img.shields.io/badge/Rust-1.99.0-243a31?logo=rust&logoColor=white)](rust-toolchain.toml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-243a31)](LICENSE)
 [![Status: experimental](https://img.shields.io/badge/status-experimental-a26c32)](LIMITATIONS.md)
@@ -93,7 +94,7 @@ make integration acceptance property fuzz security
 make publication-check
 ```
 
-The [CI workflow](.github/workflows/verify.yml) executes public checks. [![CI status](https://github.com/C-X1an/rillscope/actions/workflows/verify.yml/badge.svg)](https://github.com/C-X1an/rillscope/actions/workflows/verify.yml) `make verify` runs a broader guarded verification sequence; `make clean-verify` reproduces it from a fresh committed checkout. **`make release-verify` intentionally rejects missing strict acceptance evidence** until AC-008 is genuinely satisfied. libFuzzer has not run; logical limits do not enforce an OS-level memory cap.
+The [Rust product checks workflow](.github/workflows/verify.yml) executes public checks. `make verify` runs a broader guarded verification sequence; `make clean-verify` reproduces it from a fresh committed checkout. **`make release-verify` intentionally rejects missing strict acceptance evidence** until AC-008 is genuinely satisfied. libFuzzer has not run; logical limits do not enforce an OS-level memory cap.
 
 Read the [evidence matrix](CLAIMS_EVIDENCE.md), [benchmarks](BENCHMARKS.md), [locked acceptance criteria](ACCEPTANCE_SPEC.md) and [limitations](LIMITATIONS.md) before drawing performance or security conclusions.
 

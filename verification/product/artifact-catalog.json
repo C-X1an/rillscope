@@ -36,7 +36,7 @@
     "sha256": "bbaed43e74dbc5f942d390e9b15091010fed3dafc4bc84c4bd7e319a27df711a"
   },
   "readme-wording-review": {
-    "path": "verification/product/runs/public-wording-review-20261107.json",
-    "sha256": "c68677f873e46e09a341816d730847a8745c079b1be08e97394569db30456705"
+    "path": "verification/product/runs/public-wording-review-badge-20261107.json",
+    "sha256": "fd33360a87045a9484295342bb049c66754a504fbf50f12b3da2b86ead517f87"
   }
 }
