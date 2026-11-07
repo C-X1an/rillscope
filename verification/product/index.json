@@ -252,8 +252,8 @@
       "sha256": "bbaed43e74dbc5f942d390e9b15091010fed3dafc4bc84c4bd7e319a27df711a"
     },
     "readme-wording-review": {
-      "path": "verification/product/runs/public-wording-review.json",
-      "sha256": "3bbdcd9f9ead7fe7bd1e03bc9d9952e362319a286ae1585b58fea988e4f480bf"
+      "path": "verification/product/runs/public-wording-review-20261107.json",
+      "sha256": "c68677f873e46e09a341816d730847a8745c079b1be08e97394569db30456705"
     }
   },
   "release_status": "INCOMPLETE",

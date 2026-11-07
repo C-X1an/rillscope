@@ -31,4 +31,4 @@ Public claims must never exceed the linked implementation/environment evidence. 
 | C-027: Require claim-specific real evidence and source identity | NFR-004 / AC-027 | claims audit | [claims-audit](verification/product/runs/claims-audit.json) | PASS |
 | C-028: Core path requests no external service | NFR-005 / AC-028 | environment allowlist | [native-contracts](verification/product/runs/native-contracts.json) | PASS |
 | C-029: No script/dependency; escaped supplied labels | NFR-006 / AC-029 | HTML test and inspection | [native-contracts](verification/product/runs/native-contracts.json) | PASS |
-| C-030: Identify actual licenses and reject unsupported maturity claims | NFR-007 / AC-030 | license report | [dependency-licenses](verification/product/runs/dependency-licenses.json), [readme-wording-review](verification/product/runs/public-wording-review.json) | PASS |
+| C-030: Identify actual licenses and reject unsupported maturity claims | NFR-007 / AC-030 | license report | [dependency-licenses](verification/product/runs/dependency-licenses.json), [readme-wording-review](verification/product/runs/public-wording-review-20261107.json) | PASS |
