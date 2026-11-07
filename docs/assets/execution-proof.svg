@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="375" viewBox="0 0 1200 375" role="img" aria-labelledby="title desc">
+  <title id="title">Recorded RillScope execution outcomes</title>
+  <desc id="desc">Editorial summary of the archived synthetic run: alpha returns orders 3 and total 40, forbidden-column query returns E_FORBIDDEN without rows, beta returns orders 1 and total 999. Source is linked in README.</desc>
+  <rect width="1200" height="375" rx="18" fill="#14231f"/>
+  <rect x="1" y="1" width="1198" height="373" rx="17" fill="none" stroke="#6a9580" stroke-opacity=".38" stroke-width="2"/>
+  <g font-family="Consolas,Menlo,monospace">
+    <text x="40" y="45" fill="#b0cab7" font-size="17" letter-spacing="2">RILLSCOPE / RECORDED OUTPUT</text>
+    <text x="1158" y="45" text-anchor="end" fill="#8fb29e" font-size="15">SYNTHETIC FIXTURES</text>
+    <path d="M40 65h1118" stroke="#46675b"/>
+  </g>
+  <g font-family="Arial,Helvetica,sans-serif">
+    <rect x="39" y="88" width="352" height="218" rx="14" fill="#1b342b" stroke="#638b73"/>
+    <rect x="424" y="88" width="352" height="218" rx="14" fill="#332423" stroke="#a76e60"/>
+    <rect x="809" y="88" width="352" height="218" rx="14" fill="#1b342b" stroke="#638b73"/>
+    <circle cx="72" cy="123" r="6" fill="#a9e2b6"/>
+    <circle cx="457" cy="123" r="6" fill="#e5a58c"/>
+    <circle cx="842" cy="123" r="6" fill="#a9e2b6"/>
+    <text x="89" y="129" font-size="18" font-weight="700" letter-spacing="1.3" fill="#cfebd5">TENANT ALPHA</text>
+    <text x="474" y="129" font-size="18" font-weight="700" letter-spacing="1.3" fill="#f1c1b2">FORBIDDEN COLUMN</text>
+    <text x="859" y="129" font-size="18" font-weight="700" letter-spacing="1.3" fill="#cfebd5">TENANT BETA</text>
+    <text x="70" y="194" font-family="Consolas,Menlo,monospace" font-size="43" font-weight="700" fill="#f3f4e9">[3, 40]</text>
+    <text x="454" y="194" font-family="Consolas,Menlo,monospace" font-size="32" font-weight="700" fill="#f5c5b6">E_FORBIDDEN</text>
+    <text x="839" y="194" font-family="Consolas,Menlo,monospace" font-size="43" font-weight="700" fill="#f3f4e9">[1, 999]</text>
+    <text x="70" y="235" fill="#a8cbb4" font-size="18">orders: 3  ·  total: 40</text>
+    <text x="454" y="235" fill="#e7b2a4" font-size="18">No result rows published</text>
+    <text x="839" y="235" fill="#a8cbb4" font-size="18">orders: 1  ·  total: 999</text>
+    <text x="70" y="280" fill="#d5e9da" font-size="16">SQLite oracle: exact match</text>
+    <text x="454" y="280" fill="#f3d4cb" font-size="16">Rejected before execution</text>
+    <text x="839" y="280" fill="#d5e9da" font-size="16">SQLite oracle: exact match</text>
+    <text x="41" y="350" fill="#98b6a3" font-size="16">Faithful summary of the archived Rust/SQLite report — not a product-interface screenshot.</text>
+  </g>
+</svg>

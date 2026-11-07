@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="docs/assets/rillscope-mark.svg" alt="RillScope — a query passes through binding, policy enforcement and verification before execution" width="100%">
+<img src="docs/assets/rillscope-mark.svg" alt="RillScope — the query is flexible, the boundary is not; bind, scope and verify" width="100%">
 
 # RillScope
 
@@ -10,7 +10,6 @@ An experimental **Rust query compiler and bounded analytical executor** that acc
 
 [![Rust 1.99](https://img.shields.io/badge/Rust-1.99.0-243a31?logo=rust&logoColor=white)](rust-toolchain.toml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-243a31)](LICENSE)
-[![CI](https://github.com/C-X1an/rillscope/actions/workflows/verify.yml/badge.svg)](https://github.com/C-X1an/rillscope/actions/workflows/verify.yml)
 [![Status: experimental](https://img.shields.io/badge/status-experimental-a26c32)](LIMITATIONS.md)
 
 **[Quickstart](#quickstart)** · **[Real execution](#watch-a-real-execution)** · **[Architecture](#how-it-works)** · **[Verification](#verification-and-honest-limits)** · **[Documentation](#documentation)**
@@ -23,24 +22,20 @@ An experimental **Rust query compiler and bounded analytical executor** that acc
 
 Handing a client a query interface shouldn't mean handing it authority over the database. RillScope separates **what a client can ask** from **what the host permits it to read**. The client supplies a bounded query; the host provides an immutable catalog, tenant context, column grants and resource budgets. The compiler then binds every reference, inserts mandatory policy scans, verifies the resulting plan and only then executes it.
 
-| Query-engineering depth | Boundary by construction | Reproducible evidence |
-| :--- | :--- | :--- |
-| Typed nullable values, hash joins, grouped aggregates, stable sort, projection pruning and filter pushdown. | An opaque `VerifiedPlan`, authority/provenance checks, typed failures, logical reservations and cooperative cancellation. | Real Rust CLI executions compared with independently materialized authorized SQLite relations; tests and benchmark methodology are published. |
+- **A real query engine.** Typed nullable values, hash joins, grouped aggregates, stable sorting, projection pruning and filter pushdown.
+- **A host-controlled boundary.** Opaque `VerifiedPlan`, authority/provenance checks, typed failures, logical reservations and cooperative cancellation.
+- **Evidence you can inspect.** Rust CLI executions compared with independently materialized authorized SQLite relations, plus documented tests and benchmark methodology.
 
 > [!NOTE]
 > **Scope matters.** This is an experimental local system, not a hosted multi-tenant service or OS sandbox. Logical reservations are not process-memory limits. Strict release acceptance remains **unestablished** because current visual/keyboard inspection for [AC-008](TEST_SPEC_EXCEPTION_AC-008.md) is unverified.
 
 ## Watch a real execution
 
-<a href="docs/demo/rust-report.html"><img src="docs/demo/rust-execution-focus.jpg" width="100%" alt="Cropped historical Rust execution report: tenant alpha aggregate returns orders 3 and total 40, matches independent SQLite results, and a forbidden column is rejected with E_FORBIDDEN"></a>
+<a href="docs/demo/rust-report.html"><img src="docs/assets/execution-proof.svg" width="100%" alt="Faithful visual summary of a recorded synthetic execution: tenant alpha returns three orders totalling 40, a forbidden column is rejected without publishing rows, and tenant beta returns one order totalling 999. Both allowed outcomes match SQLite."></a>
 
-<sub>Authentic crop of the [recorded Rust desktop capture](docs/demo/rust-desktop.jpg), not a mock-up or an illustration. Synthetic fixtures; original results are preserved. [Open the complete offline report](docs/demo/rust-report.html) · [Reproduce the run](docs/demo/README.md).</sub>
+<sub>Illustrated **from recorded outputs**, not a screenshot or an interactive product UI. No values have been fabricated. View the [original report](docs/demo/rust-report.html), [unaltered desktop capture](docs/demo/rust-desktop.jpg), [historical crop](docs/demo/rust-execution-focus.jpg) or [reproduction guide](docs/demo/README.md).</sub>
 
-| Authorized | Denied | Tenant separation |
-| :--- | :--- | :--- |
-| **Alpha:** `orders = 3`, `total = 40` — independent SQLite rows match. | Querying a forbidden column returns **`E_FORBIDDEN`**; no result rows are published. | **Beta:** `orders = 1`, `total = 999` under a different trusted context. |
-
-The report is generated from actual Rust CLI runs by `make demo`. Its saved image is a **historical** capture: it does not count as a new browser or keyboard-accessibility test, and the [AC-008 exception](TEST_SPEC_EXCEPTION_AC-008.md) remains open.
+**What this proves:** the Rust CLI produced the displayed authorized aggregates, the independently authorized SQLite oracle agreed, and the forbidden-column query returned `E_FORBIDDEN` with no result rows. `make demo` generates the report from local Rust executions. The archived capture does **not** establish a fresh browser/keyboard accessibility result; [AC-008 remains open](TEST_SPEC_EXCEPTION_AC-008.md).
 
 ## Quickstart
 
@@ -92,7 +87,7 @@ make integration acceptance property fuzz security
 make publication-check
 ```
 
-The [CI workflow](.github/workflows/verify.yml) executes public checks. `make verify` runs a broader guarded verification sequence; `make clean-verify` reproduces it from a fresh committed checkout. **`make release-verify` intentionally rejects missing strict acceptance evidence** until AC-008 is genuinely satisfied. libFuzzer has not run; logical limits do not enforce an OS-level memory cap.
+The [CI workflow](.github/workflows/verify.yml) executes public checks. [![CI status](https://github.com/C-X1an/rillscope/actions/workflows/verify.yml/badge.svg)](https://github.com/C-X1an/rillscope/actions/workflows/verify.yml) `make verify` runs a broader guarded verification sequence; `make clean-verify` reproduces it from a fresh committed checkout. **`make release-verify` intentionally rejects missing strict acceptance evidence** until AC-008 is genuinely satisfied. libFuzzer has not run; logical limits do not enforce an OS-level memory cap.
 
 Read the [evidence matrix](CLAIMS_EVIDENCE.md), [benchmarks](BENCHMARKS.md), [locked acceptance criteria](ACCEPTANCE_SPEC.md) and [limitations](LIMITATIONS.md) before drawing performance or security conclusions.
 

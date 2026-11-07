@@ -1,25 +1,49 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="250" viewBox="0 0 1200 250" role="img" aria-labelledby="title desc">
-  <title id="title">RillScope visual identity</title>
-  <desc id="desc">A restrained dark green banner with a flowing scope symbol and three steps: bind, enforce, verify.</desc>
-  <rect width="1200" height="250" rx="18" fill="#12291f"/>
-  <path d="M0 194C160 132 242 242 402 177S690 134 834 178s262 15 366-48" fill="none" stroke="#4b7961" stroke-width="1.5" opacity=".32"/>
-  <path d="M0 216C160 154 242 264 402 199S690 156 834 200s262 15 366-48" fill="none" stroke="#4b7961" stroke-width="1" opacity=".18"/>
-  <rect x="48" y="55" width="113" height="113" rx="26" fill="#224636" stroke="#6fa787" stroke-width="1.8"/>
-  <path d="M75 101c15-25 30-25 45 0s30 25 45 0" fill="none" stroke="#c9ecd1" stroke-width="7" stroke-linecap="round" transform="translate(-3 5) scale(.79 1)"/>
-  <path d="M73 131h62" stroke="#c9ecd1" stroke-width="6" stroke-linecap="round"/>
-  <path d="M146 80v61" stroke="#e5bd78" stroke-width="5" stroke-linecap="round"/>
-  <text x="191" y="116" font-family="Arial,Helvetica,sans-serif" font-size="57" font-weight="700" letter-spacing="-2" fill="#f3f8ef">RillScope</text>
-  <text x="194" y="153" font-family="Arial,Helvetica,sans-serif" font-size="17" letter-spacing="2.6" fill="#afc8b5">SCOPED QUERIES. VERIFIED PLANS.</text>
-  <g font-family="Arial,Helvetica,sans-serif" font-size="17" font-weight="600" fill="#d5e6d9">
-    <rect x="838" y="85" width="100" height="53" rx="10" fill="#244d3a" stroke="#547c62"/>
-    <text x="888" y="118" text-anchor="middle">BIND</text>
-    <path d="M941 112h27" stroke="#a7c9b0" stroke-width="2" stroke-linecap="round"/>
-    <path d="m961 106 7 6-7 6" stroke="#a7c9b0" stroke-width="2" fill="none"/>
-    <rect x="975" y="85" width="103" height="53" rx="10" fill="#244d3a" stroke="#547c62"/>
-    <text x="1026" y="118" text-anchor="middle">POLICY</text>
-    <path d="M1080 112h26" stroke="#a7c9b0" stroke-width="2" stroke-linecap="round"/>
-    <path d="m1099 106 7 6-7 6" stroke="#a7c9b0" stroke-width="2" fill="none"/>
-    <rect x="1113" y="85" width="70" height="53" rx="10" fill="#456c49" stroke="#acd0a7"/>
-    <text x="1148" y="118" text-anchor="middle" font-size="13">VERIFY</text>
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="384" viewBox="0 0 1400 384" role="img" aria-labelledby="t d">
+  <title id="t">RillScope — queries with a boundary</title>
+  <desc id="d">Dark ink editorial banner. A mint geometric scope mark sits beside the RillScope wordmark, with a three-stage Bind, Scope, Verify circuit.</desc>
+  <defs>
+    <linearGradient id="bg" x2="1" y2="1"><stop stop-color="#102723"/><stop offset=".56" stop-color="#10201e"/><stop offset="1" stop-color="#182d28"/></linearGradient>
+    <linearGradient id="mint" x2="1" y2="1"><stop stop-color="#dcfae6"/><stop offset="1" stop-color="#87c9a2"/></linearGradient>
+    <radialGradient id="glow"><stop stop-color="#79cc9c" stop-opacity=".15"/><stop offset="1" stop-color="#79cc9c" stop-opacity="0"/></radialGradient>
+    <pattern id="dots" width="24" height="24" patternUnits="userSpaceOnUse"><circle cx="1" cy="1" r="1" fill="#b4dfc4" opacity=".10"/></pattern>
+  </defs>
+  <rect width="1400" height="384" rx="22" fill="url(#bg)"/>
+  <rect x="1" y="1" width="1398" height="382" rx="21" fill="none" stroke="#a6d2b5" stroke-opacity=".18" stroke-width="2"/>
+  <rect x="716" y="0" width="684" height="384" fill="url(#dots)"/>
+  <circle cx="1117" cy="194" r="335" fill="url(#glow)"/>
+  <path d="M48 47h1304" stroke="#a4c5b2" stroke-opacity=".20"/>
+  <circle cx="52" cy="48" r="4" fill="#c7e8cc"/>
+  <text x="69" y="54" font-family="Arial,Helvetica,sans-serif" font-size="17" font-weight="600" letter-spacing="4" fill="#b7d7bf">R / S</text>
+  <text x="1352" y="54" text-anchor="end" font-family="Consolas,Menlo,monospace" font-size="16" fill="#b7d7bf">RUST  /  SYSTEMS ENGINEERING</text>
+  <g transform="translate(54 123)">
+    <rect width="118" height="118" rx="26" fill="#1c3c33" stroke="#7bb795" stroke-opacity=".56" stroke-width="2"/>
+    <path d="M24 74c17-44 29-44 45 0 15 42 24 42 40-2" fill="none" stroke="url(#mint)" stroke-width="9" stroke-linecap="round"/>
+    <path d="M21 92h77" stroke="#e5bd76" stroke-width="5" stroke-linecap="round"/>
+    <path d="M97 22v73" stroke="#a8d9b6" stroke-width="3.5" stroke-linecap="round"/>
+    <circle cx="97" cy="22" r="6" fill="#e5bd76"/>
   </g>
+  <text x="200" y="202" font-family="Arial,Helvetica,sans-serif" font-size="83" font-weight="750" letter-spacing="-4.5" fill="#f1f4e9">RillScope</text>
+  <text x="204" y="245" font-family="Arial,Helvetica,sans-serif" font-size="25" font-weight="400" fill="#bed5c3">The query is flexible. The boundary isn't.</text>
+  <text x="56" y="330" font-family="Consolas,Menlo,monospace" font-size="20" letter-spacing="1" fill="#95b8a4">RESTRICTED INPUT   <tspan fill="#d3e6d5">→</tspan>   HOST-ENFORCED AUTHORITY</text>
+  <path d="M765 101v187" stroke="#b2d3bd" stroke-opacity=".22"/>
+  <g font-family="Arial,Helvetica,sans-serif">
+    <path d="M841 190h57m82 0h55m81 0h55" stroke="#9ccca9" stroke-opacity=".7" stroke-width="3" stroke-dasharray="5 8"/>
+    <circle cx="839" cy="190" r="7" fill="#e9c582"/>
+    <circle cx="918" cy="190" r="7" fill="#a6ddbc"/>
+    <circle cx="1033" cy="190" r="7" fill="#a6ddbc"/>
+    <circle cx="1175" cy="190" r="7" fill="#a6ddbc"/>
+    <g fill="#1a3b31" stroke="#729e86" stroke-width="2">
+      <rect x="814" y="147" width="112" height="86" rx="14"/>
+      <rect x="962" y="147" width="112" height="86" rx="14"/>
+      <rect x="1110" y="147" width="169" height="86" rx="14" fill="#264d3b" stroke="#b2dfb9"/>
+    </g>
+    <text x="870" y="180" text-anchor="middle" fill="#b9d4c2" font-size="14" letter-spacing="3">01</text>
+    <text x="870" y="210" text-anchor="middle" fill="#f0f4eb" font-size="24" font-weight="700">Bind</text>
+    <text x="1018" y="180" text-anchor="middle" fill="#b9d4c2" font-size="14" letter-spacing="3">02</text>
+    <text x="1018" y="210" text-anchor="middle" fill="#f0f4eb" font-size="24" font-weight="700">Scope</text>
+    <text x="1194" y="180" text-anchor="middle" fill="#c5e7cd" font-size="14" letter-spacing="3">03</text>
+    <text x="1194" y="210" text-anchor="middle" fill="#f0f4eb" font-size="24" font-weight="700">Verify</text>
+    <text x="1047" y="277" text-anchor="middle" fill="#a3c2ae" font-size="17" letter-spacing="1.5">POLICY SURVIVES THE PLAN</text>
+  </g>
+  <path d="M48 350h1304" stroke="#a4c5b2" stroke-opacity=".18"/>
 </svg>
