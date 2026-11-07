@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="650" height="302" viewBox="0 0 650 302" role="img" aria-labelledby="title desc">
+  <title id="title">RillScope mobile banner</title>
+  <desc id="desc">RillScope wordmark and scope symbol with the message: scoped queries, verified plans.</desc>
+  <defs><linearGradient id="g" x2="1" y2="1"><stop stop-color="#112922"/><stop offset="1" stop-color="#1b392b"/></linearGradient></defs>
+  <rect width="650" height="302" rx="22" fill="url(#g)"/>
+  <rect x="1" y="1" width="648" height="300" rx="21" fill="none" stroke="#89c29b" stroke-opacity=".36" stroke-width="2"/>
+  <path d="M30 56h590" stroke="#9dc3a9" stroke-opacity=".27"/>
+  <text x="31" y="39" font-family="Consolas,Menlo,monospace" font-size="17" fill="#c0dcc7" letter-spacing="2.5">R / S    RUST QUERY ENGINE</text>
+  <rect x="34" y="91" width="110" height="110" rx="26" fill="#224334" stroke="#8ec7a2" stroke-width="2"/>
+  <path d="M55 152q19-53 37 0t35 0" fill="none" stroke="#c7f1ce" stroke-width="9" stroke-linecap="round"/>
+  <path d="M55 175h71" stroke="#e5bd76" stroke-width="5" stroke-linecap="round"/>
+  <path d="M123 107v73" stroke="#b0dfbd" stroke-width="4" stroke-linecap="round"/>
+  <circle cx="123" cy="107" r="6" fill="#e5bd76"/>
+  <text x="171" y="160" font-family="Arial,Helvetica,sans-serif" font-size="67" font-weight="700" letter-spacing="-3" fill="#f0f6ea">RillScope</text>
+  <text x="173" y="194" font-family="Arial,Helvetica,sans-serif" font-size="22" fill="#c4ddca">Scoped queries. Verified plans.</text>
+  <path d="M32 235h586" stroke="#9dc3a9" stroke-opacity=".27"/>
+  <text x="33" y="271" font-family="Consolas,Menlo,monospace" font-size="18" fill="#d2e9d7" letter-spacing="1.5">BIND   →   SCOPE   →   VERIFY</text>
+</svg>

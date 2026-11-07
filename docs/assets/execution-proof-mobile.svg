@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="440" height="720" viewBox="0 0 440 720" role="img" aria-labelledby="t d">
+  <title id="t">Recorded RillScope outcomes, mobile format</title>
+  <desc id="d">Alpha: three orders, total 40; forbidden-column access denied with no rows; beta: one order, total 999. These recorded results match the archived Rust and SQLite report.</desc>
+  <rect width="440" height="720" rx="18" fill="#14231f"/>
+  <rect x="1" y="1" width="438" height="718" rx="17" fill="none" stroke="#6a9580" stroke-opacity=".42" stroke-width="2"/>
+  <text x="24" y="37" font-family="Consolas,Menlo,monospace" font-size="17" letter-spacing="1.5" fill="#c4dcca">RECORDED OUTPUT</text>
+  <text x="414" y="37" text-anchor="end" font-family="Consolas,Menlo,monospace" font-size="13" fill="#9cbda8">SYNTHETIC</text>
+  <path d="M24 54h392" stroke="#577665"/>
+  <g font-family="Arial,Helvetica,sans-serif">
+    <rect x="24" y="74" width="392" height="172" rx="14" fill="#203c30" stroke="#648e74"/>
+    <circle cx="47" cy="106" r="6" fill="#ade3bc"/>
+    <text x="63" y="112" font-size="18" font-weight="700" letter-spacing=".8" fill="#d6efdb">TENANT ALPHA</text>
+    <text x="45" y="163" font-family="Consolas,Menlo,monospace" font-size="40" font-weight="700" fill="#fffdf1">[3, 40]</text>
+    <text x="45" y="197" font-size="18" fill="#bfdfc7">3 orders · total 40</text>
+    <text x="45" y="226" font-size="16" fill="#d4efdc">SQLite: exact match</text>
+    <rect x="24" y="263" width="392" height="172" rx="14" fill="#392926" stroke="#af7869"/>
+    <circle cx="47" cy="295" r="6" fill="#e4a08e"/>
+    <text x="63" y="301" font-size="18" font-weight="700" letter-spacing=".7" fill="#f1c6ba">FORBIDDEN COLUMN</text>
+    <text x="45" y="352" font-family="Consolas,Menlo,monospace" font-size="34" font-weight="700" fill="#f7d2c7">E_FORBIDDEN</text>
+    <text x="45" y="386" font-size="18" fill="#e6beb2">No result rows published</text>
+    <text x="45" y="415" font-size="16" fill="#f4d5cb">Rejected before execution</text>
+    <rect x="24" y="452" width="392" height="172" rx="14" fill="#203c30" stroke="#648e74"/>
+    <circle cx="47" cy="484" r="6" fill="#ade3bc"/>
+    <text x="63" y="490" font-size="18" font-weight="700" letter-spacing=".8" fill="#d6efdb">TENANT BETA</text>
+    <text x="45" y="541" font-family="Consolas,Menlo,monospace" font-size="40" font-weight="700" fill="#fffdf1">[1, 999]</text>
+    <text x="45" y="575" font-size="18" fill="#bfdfc7">1 order · total 999</text>
+    <text x="45" y="604" font-size="16" fill="#d4efdc">SQLite: exact match</text>
+  </g>
+  <text x="24" y="674" font-family="Arial,Helvetica,sans-serif" font-size="15" fill="#afcbb6">Faithful summary of recorded execution.</text>
+  <text x="24" y="698" font-family="Arial,Helvetica,sans-serif" font-size="15" fill="#afcbb6">Original report and capture are linked below.</text>
+</svg>

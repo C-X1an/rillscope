@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="docs/assets/rillscope-mark.svg" alt="RillScope — the query is flexible, the boundary is not; bind, scope and verify" width="100%">
+<picture><source media="(max-width: 600px)" srcset="docs/assets/rillscope-mark-mobile.svg"><img src="docs/assets/rillscope-mark.svg" alt="RillScope — the query is flexible, the boundary is not; bind, scope and verify" width="100%"></picture>
 
 # RillScope
 
@@ -31,7 +31,7 @@ Handing a client a query interface shouldn't mean handing it authority over the 
 
 ## Watch a real execution
 
-<a href="docs/demo/rust-report.html"><img src="docs/assets/execution-proof.svg" width="100%" alt="Faithful visual summary of a recorded synthetic execution: tenant alpha returns three orders totalling 40, a forbidden column is rejected without publishing rows, and tenant beta returns one order totalling 999. Both allowed outcomes match SQLite."></a>
+<a href="docs/demo/rust-report.html"><picture><source media="(max-width: 600px)" srcset="docs/assets/execution-proof-mobile.svg"><img src="docs/assets/execution-proof.svg" width="100%" alt="Faithful visual summary of a recorded synthetic execution: tenant alpha returns three orders totalling 40, a forbidden column is rejected without publishing rows, and tenant beta returns one order totalling 999. Both allowed outcomes match SQLite."></picture></a>
 
 <sub>Illustrated **from recorded outputs**, not a screenshot or an interactive product UI. No values have been fabricated. View the [original report](docs/demo/rust-report.html), [unaltered desktop capture](docs/demo/rust-desktop.jpg), [historical crop](docs/demo/rust-execution-focus.jpg) or [reproduction guide](docs/demo/README.md).</sub>
 
