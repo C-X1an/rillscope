@@ -47,8 +47,14 @@ cd rillscope
 make bootstrap build
 
 # Execute, then inspect the compiler's plan.
-target/debug/rillscope run --catalog examples/catalog.json --context examples/context.json --query examples/query.json
-target/debug/rillscope explain --catalog examples/catalog.json --context examples/context.json --query examples/query.json
+target/debug/rillscope run \
+  --catalog examples/catalog.json \
+  --context examples/context.json \
+  --query examples/query.json
+target/debug/rillscope explain \
+  --catalog examples/catalog.json \
+  --context examples/context.json \
+  --query examples/query.json
 
 # Run the Rust/SQLite evidence demo; open the reported local HTML path.
 make demo
