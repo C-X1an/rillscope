@@ -1,14 +1,14 @@
 {
   "schema_version": 1,
-  "run": "public-wording-review",
+  "run": "readme-wording-review",
   "status": "PASS",
   "requested_targets": [],
   "executed_targets": [],
   "exit_code": 0,
   "execution_outcome": "EXECUTED",
-  "started_utc": "2026-11-05T17:44:24.606531+00:00",
-  "finished_utc": "2026-11-05T17:44:25.576409+00:00",
-  "elapsed_seconds": 0.916022399906069,
+  "started_utc": "2026-11-07T08:07:27.845764+00:00",
+  "finished_utc": "2026-11-07T08:07:28.726211+00:00",
+  "elapsed_seconds": 0.7987090000096941,
   "environment": {
     "python": "3.12.14",
     "sqlite": "3.53.1",
@@ -17,11 +17,11 @@
     "cpu_count": 20
   },
   "git": {
-    "commit": "1e00e9993225bd88f63175f261ad673ce268208b",
-    "dirty": true
+    "commit": "5f3d5040b3b6f86f780b2024d94a8b2212052570",
+    "dirty": false
   },
-  "source_before_sha256": "31b6238d78bf0fe590cdeb63f8a88cd4adee43058fb5a57bba693083460d2afa",
-  "source_after_sha256": "31b6238d78bf0fe590cdeb63f8a88cd4adee43058fb5a57bba693083460d2afa",
+  "source_before_sha256": "4c18d7b12772f2ab27effc36e9e6b987b350dde85dc77fa510dc012f5822977b",
+  "source_after_sha256": "4c18d7b12772f2ab27effc36e9e6b987b350dde85dc77fa510dc012f5822977b",
   "source_files": [
     [
       ".github/workflows/full-available.yml",
@@ -73,7 +73,7 @@
     ],
     [
       "CLAIMS_EVIDENCE.md",
-      "a6a4150de2729d4d2b2963d3c45b68b74ac2e8c32e07ee5e2bfdf927557ed7a9"
+      "00f4fde6aec5eb27cded3af714d0c8891731bb7deb9448014c8a7d978590762c"
     ],
     [
       "CONTRIBUTING.md",
@@ -125,7 +125,7 @@
     ],
     [
       "README.md",
-      "2426cb1277045b1676955b0c6f6e0cc50cdf936ed47f7aae26cb42af033b0b9a"
+      "17789f84d82da34acb106c808981cc20c18057e0875bb22b7c5b78c8e9d962fc"
     ],
     [
       "SECURITY.md",
@@ -232,12 +232,20 @@
       "9961b568a378979ce03dc9e84493266aa86033dccda3aa3db30502392f574d20"
     ],
     [
+      "docs/assets/rillscope-mark.svg",
+      "db124077c4213501a1b097ea3871fd70e434c4ccf13235234f050091a1f84e02"
+    ],
+    [
       "docs/demo/README.md",
-      "5937b98506e360509197bc1e4eaf905967128c07ad14333d7dbb7728738b1ecb"
+      "168bfc2b79116e71ab00d010994bbf8a5a4fa5eccf7e9bb705eb5c033fef3939"
     ],
     [
       "docs/demo/rust-desktop.jpg",
       "34368b3170579ce2bed0b4333a89128f77aa516b0dc2110b0ed70bcf7f3ad968"
+    ],
+    [
+      "docs/demo/rust-execution-focus.jpg",
+      "7b8ef667cda97ef1968ad4ab9865f17de46f2f83c86d3ad2610f4cd71c257245"
     ],
     [
       "docs/demo/rust-report.html",
@@ -1376,7 +1384,7 @@
       "d93b88379c57f4282ff70bc216577f1a675e4521607fe0c5300796bed989d5cf"
     ]
   ],
-  "raw_stdout_sha256": "3a6948404903767d1d418fa73a85599bbf419baa0de9cefa45de43cb2028a006",
+  "raw_stdout_sha256": "0f149c84df89df8abce0d50327085f262680a100a532e5b60612ecb24a5a6b82",
   "raw_stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
   "rust_unit_results": [],
   "rust_test_names": [],
@@ -1384,7 +1392,6 @@
   "python_test_names": [],
   "observations": [
     {
-      "status": "PASS CURRENT PUBLIC DRAFT SCOPE/WORDING REVIEW",
       "review_kind": "independent-public-wording",
       "review_status": "PASS",
       "unsupported_maturity_claims": [],
@@ -1398,8 +1405,10 @@
         "CONTRIBUTING.md": "4837fa58ddb33a8a417efafd6222f5ae84a4ffe2cbe5c9e93114f91ab092c8b8",
         "DECISIONS.md": "a3e38ebea11478894883c2247030937fc77ac17fb75f780463e42cf22eb663d3",
         "DEPENDENCIES.md": "04873e2f11e4ffbc0133f958a7efbddff3cf62c94ff3b93af6078a05fe04eab7",
-        "docs/demo/README.md": "5937b98506e360509197bc1e4eaf905967128c07ad14333d7dbb7728738b1ecb",
+        "docs/assets/rillscope-mark.svg": "db124077c4213501a1b097ea3871fd70e434c4ccf13235234f050091a1f84e02",
+        "docs/demo/README.md": "168bfc2b79116e71ab00d010994bbf8a5a4fa5eccf7e9bb705eb5c033fef3939",
         "docs/demo/rust-desktop.jpg": "34368b3170579ce2bed0b4333a89128f77aa516b0dc2110b0ed70bcf7f3ad968",
+        "docs/demo/rust-execution-focus.jpg": "7b8ef667cda97ef1968ad4ab9865f17de46f2f83c86d3ad2610f4cd71c257245",
         "docs/demo/rust-report.html": "ee3188f2c36d95fbf88f98f293dcded72e55f3c36254541a7f167d318e6a64b0",
         "docs/reference-allocation.md": "cc57e2244230740f113ab03315b44b46417a40bca8c8264cd57b250d2ad37330",
         "EVALUATION.md": "8c1810a76699033ab2b73ebb51a762b8139b006863ba5211a4531464c7d34b0e",
@@ -1407,7 +1416,7 @@
         "LIMITATIONS.md": "d5ac1cb217942fdd4e6e7ae754d12e978733a4f614786988150d5439fd08868e",
         "OPERATIONS.md": "99bf958835ed6bdc519a593b779781b89392f7430a355f5d94352772bc791b53",
         "PRD.md": "66084216e750eac4d6a06f4a17d34fb63e12ed666d6cde997133102dc71f59e9",
-        "README.md": "2426cb1277045b1676955b0c6f6e0cc50cdf936ed47f7aae26cb42af033b0b9a",
+        "README.md": "17789f84d82da34acb106c808981cc20c18057e0875bb22b7c5b78c8e9d962fc",
         "scripts/demo.py": "b13d67ae512464fd095d5e5fa4031d5d8b733467a555cf7f70fdf3785fadf1d4",
         "scripts/demo_reference.py": "a4ad42e35a4c4b67038eccc408e8dbcabd50b0127096523923270b4153fb38b0",
         "SECURITY.md": "d3f52e94f3f5358ae59ae25c5b8039c2fb3c35a57f9dfec9598381819478f922",
@@ -1420,24 +1429,24 @@
         "tools/fixed_scope.py": "ab9ab4960f83834300343165d565aab8fd4e727ef5d4c74ec8bb8c40e17dc13e",
         "VERIFICATION_REPORT.md": "1c86db402ab8bfa87f907e58782cc636ff1c491efdc94d5fb338f6627ac1ebc9"
       },
-      "review_scope": "Actual main-chat read-only assessment with shared implementation history under PD023. All29current wording entries assessed: concise product docs, unchanged six locked contracts, unchanged legal inputs, true original benchmark figures, explicit AC008/libFuzzer gaps and historical screenshot scope. No new test/benchmark/browser execution or separate actor is claimed. Publication statements about private old history are conditional on the exact-ID private archive and clean public replacement postconditions; those remote transitions have NOT run yet.",
+      "source_sha256": "4c18d7b12772f2ab27effc36e9e6b987b350dde85dc77fa510dc012f5822977b",
+      "review_scope": "Public documentation review shares implementation history.27 unchanged entries match the retained prior review byte-for-byte. The four updated/new README/demo/banner/crop entries were assessed against unchanged implementation/contracts and recorded Rust/SQLite outputs. Actual displayed historical original and focused screenshot were compared: alpha3/40 and forbidden-column E_FORBIDDEN state match; no new browser run, keyboard test, screenshot capture, production readiness or independent actor is claimed. ",
       "checks": {
-        "public_paths_classified": 350,
-        "local_links_checked": 126,
-        "raw_logs_or_agent_instructions_in_public": false,
-        "locked_contracts_unchanged": true,
-        "runtime_tests_CI_methods_unchanged": true,
-        "original_reference_dependency_counts": {
-          "AC-021": 153,
-          "AC-022": 153,
-          "AC-023": 153,
-          "AC-024": 275,
-          "AC-025": 277
-        },
-        "historical_screenshot_not_current_visual_acceptance": true,
-        "privacy_errors": []
-      },
-      "source_sha256": "31b6238d78bf0fe590cdeb63f8a88cd4adee43058fb5a57bba693083460d2afa"
+        "wording_entries": 31,
+        "unchanged_prior_entries": 27,
+        "changed_or_added_entries": [
+          "README.md",
+          "docs/assets/rillscope-mark.svg",
+          "docs/demo/README.md",
+          "docs/demo/rust-execution-focus.jpg"
+        ],
+        "all_public_paths_have_purpose": 352,
+        "runtime_tests_methods_contracts_licenses_unchanged": 310,
+        "links_checked": 142,
+        "privacy_errors": [],
+        "live_ci_badge_not_replaced": true,
+        "historical_assets_not_current_visual_acceptance": true
+      }
     }
   ],
   "privacy": "curated summary only; raw private commands/stdout/stderr/model orchestration not published",

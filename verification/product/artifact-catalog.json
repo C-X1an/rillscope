@@ -35,8 +35,8 @@
     "path": "verification/product/runs/benchmark-distributions.json",
     "sha256": "bbaed43e74dbc5f942d390e9b15091010fed3dafc4bc84c4bd7e319a27df711a"
   },
-  "public-wording-review": {
+  "readme-wording-review": {
     "path": "verification/product/runs/public-wording-review.json",
-    "sha256": "8fc2c7365f3bd92c9c0d1a6f933854c234651df8692b15b02cdd0dfe0043c601"
+    "sha256": "3bbdcd9f9ead7fe7bd1e03bc9d9952e362319a286ae1585b58fea988e4f480bf"
   }
 }

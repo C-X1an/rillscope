@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="250" viewBox="0 0 1200 250" role="img" aria-labelledby="title desc">
+  <title id="title">RillScope visual identity</title>
+  <desc id="desc">A restrained dark green banner with a flowing scope symbol and three steps: bind, enforce, verify.</desc>
+  <rect width="1200" height="250" rx="18" fill="#12291f"/>
+  <path d="M0 194C160 132 242 242 402 177S690 134 834 178s262 15 366-48" fill="none" stroke="#4b7961" stroke-width="1.5" opacity=".32"/>
+  <path d="M0 216C160 154 242 264 402 199S690 156 834 200s262 15 366-48" fill="none" stroke="#4b7961" stroke-width="1" opacity=".18"/>
+  <rect x="48" y="55" width="113" height="113" rx="26" fill="#224636" stroke="#6fa787" stroke-width="1.8"/>
+  <path d="M75 101c15-25 30-25 45 0s30 25 45 0" fill="none" stroke="#c9ecd1" stroke-width="7" stroke-linecap="round" transform="translate(-3 5) scale(.79 1)"/>
+  <path d="M73 131h62" stroke="#c9ecd1" stroke-width="6" stroke-linecap="round"/>
+  <path d="M146 80v61" stroke="#e5bd78" stroke-width="5" stroke-linecap="round"/>
+  <text x="191" y="116" font-family="Arial,Helvetica,sans-serif" font-size="57" font-weight="700" letter-spacing="-2" fill="#f3f8ef">RillScope</text>
+  <text x="194" y="153" font-family="Arial,Helvetica,sans-serif" font-size="17" letter-spacing="2.6" fill="#afc8b5">SCOPED QUERIES. VERIFIED PLANS.</text>
+  <g font-family="Arial,Helvetica,sans-serif" font-size="17" font-weight="600" fill="#d5e6d9">
+    <rect x="838" y="85" width="100" height="53" rx="10" fill="#244d3a" stroke="#547c62"/>
+    <text x="888" y="118" text-anchor="middle">BIND</text>
+    <path d="M941 112h27" stroke="#a7c9b0" stroke-width="2" stroke-linecap="round"/>
+    <path d="m961 106 7 6-7 6" stroke="#a7c9b0" stroke-width="2" fill="none"/>
+    <rect x="975" y="85" width="103" height="53" rx="10" fill="#244d3a" stroke="#547c62"/>
+    <text x="1026" y="118" text-anchor="middle">POLICY</text>
+    <path d="M1080 112h26" stroke="#a7c9b0" stroke-width="2" stroke-linecap="round"/>
+    <path d="m1099 106 7 6-7 6" stroke="#a7c9b0" stroke-width="2" fill="none"/>
+    <rect x="1113" y="85" width="70" height="53" rx="10" fill="#456c49" stroke="#acd0a7"/>
+    <text x="1148" y="118" text-anchor="middle" font-size="13">VERIFY</text>
+  </g>
+</svg>
